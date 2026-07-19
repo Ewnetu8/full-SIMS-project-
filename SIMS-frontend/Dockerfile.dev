@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ExamSphere — AI-Powered Examination & Grading System
+# Dockerfile.dev — Development Image with Hot Reload Support
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# This file is NOT for production. It is optimised for the inner development
+# loop — fast startup, live code reload via volume mounts, and minimal rebuild
+# friction.
+#
+# How it works:
+#   • Source code is mounted from the host via Docker volumes, so any file
+#     save on the host is immediately visible inside the container.
+#   • Next.js Fast Refresh detects the change and hot-reloads only the
+#     affected module — no full page reload required.
+#   • node_modules live in a named volume managed by Docker, NOT on the host
+#     bind-mount. This prevents Windows/macOS host filesystem performance
+#     issues and avoids native module platform mismatches.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+FROM node:22-alpine
+
+# Install libc6-compat — needed by some native npm addons on Alpine (musl libc).
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# ── Dependency Installation ────────────────────────────────────────────────────
+# Copy only manifest files. Docker caches this layer. If package*.json is
+# unchanged between restarts, npm install is skipped entirely.
+COPY package.json package-lock.json* ./
+
+# Install all dependencies (including devDependencies, e.g., TypeScript, ESLint).
+# We intentionally do NOT use `npm ci --omit=dev` here — dev tools must be
+# present for the build pipeline to work inside the container.
+RUN npm install
+
+# ── Source Code ────────────────────────────────────────────────────────────────
+# Copy source. In development this is ALSO bind-mounted, so changes on the
+# host are reflected immediately. The COPY here ensures the image works even
+# if you run it without a compose bind-mount (e.g., `docker run` standalone).
+COPY . .
+
+# ── Runtime Configuration ─────────────────────────────────────────────────────
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Enable polling-based file watching for environments where inotify is
+# unavailable or unreliable (Windows WSL2, some VM setups).
+# Next.js will poll every 300 ms instead of relying on fs.watch events.
+ENV WATCHPACK_POLLING=true
+
+EXPOSE 3000
+
+# Start the Next.js development server with Turbopack for faster HMR.
+# (Remove --turbopack if your project uses a custom webpack config that is
+# not yet Turbopack-compatible.)
+CMD ["npm", "run", "dev"]
