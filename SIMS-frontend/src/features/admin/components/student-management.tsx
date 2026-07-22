@@ -1,0 +1,277 @@
+'use client';
+
+import {
+  GraduationCap,
+  Eye,
+  BookOpen,
+  Award,
+  Calendar,
+  CheckCircle,
+  Building,
+  Mail,
+} from 'lucide-react';
+import * as React from 'react';
+
+import {
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  SearchInput,
+} from '@/components/ui';
+import { useAdminStore } from '../store';
+import type { StudentProfile } from '../types';
+
+export function StudentManagement() {
+  const {
+    students,
+    departments,
+    studentSearchQuery,
+    studentDeptFilter,
+    setStudentSearchQuery,
+    setStudentDeptFilter,
+  } = useAdminStore();
+
+  const [selectedStudent, setSelectedStudent] = React.useState<StudentProfile | null>(null);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 5;
+
+  const filteredStudents = students.filter((s) => {
+    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const matchesSearch =
+      fullName.includes(studentSearchQuery.toLowerCase()) ||
+      s.email.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+      s.studentId.toLowerCase().includes(studentSearchQuery.toLowerCase());
+
+    const matchesDept = studentDeptFilter === 'ALL' || s.department === studentDeptFilter;
+
+    return matchesSearch && matchesDept;
+  });
+
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
+  const paginatedStudents = filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const selectClass =
+    'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground';
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+          <GraduationCap className="h-6 w-6 text-blue-500" /> Student Directory
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          View all enrolled student profiles, academic standings, programs, and course enrollments.
+        </p>
+      </div>
+
+      {/* Filter Bar */}
+      <Card className="p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <SearchInput
+              placeholder="Search by student name, ID, or email..."
+              value={studentSearchQuery}
+              onChange={(e) => {
+                setStudentSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              onClear={() => setStudentSearchQuery('')}
+            />
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
+              value={studentDeptFilter}
+              onChange={(e) => {
+                setStudentDeptFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="ALL">All Academic Departments</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      {/* Student List Table */}
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-border bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <tr>
+                <th className="px-4 py-3.5">Student ID</th>
+                <th className="px-4 py-3.5">Student Name</th>
+                <th className="px-4 py-3.5">Department</th>
+                <th className="px-4 py-3.5">Program</th>
+                <th className="px-4 py-3.5">Academic Year</th>
+                <th className="px-4 py-3.5">GPA</th>
+                <th className="px-4 py-3.5">Status</th>
+                <th className="px-4 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {paginatedStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No student profiles match your search criteria.
+                  </td>
+                </tr>
+              ) : (
+                paginatedStudents.map((std) => (
+                  <tr key={std.id} className="hover:bg-accent/40 transition-colors">
+                    <td className="px-4 py-3.5 font-mono text-xs font-semibold text-primary">{std.studentId}</td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold text-xs shrink-0">
+                          {std.firstName[0]}
+                          {std.lastName[0]}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">
+                            {std.firstName} {std.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{std.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{std.department}</td>
+                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{std.program}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{std.academicYear}</td>
+                    <td className="px-4 py-3.5">
+                      <Badge variant="outline" className="font-mono font-bold text-emerald-500 bg-emerald-500/10 border-emerald-500/20">
+                        {std.gpa.toFixed(2)}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <Badge variant={std.status === 'active' ? 'success' : 'secondary'} className="capitalize">
+                        {std.status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedStudent(std)}>
+                        <Eye className="h-4 w-4 mr-1" /> View Profile
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <span className="text-xs text-muted-foreground">
+              Page {currentPage} of {totalPages} ({filteredStudents.length} total students)
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Student Profile Modal */}
+      {selectedStudent && (
+        <Dialog open={!!selectedStudent} onOpenChange={() => setSelectedStudent(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-blue-500" /> Student Profile & Academic Record
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-3">
+              <div className="flex items-center gap-4 border-b border-border pb-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold text-xl">
+                  {selectedStudent.firstName[0]}
+                  {selectedStudent.lastName[0]}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {selectedStudent.firstName} {selectedStudent.lastName}
+                  </h3>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Mail className="h-3.5 w-3.5" /> {selectedStudent.email}
+                  </p>
+                  <p className="text-xs font-mono text-primary mt-1 font-semibold">
+                    ID: {selectedStudent.studentId}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 text-xs text-foreground">
+                <div className="flex justify-between py-1 border-b border-border/50">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Building className="h-3.5 w-3.5" /> Department:
+                  </span>
+                  <span className="font-medium text-right max-w-[200px]">{selectedStudent.department}</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-b border-border/50">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <BookOpen className="h-3.5 w-3.5" /> Program of Study:
+                  </span>
+                  <span className="font-medium">{selectedStudent.program}</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-b border-border/50">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" /> Current Academic Level:
+                  </span>
+                  <span className="font-medium">{selectedStudent.academicYear}</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-b border-border/50">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Award className="h-3.5 w-3.5" /> Cumulative GPA:
+                  </span>
+                  <span className="font-mono font-bold text-emerald-500">{selectedStudent.gpa.toFixed(2)} / 4.00</span>
+                </div>
+
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5" /> Enrolled Courses:
+                  </span>
+                  <span className="font-semibold text-foreground">{selectedStudent.enrolledCoursesCount} Courses</span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button onClick={() => setSelectedStudent(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
