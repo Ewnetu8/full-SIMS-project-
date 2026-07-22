@@ -3,43 +3,40 @@ from django.dispatch import receiver
 from django.contrib.auth.signals import user_logged_in, user_login_failed, user_logged_out
 from django.contrib.auth import get_user_model
 from audit.models import AuditLog
+from audit.utils import log_action
 from accounts.middleware import get_current_request, get_client_ip
 
 User = get_user_model()
 
 @receiver(user_logged_in)
 def log_login_success(sender, request, user, **kwargs):
-    ip = get_client_ip(request)
-    AuditLog.objects.create(
+    log_action(
         actor=user,
-        action_type="LOGIN_SUCCESS",
-        ip_address=ip,
-        payload_snapshot={"email": user.email}
+        action_type='LOGIN_SUCCESS',
+        request=request,
+        payload={'email': user.email},
     )
 
 
 @receiver(user_login_failed)
 def log_login_failure(sender, credentials, request, **kwargs):
-    ip = get_client_ip(request) if request else None
     attempted_email = credentials.get('username') or credentials.get('email') or 'Unknown'
-    AuditLog.objects.create(
+    log_action(
         actor=None,
-        action_type="LOGIN_FAILURE",
-        ip_address=ip,
-        payload_snapshot={"attempted_email": attempted_email}
+        action_type='LOGIN_FAILURE',
+        request=request,
+        payload={'attempted_email': attempted_email},
     )
 
 
 @receiver(user_logged_out)
 def log_logout(sender, request, user, **kwargs):
-    ip = get_client_ip(request) if request else None
-    if user:
-        AuditLog.objects.create(
-            actor=user,
-            action_type="LOGOUT",
-            ip_address=ip,
-            payload_snapshot={"email": user.email}
-        )
+    log_action(
+        actor=user,
+        action_type='LOGOUT',
+        request=request,
+        payload={'email': getattr(user, 'email', None)},
+    )
 
 
 @receiver(pre_save, sender=User)
