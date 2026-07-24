@@ -78,8 +78,8 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         email = validated_data.pop('email')
         password = validated_data.pop('password')
         role = validated_data.pop('role', RoleChoices.STUDENT)
-        first_name = validated_data.get('first_name', '')
-        last_name = validated_data.get('last_name', '')
+        first_name = validated_data.pop('first_name', '')
+        last_name = validated_data.pop('last_name', '')
         
         student_id = validated_data.pop('student_identifier', None)
         faculty_id = validated_data.pop('faculty_identifier', None)
