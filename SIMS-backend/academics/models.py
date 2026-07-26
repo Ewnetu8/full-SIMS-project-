@@ -1,6 +1,19 @@
 from django.db import models
 from common.models import BaseModel
 
+class University(BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    code = models.CharField(max_length=10, unique=True)
+
+    def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.upper().strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
 class Department(BaseModel):
     name = models.CharField(max_length=255, unique=True)
     code = models.CharField(max_length=10, unique=True)
@@ -36,7 +49,7 @@ class AcademicYear(BaseModel):
         return self.display_label
 
 
-class TermChoices(models.TextChoices):
+class SemesterChoices(models.TextChoices):
     FIRST = 'FIRST', 'First'
     SECOND = 'SECOND', 'Second'
     SUMMER = 'SUMMER', 'Summer'
@@ -48,13 +61,13 @@ class Semester(BaseModel):
         on_delete=models.CASCADE,
         related_name='semesters'
     )
-    term_index = models.CharField(
+    semester_index = models.CharField(
         max_length=10,
-        choices=TermChoices.choices
+        choices=SemesterChoices.choices
     )
 
     def __str__(self):
-        return f"{self.get_term_index_display()} ({self.academic_year.display_label})"
+        return f"{self.get_semester_index_display()} ({self.academic_year.display_label})"
 
 
 class Enrollment(BaseModel):
