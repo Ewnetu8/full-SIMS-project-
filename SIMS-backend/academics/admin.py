@@ -1,6 +1,15 @@
 from django.contrib import admin
-from academics.models import Department, Course, AcademicYear, Semester, Enrollment
 
+from academics.models import (
+    AcademicYear,
+    Course,
+    Department,
+    Enrollment,
+    Semester,
+    University,
+)
+
+admin.site.register(University)
 admin.site.register(Department)
 admin.site.register(Course)
 admin.site.register(AcademicYear)
