@@ -7,6 +7,13 @@ class RoleChoices(models.TextChoices):
     LECTURER = 'LECTURER', 'Lecturer'
     STUDENT = 'STUDENT', 'Student'
 
+class ClassStandingChoices(models.TextChoices):
+    FRESHMAN = 'FRESHMAN', 'Freshman'
+    SOPHOMORE = 'SOPHOMORE', 'Sophomore'
+    JUNIOR = 'JUNIOR', 'Junior'
+    SENIOR = 'SENIOR', 'Senior'
+    GRADUATE = 'GRADUATE', 'Graduate'
+
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, role=RoleChoices.STUDENT, **extra_fields):
         if not email:
@@ -76,6 +83,11 @@ class Student(BaseModel):
         null=True,
         blank=True,
         related_name='students'
+    )
+    class_standing = models.CharField(
+        max_length=20,
+        choices=ClassStandingChoices.choices,
+        default=ClassStandingChoices.FRESHMAN
     )
 
     def __str__(self):
