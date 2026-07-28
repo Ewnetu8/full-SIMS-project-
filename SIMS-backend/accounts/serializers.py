@@ -9,19 +9,20 @@ from academics.models import Department
 class UserResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'created_at')
+        fields = ('id', 'email', 'first_name', 'last_name', 'national_id_fan', 'role', 'created_at')
         read_only_fields = fields
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    national_id_fan = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     student_identifier = serializers.CharField(required=False, write_only=True)
     faculty_identifier = serializers.CharField(required=False, write_only=True)
     department_id = serializers.UUIDField(required=False, write_only=True, allow_null=True)
 
     class Meta:
         model = User
-        fields = ('email', 'password', 'first_name', 'last_name', 'role', 
+        fields = ('email', 'password', 'first_name', 'last_name', 'national_id_fan', 'role', 
                   'student_identifier', 'faculty_identifier', 'department_id')
 
     def validate_email(self, value):

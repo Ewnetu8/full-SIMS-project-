@@ -1,7 +1,11 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 from common.models import BaseModel
+from accounts.models import ClassStandingChoices
+from academics.services import check_prerequisite_cycle
 
-class Department(BaseModel):
+
+class University(BaseModel):
     name = models.CharField(max_length=255, unique=True)
     code = models.CharField(max_length=10, unique=True)
 
@@ -14,17 +18,74 @@ class Department(BaseModel):
         return f"{self.name} ({self.code})"
 
 
-class Course(BaseModel):
-    department = models.ForeignKey(
-        Department,
-        on_delete=models.PROTECT,
-        related_name='courses'
+class College(BaseModel):
+    university = models.ForeignKey(
+        University,
+        on_delete=models.CASCADE,
+        related_name='colleges'
     )
-    title = models.CharField(max_length=255)
-    course_code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=255, unique=True)
+    code = models.CharField(max_length=10, unique=True)
+
+    def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.upper().strip()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.course_code} - {self.title}"
+        return f"{self.name} ({self.code})"
+
+
+class Department(BaseModel):
+    college = models.ForeignKey(
+        College,
+        on_delete=models.CASCADE,
+        related_name='departments',
+        null=True,
+        blank=True
+    )
+    name = models.CharField(max_length=255, unique=True)
+    code = models.CharField(max_length=10, unique=True)
+
+    def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.upper().strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class DegreeLevelChoices(models.TextChoices):
+    BACHELOR = 'BACHELOR', 'Bachelor'
+    MASTER = 'MASTER', 'Master'
+    DOCTORATE = 'DOCTORATE', 'Doctorate'
+    DIPLOMA = 'DIPLOMA', 'Diploma'
+    CERTIFICATE = 'CERTIFICATE', 'Certificate'
+
+
+class Program(BaseModel):
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        related_name='programs'
+    )
+    name = models.CharField(max_length=255)
+    code = models.CharField(max_length=20, unique=True)
+    degree_level = models.CharField(
+        max_length=20,
+        choices=DegreeLevelChoices.choices,
+        default=DegreeLevelChoices.BACHELOR
+    )
+    total_credit_hours_required = models.PositiveIntegerField(default=120)
+
+    def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.upper().strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} [{self.degree_level}] ({self.code})"
 
 
 class AcademicYear(BaseModel):
@@ -36,7 +97,7 @@ class AcademicYear(BaseModel):
         return self.display_label
 
 
-class TermChoices(models.TextChoices):
+class SemesterChoices(models.TextChoices):
     FIRST = 'FIRST', 'First'
     SECOND = 'SECOND', 'Second'
     SUMMER = 'SUMMER', 'Summer'
@@ -48,13 +109,149 @@ class Semester(BaseModel):
         on_delete=models.CASCADE,
         related_name='semesters'
     )
-    term_index = models.CharField(
+    semester_index = models.CharField(
         max_length=10,
-        choices=TermChoices.choices
+        choices=SemesterChoices.choices
     )
 
+    class Meta:
+        unique_together = ('academic_year', 'semester_index')
+
     def __str__(self):
-        return f"{self.get_term_index_display()} ({self.academic_year.display_label})"
+        return f"{self.get_semester_index_display()} ({self.academic_year.display_label})"
+
+
+class Course(BaseModel):
+    program = models.ForeignKey(
+        Program,
+        on_delete=models.PROTECT,
+        related_name='courses',
+        null=True,
+        blank=True
+    )
+    title = models.CharField(max_length=255)
+    course_code = models.CharField(max_length=20, unique=True)
+    credit_hours = models.PositiveIntegerField(default=3)
+    intended_class_standing = models.CharField(
+        max_length=20,
+        choices=ClassStandingChoices.choices,
+        default=ClassStandingChoices.FRESHMAN
+    )
+
+    def save(self, *args, **kwargs):
+        if self.course_code:
+            self.course_code = self.course_code.upper().strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.course_code} - {self.title}"
+
+
+class CoursePrerequisite(BaseModel):
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='prerequisites'
+    )
+    prerequisite_course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='prerequisite_for'
+    )
+
+    class Meta:
+        unique_together = ('course', 'prerequisite_course')
+
+    def clean(self):
+        super().clean()
+        if self.course_id and self.prerequisite_course_id:
+            check_prerequisite_cycle(self.course, self.prerequisite_course)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.course.course_code} requires {self.prerequisite_course.course_code}"
+
+
+class CourseOffering(BaseModel):
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='offerings'
+    )
+    semester = models.ForeignKey(
+        Semester,
+        on_delete=models.CASCADE,
+        related_name='offerings'
+    )
+    section = models.CharField(max_length=10, default="A")
+    capacity = models.PositiveIntegerField(default=50)
+
+    class Meta:
+        unique_together = ('course', 'semester', 'section')
+
+    def __str__(self):
+        return f"{self.course.course_code} ({self.semester}) - Sec {self.section}"
+
+
+class CreditHourPolicy(BaseModel):
+    class_standing = models.CharField(
+        max_length=20,
+        choices=ClassStandingChoices.choices,
+        unique=True
+    )
+    min_credit_hours = models.PositiveIntegerField(default=12)
+    max_credit_hours = models.PositiveIntegerField(default=18)
+
+    def __str__(self):
+        return f"{self.class_standing}: {self.min_credit_hours}-{self.max_credit_hours} hrs"
+
+
+class OverrideTypeChoices(models.TextChoices):
+    PREREQUISITE = 'PREREQUISITE', 'Prerequisite'
+    STANDING = 'STANDING', 'Standing'
+    CREDIT_LIMIT = 'CREDIT_LIMIT', 'Credit Limit'
+    DUPLICATE = 'DUPLICATE', 'Duplicate'
+    ALL = 'ALL', 'All'
+
+
+class EnrollmentOverride(BaseModel):
+    student = models.ForeignKey(
+        'accounts.Student',
+        on_delete=models.CASCADE,
+        related_name='enrollment_overrides'
+    )
+    semester = models.ForeignKey(
+        Semester,
+        on_delete=models.CASCADE,
+        related_name='enrollment_overrides'
+    )
+    override_type = models.CharField(
+        max_length=20,
+        choices=OverrideTypeChoices.choices,
+        default=OverrideTypeChoices.ALL
+    )
+    approved_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_overrides'
+    )
+    reason = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Override [{self.override_type}] for {self.student.student_identifier} ({self.semester})"
+
+
+class EnrollmentStatusChoices(models.TextChoices):
+    ENROLLED = 'ENROLLED', 'Enrolled'
+    PASSED = 'PASSED', 'Passed'
+    FAILED = 'FAILED', 'Failed'
+    DROPPED = 'DROPPED', 'Dropped'
 
 
 class Enrollment(BaseModel):
@@ -63,19 +260,24 @@ class Enrollment(BaseModel):
         on_delete=models.CASCADE,
         related_name='enrollments'
     )
-    course = models.ForeignKey(
-        Course,
+    course_offering = models.ForeignKey(
+        CourseOffering,
         on_delete=models.CASCADE,
-        related_name='enrollments'
+        related_name='enrollments',
+        null=True,
+        blank=True
     )
-    semester = models.ForeignKey(
-        Semester,
-        on_delete=models.CASCADE,
-        related_name='enrollments'
+    status = models.CharField(
+        max_length=20,
+        choices=EnrollmentStatusChoices.choices,
+        default=EnrollmentStatusChoices.ENROLLED
     )
+    is_retake = models.BooleanField(default=False)
+    grade = models.CharField(max_length=5, blank=True, null=True)
 
     class Meta:
-        unique_together = ('student', 'course', 'semester')
+        unique_together = ('student', 'course_offering')
 
     def __str__(self):
-        return f"{self.student.student_identifier} - {self.course.course_code}"
+        offering_str = str(self.course_offering) if self.course_offering else "No Offering"
+        return f"{self.student.student_identifier} - {offering_str} ({self.status})"
