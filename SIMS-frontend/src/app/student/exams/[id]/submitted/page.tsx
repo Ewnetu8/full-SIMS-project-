@@ -3,11 +3,11 @@
 import { useParams, useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 
+import { ROUTES } from '@/constants/routes';
 import { SubmissionSuccess } from '@/features/examination/components';
 import { examinationService } from '@/features/examination/services';
 import { useExaminationStore } from '@/features/examination/store/examination-store';
-import { SubmissionReceipt } from '@/features/examination/types/examination.types';
-import { ROUTES } from '@/constants/routes';
+import { type SubmissionReceipt } from '@/features/examination/types/examination.types';
 
 export default function ExamSubmittedPage() {
   const params = useParams();
@@ -40,7 +40,7 @@ export default function ExamSubmittedPage() {
   if (!receipt) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500" />
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
       </div>
     );
   }

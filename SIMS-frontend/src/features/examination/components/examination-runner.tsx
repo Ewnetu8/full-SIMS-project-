@@ -17,10 +17,13 @@ import {
   DialogTitle,
 } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { examinationService } from '../services';
 import { useExaminationStore } from '../store';
-import type { ExaminationAnswer, ExaminationSession } from '../types';
+
 import { AutoSaveIndicator, ExaminationQuestionCard } from './question-card';
+
+import type { ExaminationAnswer, ExaminationSession } from '../types';
 
 const hasAnswer = (answer: ExaminationAnswer | undefined): boolean =>
   Array.isArray(answer) ? answer.length > 0 : Boolean(answer?.trim());

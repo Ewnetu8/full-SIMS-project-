@@ -6,7 +6,9 @@ import * as React from 'react';
 
 import { Badge, Button, Card, CardContent } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { lecturerService } from '../services';
+
 import type { LecturerExam } from '../types';
 
 const TYPE_LABELS: Record<string, string> = {

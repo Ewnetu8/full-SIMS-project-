@@ -22,7 +22,9 @@ import {
   DialogTitle,
   SearchInput,
 } from '@/components/ui';
+
 import { useAdminStore } from '../store';
+
 import type { LecturerProfile } from '../types';
 
 export function LecturerManagement() {
@@ -57,7 +59,7 @@ export function LecturerManagement() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <UserCheck className="h-6 w-6 text-indigo-500" /> Lecturer & Faculty Directory
+          <UserCheck className="h-6 w-6 text-primary" /> Lecturer & Faculty Directory
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           View assigned faculty members, department affiliations, offices, and course responsibilities.
@@ -118,10 +120,10 @@ export function LecturerManagement() {
               ) : (
                 filteredLecturers.map((lec) => (
                   <tr key={lec.id} className="hover:bg-accent/40 transition-colors">
-                    <td className="px-4 py-3.5 font-mono text-xs font-semibold text-indigo-500">{lec.lecturerId}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs font-semibold text-primary">{lec.lecturerId}</td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500 font-bold text-xs shrink-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
                           {lec.firstName[0]}
                           {lec.lastName[0]}
                         </div>
@@ -168,13 +170,13 @@ export function LecturerManagement() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-indigo-500" /> Faculty Member Profile
+                <UserCheck className="h-5 w-5 text-primary" /> Faculty Member Profile
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4 py-3">
               <div className="flex items-center gap-4 border-b border-border pb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500 font-bold text-xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl">
                   {selectedLecturer.firstName[0]}
                   {selectedLecturer.lastName[0]}
                 </div>
@@ -185,7 +187,7 @@ export function LecturerManagement() {
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Mail className="h-3.5 w-3.5" /> {selectedLecturer.email}
                   </p>
-                  <p className="text-xs font-mono text-indigo-500 mt-1 font-semibold">
+                  <p className="text-xs font-mono text-primary mt-1 font-semibold">
                     ID: {selectedLecturer.lecturerId}
                   </p>
                 </div>

@@ -1,6 +1,8 @@
 import * as React from 'react';
-import type { Metadata } from 'next';
+
 import { LecturerShell, CourseDetail } from '@/features/lecturer/components';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Course Details — ExamSphere',

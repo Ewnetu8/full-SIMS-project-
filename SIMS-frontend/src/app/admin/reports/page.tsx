@@ -1,5 +1,6 @@
-import type { Metadata } from 'next';
 import { AdminShell, ReportsAnalytics } from '@/features/admin/components';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Reports & Analytics — ExamSphere Admin',

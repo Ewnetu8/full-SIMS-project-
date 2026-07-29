@@ -6,9 +6,7 @@ import {
   BarChart3,
   BookOpen,
   BrainCircuit,
-  Check,
   ChevronDown,
-  ChevronRight,
   ClipboardCheck,
   Cloud,
   FileCheck2,
@@ -18,9 +16,7 @@ import {
   Mail,
   MapPin,
   Menu,
-  MessageSquare,
   Phone,
-  Shield,
   Sparkles,
   Users,
   X,
@@ -34,9 +30,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Input,
   Textarea,
 } from '@/components/ui';
@@ -253,95 +246,6 @@ function SectionTitle({
   );
 }
 
-// ─── Landing-page feature data ────────────────────────────────────────────────
-
-const landingFeatures = [
-  {
-    Icon: BrainCircuit,
-    title: 'AI-powered grading',
-    description: 'Evaluate objective and structured responses with consistent, explainable AI assistance that reduces lecturer workload without removing human oversight.',
-    tag: 'Saves ~40% grading time',
-    color: {
-      bg: 'bg-card',
-      border: 'border-indigo-500/80 dark:border-indigo-500',
-      text: 'text-card-foreground',
-      hover: 'hover:bg-accent/40',
-      icon: 'text-indigo-600 dark:text-indigo-400',
-      tag: 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300',
-    },
-  },
-  {
-    Icon: FileCheck2,
-    title: 'Online examinations',
-    description: 'Create, schedule, and deliver secure digital assessments from one place. Supports multiple question types including essay and structured response.',
-    tag: 'Secure & monitored',
-    color: {
-      bg: 'bg-card',
-      border: 'border-blue-500/80 dark:border-blue-500',
-      text: 'text-card-foreground',
-      hover: 'hover:bg-accent/40',
-      icon: 'text-blue-600 dark:text-blue-400',
-      tag: 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
-    },
-  },
-  {
-    Icon: Zap,
-    title: 'Instant results',
-    description: 'Turn completed assessments into clear results and personalised feedback the moment a submission is reviewed — no days-long wait.',
-    tag: 'Same-day feedback',
-    color: {
-      bg: 'bg-card',
-      border: 'border-emerald-500/80 dark:border-emerald-500',
-      text: 'text-card-foreground',
-      hover: 'hover:bg-accent/40',
-      icon: 'text-emerald-600 dark:text-emerald-400',
-      tag: 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
-    },
-  },
-  {
-    Icon: LineChart,
-    title: 'Live analytics',
-    description: 'Spot cohort trends and learning gaps with purposeful academic reporting. Drill down to individual or class-level performance at any time.',
-    tag: 'Real-time data',
-    color: {
-      bg: 'bg-card',
-      border: 'border-amber-500/80 dark:border-amber-500',
-      text: 'text-card-foreground',
-      hover: 'hover:bg-accent/40',
-      icon: 'text-amber-600 dark:text-amber-400',
-      tag: 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-    },
-  },
-  {
-    Icon: Shield,
-    title: 'Secure by design',
-    description: 'Role-aware access, secure authentication, and thoughtful institutional controls protect every assessment and sensitive academic record.',
-    tag: 'RBAC & audit logs',
-    color: {
-      bg: 'bg-card',
-      border: 'border-rose-500/80 dark:border-rose-500',
-      text: 'text-card-foreground',
-      hover: 'hover:bg-accent/40',
-      icon: 'text-rose-600 dark:text-rose-400',
-      tag: 'bg-rose-500/10 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
-    },
-  },
-  {
-    Icon: GraduationCap,
-    title: 'Built for every role',
-    description: 'A unified experience tailored for students, lecturers, and administrators. No context switching — every role has exactly what it needs.',
-    tag: 'Students · Lecturers · Admins',
-    color: {
-      bg: 'bg-card',
-      border: 'border-purple-500/80 dark:border-purple-500',
-      text: 'text-card-foreground',
-      hover: 'hover:bg-accent/40',
-      icon: 'text-purple-600 dark:text-purple-400',
-      tag: 'bg-purple-500/10 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
-    },
-  },
-] as const;
-
 // ─── Preserved export used by FeaturesContent ─────────────────────────────────
 const features = [
   [BrainCircuit, 'AI-powered grading', 'Evaluate objective and structured responses with consistent, explainable AI assistance.'],
@@ -380,7 +284,7 @@ function HeroGraphic() {
       <circle cx="280" cy="200" r="68" fill="currentColor" className="text-primary/8" />
 
       {/* Document card */}
-      <rect x="80" y="90" width="200" height="260" rx="12" fill="currentColor" className="text-card" stroke="currentColor" strokeWidth="1" style={{stroke: 'var(--border)'}} />
+      <rect x="80" y="90" width="200" height="260" rx="12" fill="currentColor" className="text-card" stroke="currentColor" strokeWidth="1" style={{ stroke: 'var(--border)' }} />
       <rect x="100" y="116" width="120" height="8" rx="4" fill="currentColor" className="text-primary/60" />
       <rect x="100" y="136" width="160" height="6" rx="3" fill="currentColor" className="text-muted-foreground/30" />
       <rect x="100" y="150" width="140" height="6" rx="3" fill="currentColor" className="text-muted-foreground/30" />
@@ -390,7 +294,7 @@ function HeroGraphic() {
       <line x1="100" y1="186" x2="260" y2="186" stroke="currentColor" strokeWidth="1" className="text-border" />
 
       {/* Question rows */}
-      {[0,1,2,3].map((i) => (
+      {[0, 1, 2, 3].map((i) => (
         <React.Fragment key={i}>
           <rect x="100" y={200 + i * 28} width="12" height="12" rx="3" fill="currentColor" className={i === 1 ? 'text-primary/70' : 'text-muted-foreground/20'} />
           <rect x="120" y={203 + i * 28} width={100 + (i % 3) * 20} height="6" rx="3" fill="currentColor" className="text-muted-foreground/25" />
@@ -401,7 +305,7 @@ function HeroGraphic() {
       <rect x="100" y="316" width="80" height="22" rx="6" fill="currentColor" className="text-primary/80" />
 
       {/* Floating result chip */}
-      <rect x="290" y="140" width="130" height="52" rx="10" fill="currentColor" className="text-card" stroke="currentColor" strokeWidth="1" style={{stroke: 'var(--border)'}} />
+      <rect x="290" y="140" width="130" height="52" rx="10" fill="currentColor" className="text-card" stroke="currentColor" strokeWidth="1" style={{ stroke: 'var(--border)' }} />
       <circle cx="310" cy="166" r="8" fill="currentColor" className="text-success/70" />
       <rect x="326" y="158" width="60" height="6" rx="3" fill="currentColor" className="text-muted-foreground/40" />
       <rect x="326" y="170" width="40" height="5" rx="2.5" fill="currentColor" className="text-muted-foreground/25" />
@@ -494,61 +398,10 @@ export function HomeContent() {
       </section>
 
 
-      {/* ── Features ─────────────────────────────────────────────────── */}
-      <section className="border-t border-border bg-background px-5 py-20 lg:px-8" aria-labelledby="features-heading">
-        <div className="mx-auto max-w-7xl">
-        <div className="mb-14 max-w-2xl">
-
-          <h2 id="features-heading" className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            A better assessment experience, end&nbsp;to&nbsp;end.
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground">
-            Every capability is intentionally connected &mdash; from question creation to insight delivery.
-          </p>
-        </div>
-
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, amount: 0.1 }}
-          className="space-y-3"
-        >
-          {landingFeatures.map(({ Icon, title, description, tag, color }) => (
-            <motion.div
-              key={title}
-              variants={staggerItem}
-              role="alert"
-              className={[
-                'flex flex-col gap-4 rounded-lg border-l-4 p-4',
-                'transition duration-300 ease-in-out hover:scale-[1.015]',
-                'sm:flex-row sm:items-start sm:gap-6 md:p-5',
-                color.bg, color.border, color.text, color.hover,
-              ].join(' ')}
-            >
-              {/* Icon */}
-              <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${color.icon}`} />
-
-              {/* Text */}
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <p className="text-sm font-semibold">{title}</p>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${color.tag}`}>
-                    {tag}
-                  </span>
-                </div>
-                <p className="text-xs leading-relaxed opacity-80">{description}</p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-        </div>
-      </section>
-
       {/* ── How It Works — vertical stepper ──────────────────────────── */}
       <section
         id="how-it-works"
-        className="border-y border-border bg-muted/25 py-20"
+        className="border-b border-border bg-muted/25 py-20"
         aria-labelledby="how-heading"
       >
         <div className="mx-auto max-w-7xl px-5 lg:px-8">
@@ -984,14 +837,14 @@ export function ContentPage({
   children,
 }: {
   title: string;
-  eyebrow: string;
+  eyebrow?: string;
   description: string;
   children: React.ReactNode;
 }) {
   return (
     <>
       <section className="border-b border-border bg-muted/30 px-5 py-20 text-center">
-        <Eyebrow>{eyebrow}</Eyebrow>
+        {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <h1 className="mx-auto max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">{description}</p>
       </section>
@@ -1003,7 +856,6 @@ export function ContentPage({
 export function FeaturesContent() {
   return (
     <ContentPage
-      eyebrow="Platform capabilities"
       title="Designed for better assessment decisions."
       description="Every feature is intentionally connected, so institutions can move from a question to a clearer outcome without friction."
     >
@@ -1042,7 +894,6 @@ export function AboutContent() {
   ];
   return (
     <ContentPage
-      eyebrow="About ExamSphere"
       title="Technology in service of better learning."
       description="We believe assessment should be a moment of progress—not a bottleneck for the people who care about it."
     >
@@ -1083,7 +934,6 @@ export function ContactContent() {
   };
   return (
     <ContentPage
-      eyebrow="Contact"
       title="Let's talk about your assessment goals."
       description="Send a message and our team will follow up."
     >
@@ -1149,15 +999,15 @@ export function LegalContent({ type }: { type: 'privacy' | 'terms' }) {
   const privacy = type === 'privacy';
   const sections = privacy
     ? [
-        ['Information we collect', 'This policy describes information you may provide through the platform, such as account details and support requests.'],
-        ['How information is used', 'Information may be used to operate the service, provide support, improve the product, and meet applicable obligations.'],
-        ['Your choices', 'Institutions and users have clear ways to review, update, or request deletion of their information.'],
-      ]
+      ['Information we collect', 'This policy describes information you may provide through the platform, such as account details and support requests.'],
+      ['How information is used', 'Information may be used to operate the service, provide support, improve the product, and meet applicable obligations.'],
+      ['Your choices', 'Institutions and users have clear ways to review, update, or request deletion of their information.'],
+    ]
     : [
-        ['Using the service', 'This describes the expected responsible use of ExamSphere by authorized institutional users.'],
-        ['Institutional responsibility', 'Institutions are responsible for their users, assessment content, and compliance with applicable education policies.'],
-        ['Service availability', 'We aim to provide a reliable service while reserving the right to maintain and improve it over time.'],
-      ];
+      ['Using the service', 'This describes the expected responsible use of ExamSphere by authorized institutional users.'],
+      ['Institutional responsibility', 'Institutions are responsible for their users, assessment content, and compliance with applicable education policies.'],
+      ['Service availability', 'We aim to provide a reliable service while reserving the right to maintain and improve it over time.'],
+    ];
   return (
     <ContentPage
       eyebrow="Legal"

@@ -83,7 +83,7 @@ export function Sidebar({
       <div className="flex h-14 items-center border-b border-sidebar-border px-4 shrink-0">
         {logo ?? (
           <Link href="/" className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-ai-primary text-white text-sm font-bold shadow-sm">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold shadow-sm">
               E
             </span>
             <AnimatePresence>
@@ -164,7 +164,7 @@ function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
         'group flex items-center gap-3 rounded-lg px-2 py-2 text-sm',
         'transition-all duration-200 relative',
         isActive
-          ? 'bg-sidebar-primary text-white font-medium shadow-sm'
+          ? 'border-l-3 border-sidebar-primary bg-sidebar-accent text-sidebar-foreground font-medium'
           : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent',
       )}
       aria-current={isActive ? 'page' : undefined}

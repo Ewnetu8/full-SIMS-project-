@@ -25,7 +25,9 @@ import {
   Progress,
   SearchInput,
 } from '@/components/ui';
+
 import { useAdminStore } from '../store';
+
 import type { AdminExamOverview } from '../types';
 
 export function ExaminationManagement() {
@@ -74,7 +76,7 @@ export function ExaminationManagement() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6 text-sky-500" /> Institutional Examination Management
+          <ClipboardCheck className="h-6 w-6 text-primary" /> Institutional Examination Management
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Monitor examination sessions, participation metrics, publication statuses, and archive records.
@@ -124,7 +126,7 @@ export function ExaminationManagement() {
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="font-mono text-xs font-bold text-emerald-500">{exam.courseCode}</span>
+                    <span className="font-mono text-xs font-bold text-success">{exam.courseCode}</span>
                     <h3 className="text-base font-semibold text-foreground mt-0.5">{exam.title}</h3>
                     <p className="text-xs text-muted-foreground">{exam.courseName}</p>
                   </div>
@@ -146,15 +148,15 @@ export function ExaminationManagement() {
 
                 <div className="space-y-1.5 text-xs text-muted-foreground pt-1">
                   <div className="flex items-center gap-2">
-                    <UserCheck className="h-3.5 w-3.5 text-indigo-400" />
+                    <UserCheck className="h-3.5 w-3.5 text-primary" />
                     <span>Lecturer: <strong className="text-foreground">{exam.lecturerName}</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 text-sky-400" />
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
                     <span>Window: {exam.startDate} — {exam.endDate}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 text-amber-400" />
+                    <Clock className="h-3.5 w-3.5 text-accent" />
                     <span>Duration: {exam.durationMinutes} Minutes</span>
                   </div>
                 </div>
@@ -180,13 +182,13 @@ export function ExaminationManagement() {
                 </Button>
                 {exam.status !== 'archived' && (
                   <Button variant="outline" size="sm" onClick={() => handleArchive(exam)}>
-                    <Archive className="h-4 w-4 mr-1 text-amber-500" /> Archive
+                    <Archive className="h-4 w-4 mr-1 text-accent" /> Archive
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => setDeletingExam(exam)}
                 >
                   <Trash2 className="h-4 w-4 mr-1" /> Remove
@@ -203,13 +205,13 @@ export function ExaminationManagement() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <ClipboardCheck className="h-5 w-5 text-sky-500" /> Examination Details
+                <ClipboardCheck className="h-5 w-5 text-primary" /> Examination Details
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4 py-3 text-xs text-foreground">
               <div>
-                <span className="font-mono font-bold text-emerald-500">{selectedExam.courseCode}</span>
+                <span className="font-mono font-bold text-success">{selectedExam.courseCode}</span>
                 <h3 className="text-base font-bold text-foreground mt-0.5">{selectedExam.title}</h3>
                 <p className="text-muted-foreground">{selectedExam.courseName}</p>
               </div>
@@ -237,7 +239,7 @@ export function ExaminationManagement() {
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground">Student Submissions:</span>
-                  <span className="font-bold text-emerald-500">
+                  <span className="font-bold text-success">
                     {selectedExam.participatedStudents} of {selectedExam.totalStudents} Students
                   </span>
                 </div>

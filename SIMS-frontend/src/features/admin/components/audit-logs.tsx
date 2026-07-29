@@ -8,6 +8,7 @@ import * as React from 'react';
 
 import { toast } from '@/components/feedback';
 import { Badge, Button, Card, SearchInput } from '@/components/ui';
+
 import { useAdminStore } from '../store';
 
 export function AuditLogs() {
@@ -46,7 +47,7 @@ export function AuditLogs() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6 text-amber-500" /> Security & System Audit Trail
+            <ShieldAlert className="h-6 w-6 text-accent" /> Security & System Audit Trail
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Immutable log of all user logins, administrative actions, exam publications, settings updates, and AI jobs.

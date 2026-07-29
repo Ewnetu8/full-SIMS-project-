@@ -1,4 +1,5 @@
 import { mockExaminationSessions } from '../mock/examination-data';
+
 import type { ExaminationAnswer, ExaminationSession, SubmissionReceipt } from '../types';
 
 /** Replace these mock operations with Django REST Framework requests when the API is available. */

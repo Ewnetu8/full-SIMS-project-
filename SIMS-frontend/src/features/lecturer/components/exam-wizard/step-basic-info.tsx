@@ -15,8 +15,10 @@ import {
   SelectValue,
   Textarea,
 } from '@/components/ui';
+
 import { lecturerService } from '../../services';
 import { useLecturerStore } from '../../store';
+
 import type { Course } from '../../types';
 
 interface StepBasicInfoProps {

@@ -20,6 +20,7 @@ import {
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -37,8 +38,9 @@ import {
   Input,
   SearchInput,
 } from '@/components/ui';
-import { Label } from '@/components/forms';
+
 import { useAdminStore } from '../store';
+
 import type { AdminUser, UserRole, UserStatus } from '../types';
 
 export function UserManagement() {
@@ -291,9 +293,9 @@ export function UserManagement() {
                         }
                         className="capitalize gap-1"
                       >
-                        {user.role === 'admin' && <Shield className="h-3 w-3 text-amber-400" />}
-                        {user.role === 'lecturer' && <UserCheck className="h-3 w-3 text-indigo-400" />}
-                        {user.role === 'student' && <GraduationCap className="h-3 w-3 text-blue-400" />}
+                        {user.role === 'admin' && <Shield className="h-3 w-3 text-accent" />}
+                        {user.role === 'lecturer' && <UserCheck className="h-3 w-3 text-primary" />}
+                        {user.role === 'student' && <GraduationCap className="h-3 w-3 text-primary" />}
                         {user.role}
                       </Badge>
                     </td>
@@ -336,16 +338,16 @@ export function UserManagement() {
                           <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
                             {user.status === 'active' ? (
                               <>
-                                <XCircle className="h-4 w-4 mr-2 text-amber-500" /> Deactivate
+                                <XCircle className="h-4 w-4 mr-2 text-accent" /> Deactivate
                               </>
                             ) : (
                               <>
-                                <CheckCircle className="h-4 w-4 mr-2 text-emerald-500" /> Activate
+                                <CheckCircle className="h-4 w-4 mr-2 text-success" /> Activate
                               </>
                             )}
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-rose-500 focus:text-rose-500"
+                            className="text-destructive focus:text-destructive"
                             onClick={() => setDeletingUser(user)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" /> Delete Account

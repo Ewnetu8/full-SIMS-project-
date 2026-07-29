@@ -14,6 +14,7 @@ import {
 } from '@/components/charts';
 import { toast } from '@/components/feedback';
 import { Button } from '@/components/ui';
+
 import { INITIAL_REPORT_DATA } from '../mock';
 
 export function ReportsAnalytics() {

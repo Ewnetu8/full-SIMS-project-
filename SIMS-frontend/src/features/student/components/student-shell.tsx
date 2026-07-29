@@ -6,9 +6,11 @@ import * as React from 'react';
 
 import { DashboardLayout } from '@/components/layout';
 import { NotificationDropdown } from '@/components/navigation';
-import type { NavItem } from '@/components/layout/sidebar';
 import { ROUTES } from '@/constants';
+
 import { studentService } from '../services';
+
+import type { NavItem } from '@/components/layout/sidebar';
 
 const studentNavigation: NavItem[] = [
   { label: 'Overview', href: ROUTES.STUDENT.DASHBOARD, icon: <LayoutDashboard className="h-4 w-4" /> },

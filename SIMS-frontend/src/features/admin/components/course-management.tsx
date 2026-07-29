@@ -10,6 +10,7 @@ import {
 import * as React from 'react';
 
 import { toast } from '@/components/feedback';
+import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -23,8 +24,9 @@ import {
   Input,
   SearchInput,
 } from '@/components/ui';
-import { Label } from '@/components/forms';
+
 import { useAdminStore } from '../store';
+
 import type { Course } from '../types';
 
 export function CourseManagement() {
@@ -142,7 +144,7 @@ export function CourseManagement() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-emerald-500" /> Course Catalogue & Management
+            <BookOpen className="h-6 w-6 text-success" /> Course Catalogue & Management
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Create, configure, and assign faculty lecturers to academic courses across all departments.
@@ -208,7 +210,7 @@ export function CourseManagement() {
               ) : (
                 filteredCourses.map((crs) => (
                   <tr key={crs.id} className="hover:bg-accent/40 transition-colors">
-                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-emerald-500">{crs.code}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-success">{crs.code}</td>
                     <td className="px-4 py-3.5 font-semibold text-foreground">{crs.name}</td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground">{crs.creditHours} Hrs</td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{crs.department}</td>
@@ -226,11 +228,11 @@ export function CourseManagement() {
                       <Button variant="ghost" size="sm" onClick={() => handleToggleArchive(crs)}>
                         {crs.status === 'active' ? (
                           <>
-                            <Archive className="h-4 w-4 mr-1 text-amber-500" /> Archive
+                            <Archive className="h-4 w-4 mr-1 text-accent" /> Archive
                           </>
                         ) : (
                           <>
-                            <RotateCcw className="h-4 w-4 mr-1 text-emerald-500" /> Restore
+                            <RotateCcw className="h-4 w-4 mr-1 text-success" /> Restore
                           </>
                         )}
                       </Button>

@@ -1,8 +1,11 @@
 'use client';
 
 import * as React from 'react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+
 import { lecturerService } from '../services';
+
 import type { LecturerAnalytics } from '../types';
 
 // Simple bar chart using CSS/SVG (no external chart lib needed)

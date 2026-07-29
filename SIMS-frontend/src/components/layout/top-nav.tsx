@@ -90,7 +90,7 @@ export function TopNav({
         className="flex items-center gap-2 lg:hidden"
         aria-label="ExamSphere home"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-primary to-ai-primary text-white text-xs font-bold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
           E
         </span>
         <span className="font-semibold text-sm">ExamSphere</span>

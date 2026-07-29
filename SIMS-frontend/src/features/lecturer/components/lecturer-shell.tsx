@@ -13,11 +13,13 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { DashboardLayout } from '@/components/layout';
-import type { NavItem } from '@/components/layout/sidebar';
 import { NotificationDropdown } from '@/components/navigation';
 import { Button } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { lecturerService } from '../services';
+
+import type { NavItem } from '@/components/layout/sidebar';
 
 const lecturerNavigation: NavItem[] = [
   { label: 'Overview', href: ROUTES.LECTURER.DASHBOARD, icon: <LayoutDashboard className="h-4 w-4" /> },

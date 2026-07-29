@@ -16,6 +16,7 @@ import * as React from 'react';
 
 import { Badge, Button, Card } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { useAdminStore } from '../store';
 
 export function DepartmentDetail() {
@@ -59,7 +60,7 @@ export function DepartmentDetail() {
       <Card className="p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 font-bold font-mono text-xl">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold font-mono text-xl">
               {dept.code}
             </div>
             <div>
@@ -67,7 +68,7 @@ export function DepartmentDetail() {
               <p className="text-xs text-muted-foreground mt-0.5">Established {dept.createdAt}</p>
             </div>
           </div>
-          <Badge variant="outline" className="self-start sm:self-auto border-purple-500/30 text-purple-400 bg-purple-500/10">
+          <Badge variant="outline" className="self-start sm:self-auto border-primary/30 text-primary bg-primary/10">
             Active Department
           </Badge>
         </div>
@@ -78,7 +79,7 @@ export function DepartmentDetail() {
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-3.5 rounded-lg border border-border bg-muted/20 flex items-center gap-3">
-            <UserCheck className="h-5 w-5 text-indigo-500" />
+            <UserCheck className="h-5 w-5 text-primary" />
             <div>
               <p className="text-[10px] text-muted-foreground font-semibold uppercase">Head of Department</p>
               <p className="text-xs font-bold text-foreground">{dept.headOfDepartment.name}</p>
@@ -86,7 +87,7 @@ export function DepartmentDetail() {
           </div>
 
           <div className="p-3.5 rounded-lg border border-border bg-muted/20 flex items-center gap-3">
-            <BookOpen className="h-5 w-5 text-emerald-500" />
+            <BookOpen className="h-5 w-5 text-success" />
             <div>
               <p className="text-[10px] text-muted-foreground font-semibold uppercase">Curriculum Courses</p>
               <p className="text-xs font-bold text-foreground">{deptCourses.length} Courses Offered</p>
@@ -94,7 +95,7 @@ export function DepartmentDetail() {
           </div>
 
           <div className="p-3.5 rounded-lg border border-border bg-muted/20 flex items-center gap-3">
-            <GraduationCap className="h-5 w-5 text-blue-500" />
+            <GraduationCap className="h-5 w-5 text-primary" />
             <div>
               <p className="text-[10px] text-muted-foreground font-semibold uppercase">Student Enrollment</p>
               <p className="text-xs font-bold text-foreground">{dept.studentCount} Enrolled</p>
@@ -108,7 +109,7 @@ export function DepartmentDetail() {
         {/* Associated Courses */}
         <Card className="p-5">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-            <BookOpen className="h-4 w-4 text-emerald-500" /> Department Courses ({deptCourses.length})
+            <BookOpen className="h-4 w-4 text-success" /> Department Courses ({deptCourses.length})
           </h2>
           <div className="mt-4 space-y-3">
             {deptCourses.length === 0 ? (
@@ -118,7 +119,7 @@ export function DepartmentDetail() {
                 <div key={crs.id} className="p-3 rounded-lg border border-border flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-emerald-500">{crs.code}</span>
+                      <span className="font-mono text-xs font-bold text-success">{crs.code}</span>
                       <span className="text-xs font-semibold text-foreground">{crs.name}</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -137,7 +138,7 @@ export function DepartmentDetail() {
         {/* Assigned Lecturers */}
         <Card className="p-5">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-            <UserCheck className="h-4 w-4 text-indigo-500" /> Department Faculty Members ({deptLecturers.length})
+            <UserCheck className="h-4 w-4 text-primary" /> Department Faculty Members ({deptLecturers.length})
           </h2>
           <div className="mt-4 space-y-3">
             {deptLecturers.length === 0 ? (
@@ -146,7 +147,7 @@ export function DepartmentDetail() {
               deptLecturers.map((lec) => (
                 <div key={lec.id} className="p-3 rounded-lg border border-border flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500 font-bold text-xs">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
                       {lec.firstName[0]}
                       {lec.lastName[0]}
                     </div>

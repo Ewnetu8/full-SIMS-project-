@@ -1,16 +1,4 @@
 import { create } from 'zustand';
-import type {
-  AdminUser,
-  StudentProfile,
-  LecturerProfile,
-  Department,
-  Course,
-  AdminExamOverview,
-  AIGradingJob,
-  AuditLog,
-  SystemSettings,
-  AdminNotification,
-} from '../types';
 
 import {
   INITIAL_USERS,
@@ -24,6 +12,20 @@ import {
   INITIAL_SETTINGS,
   INITIAL_NOTIFICATIONS,
 } from '../mock';
+
+import type {
+  AdminUser,
+  StudentProfile,
+  LecturerProfile,
+  Department,
+  Course,
+  AdminExamOverview,
+  AIGradingJob,
+  AuditLog,
+  SystemSettings,
+  AdminNotification,
+} from '../types';
+
 
 interface AdminStoreState {
   // Datasets
