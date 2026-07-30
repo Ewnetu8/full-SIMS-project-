@@ -7,6 +7,13 @@ class QuestionTypeChoices(models.TextChoices):
     ESSAY = 'ESSAY', 'Essay'
 
 
+class Tag(BaseModel):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Question(BaseModel):
     examination = models.ForeignKey(
         'exams.Examination',
@@ -26,6 +33,7 @@ class Question(BaseModel):
         choices=QuestionTypeChoices.choices
     )
     total_points = models.DecimalField(max_digits=5, decimal_places=2)
+    tags = models.ManyToManyField(Tag, related_name='questions', blank=True)
 
     def __str__(self):
         return f"[{self.question_type}] {self.question_text[:50]}"
@@ -42,3 +50,19 @@ class QuestionOption(BaseModel):
 
     def __str__(self):
         return f"Option: {self.option_text[:30]} ({'Correct' if self.is_correct else 'Incorrect'})"
+
+
+class RubricCriterion(BaseModel):
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.CASCADE,
+        related_name='rubric_criteria'
+    )
+    criterion_text = models.TextField()
+    point_weight = models.DecimalField(max_digits=5, decimal_places=2)
+
+    class Meta:
+        unique_together = ('question', 'criterion_text')
+
+    def __str__(self):
+        return f"Criterion: {self.criterion_text[:50]} ({self.point_weight} pts)"
