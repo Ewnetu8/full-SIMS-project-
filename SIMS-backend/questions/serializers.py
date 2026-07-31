@@ -111,6 +111,7 @@ class QuestionSerializer(serializers.ModelSerializer):
             "question_text",
             "question_type",
             "total_points",
+            "is_active",
             "tags",
             "tag_ids",
             "options",

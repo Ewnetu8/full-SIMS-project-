@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from exams.models import StudentAnswer
 
 from questions.models import Question, QuestionOption, RubricCriterion, Tag
 from questions.serializers import (
@@ -28,8 +29,8 @@ def get_lecturer_write_permissions(request):
 
 # QUESTION VIEWS
 class QuestionListView(APIView):
-    def get_permissions(self):
-        return get_lecturer_write_permissions(self.request)
+    """Question list / create — restricted to LECTURERs (and ADMINs via HasRole)."""
+    permission_classes = [IsAuthenticated, HasRole("LECTURER")]
 
     @extend_schema(
         tags=["Question"],
@@ -82,8 +83,8 @@ class QuestionListView(APIView):
 
 
 class QuestionDetailView(APIView):
-    def get_permissions(self):
-        return get_lecturer_write_permissions(self.request)
+    """Question retrieve / update / delete — restricted to LECTURERs (and ADMINs)."""
+    permission_classes = [IsAuthenticated, HasRole("LECTURER")]
 
     def get_object(self, pk):
         try:
@@ -150,8 +151,17 @@ class QuestionDetailView(APIView):
 
     @extend_schema(
         tags=["Question"],
-        summary="Delete question",
-        responses={204: OpenApiResponse(description="Deleted.")},
+        summary="Delete (or soft-delete) question — SRS §9.3",
+        description=(
+            "Enforces the no-delete-if-linked business rule (SRS §9.3). "
+            "If the question is referenced by any Examination or StudentAnswer the request "
+            "performs a soft-delete by setting is_active=False and returns HTTP 200. "
+            "Unlinked questions are also soft-deleted for audit consistency."
+        ),
+        responses={
+            200: OpenApiResponse(description="Question soft-deleted (is_active set to False)."),
+            404: OpenApiResponse(description="Question not found."),
+        },
     )
     def delete(self, request, pk):
         obj = self.get_object(pk)
@@ -159,8 +169,22 @@ class QuestionDetailView(APIView):
             return Response(
                 {"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND
             )
-        obj.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        # §9.3: soft-delete via is_active flag — protects referential integrity
+        # for past/current examinations and preserves audit trail.
+        is_linked = (
+            obj.examination_id is not None
+            or StudentAnswer.objects.filter(question=obj).exists()
+        )
+        obj.is_active = False
+        obj.save(update_fields=["is_active", "updated_at"])
+
+        msg = (
+            "Question soft-deleted; it is still referenced by an examination or student answers."
+            if is_linked
+            else "Question soft-deleted."
+        )
+        return Response({"detail": msg, "is_active": False}, status=status.HTTP_200_OK)
 
 
 # QUESTION OPTION VIEWS

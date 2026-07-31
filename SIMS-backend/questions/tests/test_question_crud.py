@@ -266,6 +266,7 @@ def test_question_partial_update(client):
 
 
 def test_question_delete(client):
+    """Delete now performs a soft-delete (§9.3): sets is_active=False, returns 200."""
     admin = create_admin()
     token = auth_client(client, admin)
     exam = setup_exam()
@@ -277,8 +278,12 @@ def test_question_delete(client):
 
     url = reverse("question_detail", kwargs={"pk": question.pk})
     response = client.delete(url, HTTP_AUTHORIZATION=f"Bearer {token}")
-    assert response.status_code == status.HTTP_204_NO_CONTENT
-    assert not Question.objects.filter(pk=question.pk).exists()
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["is_active"] is False
+    # Record still exists but is deactivated
+    question.refresh_from_db()
+    assert question.is_active is False
+    assert Question.objects.filter(pk=question.pk).exists()
 
 
 def test_non_admin_cannot_create(client):
