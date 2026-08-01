@@ -65,9 +65,11 @@ export function Brand() {
       href={ROUTES.HOME}
       className="flex items-center gap-2 font-semibold text-foreground no-underline hover:no-underline"
     >
-      <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-        E
-      </span>
+      <img 
+        src="/images/aastu-logo.jpg" 
+        alt="AASTU Logo" 
+        className="h-8 w-auto rounded-md bg-white p-1 shrink-0" 
+      />
       <span>{APP_NAME}</span>
     </Link>
   );

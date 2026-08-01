@@ -89,7 +89,7 @@ export function AIGradingMonitor() {
 
       {/* Stats Breakdown Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-4 border-l-4 border-l-amber-500">
+        <Card className="p-4 border-l-4 border-l-warning">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Pending in Queue</span>
             <Clock className="h-4 w-4 text-accent" />
@@ -111,7 +111,7 @@ export function AIGradingMonitor() {
           </div>
         </Card>
 
-        <Card className="p-4 border-l-4 border-l-emerald-500">
+        <Card className="p-4 border-l-4 border-l-success">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Completed Batches</span>
             <CheckCircle2 className="h-4 w-4 text-success" />
@@ -122,7 +122,7 @@ export function AIGradingMonitor() {
           </div>
         </Card>
 
-        <Card className="p-4 border-l-4 border-l-rose-500">
+        <Card className="p-4 border-l-4 border-l-destructive">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Failed Jobs (Flagged)</span>
             <AlertTriangle className="h-4 w-4 text-destructive" />

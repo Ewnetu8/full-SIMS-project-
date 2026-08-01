@@ -88,12 +88,10 @@ export function TopNav({
       <Link
         href="/"
         className="flex items-center gap-2 lg:hidden"
-        aria-label="ExamSphere home"
+        aria-label="AASTU home"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
-          E
-        </span>
-        <span className="font-semibold text-sm">ExamSphere</span>
+        <img src="/images/aastu-logo.jpg" alt="AASTU Logo" className="h-6 w-auto rounded-md bg-white p-0.5 shrink-0" />
+        <span className="font-semibold text-sm">AASTU Grading</span>
       </Link>
 
       {/* Centre slot */}

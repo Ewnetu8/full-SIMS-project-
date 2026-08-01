@@ -4,7 +4,7 @@ import type { ThemeMode } from '@/types';
 
 export const THEME_MODES: ThemeMode[] = ['light', 'dark', 'system'];
 
-export const DEFAULT_THEME: ThemeMode = 'system';
+export const DEFAULT_THEME: ThemeMode = 'light';
 
 export const THEME_STORAGE_KEY = 'examsphere-theme';
 

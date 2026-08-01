@@ -575,7 +575,7 @@ export const INITIAL_SETTINGS: SystemSettings = {
   academicYear: '2025-2026',
   activeSemester: 'Semester 2 (Spring)',
   branding: {
-    primaryColor: '#3b82f6',
+    primaryColor: '#102A7A',
     darkThemeDefault: true,
     portalTitle: 'ExamSphere Institutional Portal',
   },

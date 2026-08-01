@@ -96,8 +96,8 @@ export function ReportsAnalytics() {
           data={performanceData}
           xKey="name"
           lines={[
-            { key: 'avg', name: 'Average Score (%)', color: '#3b82f6' },
-            { key: 'passRate', name: 'Pass Rate (%)', color: '#10b981' },
+            { key: 'avg', name: 'Average Score (%)', color: 'var(--chart-1)' },
+            { key: 'passRate', name: 'Pass Rate (%)', color: 'var(--chart-2)' },
           ]}
         />
 
@@ -108,7 +108,7 @@ export function ReportsAnalytics() {
           data={deptData}
           xKey="name"
           bars={[
-            { key: 'passRate', name: 'Pass Rate (%)', color: '#8b5cf6' },
+            { key: 'passRate', name: 'Pass Rate (%)', color: 'var(--chart-3)' },
           ]}
         />
 
@@ -119,8 +119,8 @@ export function ReportsAnalytics() {
           data={aiData}
           xKey="name"
           areas={[
-            { key: 'automated', name: 'Automated AI Graded', color: '#ec4899' },
-            { key: 'manual', name: 'Manual Override / Review', color: '#f59e0b' },
+            { key: 'automated', name: 'Automated AI Graded', color: 'var(--chart-4)' },
+            { key: 'manual', name: 'Manual Override / Review', color: 'var(--chart-5)' },
           ]}
         />
 
@@ -142,8 +142,8 @@ export function ReportsAnalytics() {
           data={usageData}
           xKey="name"
           bars={[
-            { key: 'students', name: 'Active Students', color: '#06b6d4' },
-            { key: 'lecturers', name: 'Active Lecturers', color: '#6366f1' },
+            { key: 'students', name: 'Active Students', color: 'var(--chart-1)' },
+            { key: 'lecturers', name: 'Active Lecturers', color: 'var(--chart-2)' },
           ]}
           height={320}
         />

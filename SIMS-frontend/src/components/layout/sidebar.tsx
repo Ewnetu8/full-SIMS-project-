@@ -83,9 +83,7 @@ export function Sidebar({
       <div className="flex h-14 items-center border-b border-sidebar-border px-4 shrink-0">
         {logo ?? (
           <Link href="/" className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold shadow-sm">
-              E
-            </span>
+            <img src="/images/aastu-logo.jpg" alt="AASTU Logo" className="h-7 w-auto rounded-md bg-white p-0.5 shrink-0" />
             <AnimatePresence>
               {!collapsed && (
                 <motion.span
@@ -96,7 +94,7 @@ export function Sidebar({
                   transition={{ duration: 0.2 }}
                   className="font-semibold text-sidebar-foreground text-sm overflow-hidden whitespace-nowrap"
                 >
-                  ExamSphere
+                  AASTU Grading
                 </motion.span>
               )}
             </AnimatePresence>
