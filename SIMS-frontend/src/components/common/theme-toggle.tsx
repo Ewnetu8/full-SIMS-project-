@@ -44,7 +44,7 @@ export function ThemeToggle({ variant = 'cycle', className }: ThemeToggleProps) 
     : theme === 'dark' ? 'dark' : 'light';
 
   if (variant === 'cycle') {
-    const nextTheme: Record<string, string> = {
+    const nextTheme: Record<string, ThemeMode> = {
       light: 'dark',
       dark: 'light',
     };
@@ -52,7 +52,7 @@ export function ThemeToggle({ variant = 'cycle', className }: ThemeToggleProps) 
     return (
       <button
         type="button"
-        onClick={() => setTheme(nextTheme[current])}
+        onClick={() => setTheme(nextTheme[current] as ThemeMode)}
         className={cn(
           'inline-flex items-center justify-center rounded-md p-2',
           'text-foreground/70 hover:text-foreground',
