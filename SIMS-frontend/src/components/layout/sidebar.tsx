@@ -162,8 +162,8 @@ function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
         'group flex items-center gap-3 rounded-lg px-2 py-2 text-sm',
         'transition-all duration-200 relative',
         isActive
-          ? 'border-l-3 border-sidebar-primary bg-sidebar-accent text-sidebar-foreground font-medium'
-          : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent',
+          ? 'bg-sidebar-accent text-white [&_svg]:text-white font-semibold shadow-xs'
+          : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/10',
       )}
       aria-current={isActive ? 'page' : undefined}
     >
@@ -183,7 +183,14 @@ function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
         )}
       </AnimatePresence>
       {!collapsed && item.badge !== undefined && (
-        <span className="ml-auto rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+        <span
+          className={cn(
+            'ml-auto rounded-full px-1.5 py-0.5 text-xs font-medium',
+            isActive
+              ? 'bg-white/20 text-white'
+              : 'bg-primary/15 text-primary',
+          )}
+        >
           {item.badge}
         </span>
       )}
