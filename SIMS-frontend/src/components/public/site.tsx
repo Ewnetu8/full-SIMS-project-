@@ -866,7 +866,7 @@ export function FeaturesContent() {
           {features.slice(0, 6).map(([Icon, title, desc], i) => (
             <motion.article
               {...fade}
-              key={title}
+              key={i}
               className="grid gap-8 rounded-2xl border border-border bg-card p-7 md:grid-cols-[.8fr_1.2fr] md:p-10"
             >
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">

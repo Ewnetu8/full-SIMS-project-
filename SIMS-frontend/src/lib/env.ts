@@ -6,10 +6,10 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   // Backend API base URL — required in all environments
-  NEXT_PUBLIC_API_URL: z
+  NEXT_PUBLIC_API_BASE_URL: z
     .string()
-    .url('NEXT_PUBLIC_API_URL must be a valid URL')
-    .default('http://localhost:8000/api/v1'),
+    .url('NEXT_PUBLIC_API_BASE_URL must be a valid URL')
+    .default('http://localhost:8000'),
 
   // Application public URL — used for canonical links and OG meta
   NEXT_PUBLIC_APP_URL: z
@@ -25,7 +25,7 @@ const envSchema = z.object({
 
 // Validate and throw a readable error if any required vars are missing
 const parsed = envSchema.safeParse({
-  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NODE_ENV: process.env.NODE_ENV,
 });

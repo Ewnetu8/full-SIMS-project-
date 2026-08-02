@@ -7,7 +7,9 @@ import axios, {
 
 import { useAuthStore } from '@/features/auth/store';
 import { env } from '@/lib/env';
+import { API_ENDPOINTS } from '@/constants';
 import { createApiError } from '@/lib/errors';
+import { toast } from '@/components/feedback';
 
 import type { ApiErrorResponse } from '@/types';
 
@@ -22,7 +24,7 @@ import type { ApiErrorResponse } from '@/types';
  */
 function createApiClient(): AxiosInstance {
   const client = axios.create({
-    baseURL: env.NEXT_PUBLIC_API_URL,
+    baseURL: env.NEXT_PUBLIC_API_BASE_URL,
     timeout: 15_000, // 15 s
     headers: {
       'Content-Type': 'application/json',
@@ -58,10 +60,59 @@ function createApiClient(): AxiosInstance {
         );
       }
 
-      const apiError = createApiError(response.data as ApiErrorResponse);
+      // Normalise the backend response into the ApiErrorResponse shape.
+      // Django REST Framework uses `detail` (string) for error messages,
+      // but our frontend ApiErrorResponse expects `message` + `statusCode`.
+      const raw = response.data as Record<string, unknown> | undefined;
+      const normalised: ApiErrorResponse = {
+        message:
+          (raw?.message as string) ||
+          (raw?.detail as string) ||
+          (typeof raw?.detail === 'object' && raw?.detail !== null
+            ? JSON.stringify(raw.detail)
+            : '') ||
+          '',
+        statusCode: (raw?.statusCode as number) || response.status,
+        errors: (raw?.errors as Record<string, string[]>) ?? undefined,
+        timestamp: (raw?.timestamp as string) || new Date().toISOString(),
+      };
 
-      if (response.status === 401) {
+      const apiError = createApiError(normalised);
+
+      const isAuthEndpoint =
+        error.config?.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
+        error.config?.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
+        error.config?.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
+
+      if (response.status === 401 && !isAuthEndpoint) {
+        try {
+          // Attempt to refresh the token using raw axios to avoid interceptor loops
+          const refreshRes = await axios.post<{ access_token?: string; access?: string; accessToken?: string }>(
+            `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
+            {},
+            { withCredentials: true }
+          );
+          
+          // The exact field name depends on the backend framework (access, access_token, etc)
+          const newAccessToken = refreshRes.data.access || refreshRes.data.access_token || refreshRes.data.accessToken || '';
+          
+          if (newAccessToken) {
+            useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
+            // Retry the original request
+            if (error.config) {
+              error.config.headers.set('Authorization', `Bearer ${newAccessToken}`);
+              return client(error.config);
+            }
+          }
+        } catch (refreshError) {
+          // If refresh fails, clear the session
+          useAuthStore.getState().clearSession();
+          toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+          return Promise.reject(apiError);
+        }
+      } else if (response.status === 401 && !isAuthEndpoint) {
         useAuthStore.getState().clearSession();
+        toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
       }
 
       return Promise.reject(apiError);

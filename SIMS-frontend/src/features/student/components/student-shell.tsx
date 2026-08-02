@@ -8,6 +8,7 @@ import { DashboardLayout } from '@/components/layout';
 import { NotificationDropdown } from '@/components/navigation';
 import { ROUTES } from '@/constants';
 
+import { useRouteProtection } from '@/features/auth/hooks';
 import { studentService } from '../services';
 
 import type { NavItem } from '@/components/layout/sidebar';
@@ -24,6 +25,9 @@ const studentNavigation: NavItem[] = [
 export function StudentShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [notifications, setNotifications] = React.useState(() => studentService.getNotifications());
+
+  useRouteProtection(['student']);
+
   const unread = notifications.filter((notification) => !notification.read);
 
   return (

@@ -20,6 +20,7 @@
  */
 
 import { apiClient } from '@/services';
+import { API_ENDPOINTS } from '@/constants';
 
 import type {
   LoginCredentials,
@@ -32,59 +33,107 @@ import type {
 } from '../types';
 import type { BaseUser } from '@/types';
 
-const BASE = '/auth';
-
 export const authApi = {
   /**
-   * POST /api/auth/login/
-   * DRF returns: { user: {...}, access: "...", refresh: "..." }
-   * (Adapter needed to map `access` → `accessToken`, etc.)
+   * POST /api/v1/auth/register
+   */
+  register: (data: any): Promise<{ message: string; user?: BaseUser }> =>
+    apiClient
+      .post<{ message: string; user?: BaseUser }>(API_ENDPOINTS.AUTH.REGISTER, data)
+      .then((r) => {
+        if (r.data?.user) {
+          const u = r.data.user as any;
+          if (u.first_name) { u.firstName = u.first_name; delete u.first_name; }
+          if (u.last_name) { u.lastName = u.last_name; delete u.last_name; }
+          if (u.role) u.role = u.role.toLowerCase();
+        }
+        return r.data;
+      }),
+
+  /**
+   * POST /api/v1/auth/login
    */
   login: (credentials: LoginCredentials): Promise<AuthLoginResponse> =>
     apiClient
-      .post<AuthLoginResponse>(`${BASE}/login/`, credentials)
-      .then((r) => r.data),
+      .post<AuthLoginResponse>(API_ENDPOINTS.AUTH.LOGIN, credentials)
+      .then(async (r) => {
+        if (r.data?.user) {
+          const u = r.data.user as any;
+          if (u.first_name) { u.firstName = u.first_name; delete u.first_name; }
+          if (u.last_name) { u.lastName = u.last_name; delete u.last_name; }
+          if (u.role) u.role = u.role.toLowerCase();
+        }
+        
+        // Synchronize Next.js edge middleware session cookie
+        try {
+          await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: r.data.user.id,
+              role: r.data.user.role,
+              exp: r.data.tokens?.expiresAt || Date.now() + 8 * 60 * 60 * 1000,
+              rememberMe: credentials.rememberMe,
+            }),
+          });
+        } catch (e) {
+          console.error('Failed to sync session cookie:', e);
+        }
+
+        return r.data;
+      }),
 
   /**
-   * POST /api/auth/logout/
-   * Sends the refresh token so the server can blacklist it.
+   * POST /api/v1/auth/logout
    */
-  logout: (refreshToken: string): Promise<void> =>
+  logout: (): Promise<void> =>
     apiClient
-      .post<void>(`${BASE}/logout/`, { refreshToken })
-      .then(() => undefined),
+      .post<void>(API_ENDPOINTS.AUTH.LOGOUT, {})
+      .then(async () => {
+        try {
+          await fetch('/api/auth/session', { method: 'DELETE' });
+        } catch (e) {
+          console.error('Failed to clear session cookie:', e);
+        }
+      }),
 
   /**
-   * POST /api/auth/forgot-password/
+   * POST /api/v1/auth/forgot-password
    */
   forgotPassword: (payload: ForgotPasswordPayload): Promise<ForgotPasswordResponse> =>
     apiClient
-      .post<ForgotPasswordResponse>(`${BASE}/forgot-password/`, payload)
+      .post<ForgotPasswordResponse>(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, payload)
       .then((r) => r.data),
 
   /**
-   * POST /api/auth/reset-password/
+   * POST /api/v1/auth/reset-password
    */
   resetPassword: (payload: ResetPasswordPayload): Promise<ResetPasswordResponse> =>
     apiClient
-      .post<ResetPasswordResponse>(`${BASE}/reset-password/`, payload)
+      .post<ResetPasswordResponse>(API_ENDPOINTS.AUTH.RESET_PASSWORD, payload)
       .then((r) => r.data),
 
   /**
-   * POST /api/auth/token/refresh/
-   * simplejwt returns: { access: "..." }
+   * POST /api/v1/auth/refresh
    */
-  refreshToken: (refreshToken: string): Promise<RefreshTokenResponse> =>
+  refreshToken: (): Promise<RefreshTokenResponse> =>
     apiClient
-      .post<RefreshTokenResponse>(`${BASE}/token/refresh/`, { refresh: refreshToken })
+      .post<RefreshTokenResponse>(API_ENDPOINTS.AUTH.REFRESH, {})
       .then((r) => r.data),
 
   /**
-   * GET /api/auth/me/
-   * Returns the currently authenticated user's profile.
+   * GET /api/v1/auth/me
    */
   getMe: (): Promise<{ user: BaseUser }> =>
     apiClient
-      .get<{ user: BaseUser }>(`${BASE}/me/`)
-      .then((r) => r.data),
+      .get<{ user: BaseUser }>(API_ENDPOINTS.AUTH.ME)
+      .then((r) => {
+        if (r.data?.user) {
+          const u = r.data.user as any;
+          if (u.first_name) { u.firstName = u.first_name; delete u.first_name; }
+          if (u.last_name) { u.lastName = u.last_name; delete u.last_name; }
+          if (u.role) u.role = u.role.toLowerCase();
+        }
+        return r.data;
+      }),
 };

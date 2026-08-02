@@ -25,6 +25,7 @@ import { Button } from '@/components/ui';
 import { ROUTES } from '@/constants';
 
 import { useAdminStore } from '../store';
+import { useRouteProtection } from '@/features/auth/hooks';
 
 import type { NavItem } from '@/components/layout/sidebar';
 
@@ -52,6 +53,8 @@ export interface AdminShellProps {
 export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
   const router = useRouter();
   const { notifications, markAllNotificationsRead } = useAdminStore();
+
+  useRouteProtection(['admin']);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

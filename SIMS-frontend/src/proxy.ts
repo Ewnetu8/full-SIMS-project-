@@ -44,7 +44,12 @@ export function proxy(request: NextRequest) {
   }
 
   if (isAuthOnly && session) {
-    return NextResponse.redirect(new URL(getHomeByRole(session.role), request.url));
+    const home = getHomeByRole(session.role);
+    if (home !== ROUTES.HOME) {
+      return NextResponse.redirect(new URL(home, request.url));
+    }
+    // If home === ROUTES.HOME, the role is invalid (stale session).
+    // Let the request proceed to /login so the client-side code can clear the session.
   }
 
   if (session && isProtected && !hasRoleAccess(session.role, pathname)) {
@@ -59,5 +64,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|$|login|about|features|contact|privacy|terms).*)',
+  ],
 };

@@ -10,6 +10,8 @@ import { UserDropdown } from '@/components/navigation';
 import { IconButton, Tooltip } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/store';
 import { cn } from '@/lib';
+import { getUserDisplayName } from '@/utils/string';
+import { toast } from '@/components/feedback';
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -49,13 +51,14 @@ export function TopNav({
 
   const handleLogout = async () => {
     await logout();
+    toast.success('You have been logged out successfully.', { id: 'auth-logout' });
     router.replace('/login');
   };
 
   const defaultUserMenu = user ? (
     <UserDropdown
       user={{
-        name: `${user.firstName} ${user.lastName}`.trim(),
+        name: getUserDisplayName(user),
         email: user.email,
         role: user.role,
         avatarUrl: user.avatarUrl,
