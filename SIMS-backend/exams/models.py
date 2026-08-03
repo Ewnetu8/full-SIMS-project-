@@ -8,10 +8,18 @@ class ExamStatusChoices(models.TextChoices):
     CLOSED = 'CLOSED', 'Closed'
     PUBLISHED = 'PUBLISHED', 'Published'
 
+# a rule table so exams can only move forward
+EXAM_STATUS_TRANSITIONS = {
+    ExamStatusChoices.DRAFT: {ExamStatusChoices.SCHEDULED},
+    ExamStatusChoices.SCHEDULED: {ExamStatusChoices.ACTIVE},
+    ExamStatusChoices.ACTIVE: {ExamStatusChoices.CLOSED},
+    ExamStatusChoices.CLOSED: {ExamStatusChoices.PUBLISHED},
+}
+
 
 class Examination(BaseModel):
-    course = models.ForeignKey(
-        'academics.Course',
+    course_offering = models.ForeignKey(
+        'academics.CourseOffering',
         on_delete=models.PROTECT,
         related_name='examinations'
     )
@@ -31,7 +39,19 @@ class Examination(BaseModel):
     duration_minutes = models.PositiveIntegerField()
 
     def __str__(self):
-        return f"{self.title} ({self.course.course_code})"
+        return f"{self.title} ({self.course_offering.course.course_code})"
+
+    def can_transition_to(self, new_status):
+        if new_status == self.status:
+            return True
+        return new_status in EXAM_STATUS_TRANSITIONS.get(self.status, set())
+
+    @property
+    def questions_editable(self):
+        return self.status in (
+            ExamStatusChoices.DRAFT,
+            ExamStatusChoices.SCHEDULED,
+        )
 
 
 class ExamAttempt(BaseModel):
