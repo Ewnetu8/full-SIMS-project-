@@ -8,10 +8,18 @@ class ExamStatusChoices(models.TextChoices):
     CLOSED = 'CLOSED', 'Closed'
     PUBLISHED = 'PUBLISHED', 'Published'
 
+# a rule table so exams can only move forward
+EXAM_STATUS_TRANSITIONS = {
+    ExamStatusChoices.DRAFT: {ExamStatusChoices.SCHEDULED},
+    ExamStatusChoices.SCHEDULED: {ExamStatusChoices.ACTIVE},
+    ExamStatusChoices.ACTIVE: {ExamStatusChoices.CLOSED},
+    ExamStatusChoices.CLOSED: {ExamStatusChoices.PUBLISHED},
+}
+
 
 class Examination(BaseModel):
-    course = models.ForeignKey(
-        'academics.Course',
+    course_offering = models.ForeignKey(
+        'academics.CourseOffering',
         on_delete=models.PROTECT,
         related_name='examinations'
     )
@@ -29,9 +37,22 @@ class Examination(BaseModel):
     start_window = models.DateTimeField()
     end_window = models.DateTimeField()
     duration_minutes = models.PositiveIntegerField()
+    allow_retake = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.title} ({self.course.course_code})"
+        return f"{self.title} ({self.course_offering.course.course_code})"
+
+    def can_transition_to(self, new_status):
+        if new_status == self.status:
+            return True
+        return new_status in EXAM_STATUS_TRANSITIONS.get(self.status, set())
+
+    @property
+    def questions_editable(self):
+        return self.status in (
+            ExamStatusChoices.DRAFT,
+            ExamStatusChoices.SCHEDULED,
+        )
 
 
 class ExamAttempt(BaseModel):
@@ -48,9 +69,6 @@ class ExamAttempt(BaseModel):
     start_time = models.DateTimeField()
     submission_time = models.DateTimeField(null=True, blank=True)
     is_disrupted = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ('examination', 'student')
 
     def __str__(self):
         return f"Attempt: {self.student.student_identifier} - {self.examination.title}"
