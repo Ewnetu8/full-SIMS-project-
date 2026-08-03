@@ -7,6 +7,7 @@ from exams.views import (
     ScheduleExaminationView,
     StartExamView,
     StudentActiveExamsView,
+    SubmitExamView,
 )
 
 urlpatterns = [
@@ -21,6 +22,11 @@ urlpatterns = [
         "exams/<uuid:pk>/start",
         StartExamView.as_view(),
         name="exam_start",
+    ),
+    path(
+        "exams/<uuid:pk>/submit",
+        SubmitExamView.as_view(),
+        name="exam_submit",
     ),
     path(
         "exams/active",

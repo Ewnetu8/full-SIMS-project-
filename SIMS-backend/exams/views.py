@@ -2,9 +2,9 @@ from academics.models import Enrollment, EnrollmentStatusChoices
 from accounts.permissions import HasRole
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from questions.models import Question, QuestionOption, QuestionTypeChoices
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,12 +24,6 @@ from exams.serializers import (
 )
 
 
-def get_lecturer_write_permissions(request):
-    if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
-    return [IsAuthenticated()]
-
-
 def get_examination(pk):
     try:
         return (
@@ -43,11 +37,18 @@ def get_examination(pk):
 
 class ExaminationListView(APIView):
     def get_permissions(self):
-        return get_lecturer_write_permissions(self.request)
+        if self.request.method in ("POST",):
+            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER", "STUDENT")()]
 
     @extend_schema(
         tags=["Examination"],
         summary="List examinations",
+        description=(
+            "Lecturers see only their own examinations. "
+            "Admins see all. Students see examinations for enrolled "
+            "course offerings. Filterable by ?status= and ?course_offering=."
+        ),
         responses={200: ExaminationSerializer(many=True)},
     )
     def get(self, request):
@@ -60,6 +61,12 @@ class ExaminationListView(APIView):
         user_role = getattr(request.user, "role", None)
         if user_role == "LECTURER" and hasattr(request.user, "lecturer_profile"):
             queryset = queryset.filter(lecturer=request.user.lecturer_profile)
+        elif user_role == "STUDENT" and hasattr(request.user, "student_profile"):
+            student = request.user.student_profile
+            queryset = queryset.filter(
+                course_offering__enrollments__student=student,
+                course_offering__enrollments__status=EnrollmentStatusChoices.ENROLLED,
+            ).distinct()
         status_filter = request.query_params.get("status")
         if status_filter:
             queryset = queryset.filter(status=status_filter)
@@ -72,9 +79,12 @@ class ExaminationListView(APIView):
         tags=["Examination"],
         summary="Create examination",
         description=(
+            "**Role: LECTURER / ADMIN**\n\n"
             "Examinations are always created in DRAFT. "
-            "Status follows the lifecycle DRAFT → SCHEDULED → ACTIVE → "
-            "CLOSED → PUBLISHED; no skipping or rollback is allowed."
+            "Status follows the strict lifecycle:\n"
+            "`DRAFT → SCHEDULED → ACTIVE → CLOSED → PUBLISHED`\n\n"
+            "No skipping or rollback is allowed. The lecturer who creates "
+            "the exam is automatically set as the owner."
         ),
         request=ExaminationSerializer,
         responses={201: ExaminationSerializer},
@@ -95,7 +105,9 @@ class ExaminationListView(APIView):
 
 class ExaminationDetailView(APIView):
     def get_permissions(self):
-        return get_lecturer_write_permissions(self.request)
+        if self.request.method in ("PUT", "PATCH", "DELETE"):
+            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER", "STUDENT")()]
 
     def get_object(self, pk):
         return get_examination(pk)
@@ -116,6 +128,12 @@ class ExaminationDetailView(APIView):
     @extend_schema(
         tags=["Examination"],
         summary="Update examination",
+        description=(
+            "**Role: LECTURER / ADMIN**\n\n"
+            "Full replacement update. Status changes must follow the "
+            "lifecycle: `DRAFT → SCHEDULED → ACTIVE → CLOSED → PUBLISHED`. "
+            "Any other transition is rejected with a 400."
+        ),
         request=ExaminationSerializer,
         responses={200: ExaminationSerializer},
     )
@@ -135,8 +153,11 @@ class ExaminationDetailView(APIView):
         tags=["Examination"],
         summary="Partial update examination",
         description=(
-            "Status changes follow the lifecycle DRAFT → SCHEDULED → ACTIVE → "
-            "CLOSED → PUBLISHED. Any other transition is rejected with a 400."
+            "**Role: LECTURER / ADMIN**\n\n"
+            "Partial update. Status changes follow the strict lifecycle:\n"
+            "`DRAFT → SCHEDULED → ACTIVE → CLOSED → PUBLISHED`\n\n"
+            "No skipping or rollback is allowed. Question-list edits are "
+            "locked once status leaves DRAFT/SCHEDULED (§9.2)."
         ),
         request=ExaminationSerializer,
         responses={200: ExaminationSerializer},
@@ -156,6 +177,10 @@ class ExaminationDetailView(APIView):
     @extend_schema(
         tags=["Examination"],
         summary="Delete examination",
+        description=(
+            "**Role: LECTURER / ADMIN**\n\n"
+            "Deletes a DRAFT examination. Returns 409 if attempts exist."
+        ),
         responses={204: OpenApiResponse(description="Deleted.")},
     )
     def delete(self, request, pk):
@@ -176,16 +201,20 @@ class ExaminationDetailView(APIView):
 
 class ScheduleExaminationView(APIView):
     def get_permissions(self):
-        return get_lecturer_write_permissions(self.request)
+        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
 
     @extend_schema(
         tags=["Examination"],
         summary="Schedule an examination",
         description=(
+            "**Role: LECTURER / ADMIN**\n\n"
             "Validates the time window against the server clock and moves "
-            "the exam from DRAFT to SCHEDULED. start_window must be in the "
-            "future, end_window must be after start_window, and "
-            "duration_minutes must be positive."
+            "the exam from DRAFT → SCHEDULED.\n\n"
+            "Rules:\n"
+            "- `start_window` must be in the **future** (server clock)\n"
+            "- `end_window` must be after `start_window`\n"
+            "- `duration_minutes` must be positive\n"
+            "- Exam must currently be in DRAFT status"
         ),
         request=ExamScheduleSerializer,
         responses={
@@ -218,15 +247,21 @@ class ScheduleExaminationView(APIView):
 
 class StudentActiveExamsView(APIView):
     def get_permissions(self):
-        return [IsAuthenticated()]
+        return [IsAuthenticated(), HasRole("STUDENT")()]
 
     @extend_schema(
         tags=["Examination"],
         summary="List active examinations for the logged-in student",
         description=(
-            "Returns only examinations for course offerings the student is "
-            "enrolled in, whose status is ACTIVE and whose window currently "
-            "includes the server time (start_window <= now < end_window)."
+            "**Role: STUDENT**\n\n"
+            "Returns only examinations the student can see, scoped through "
+            "their actual Enrollment rows:\n"
+            "`student → Enrollment → CourseOffering → Examination`\n\n"
+            "An exam appears only when:\n"
+            "- `status = ACTIVE`\n"
+            "- `start_window <= now < end_window`\n"
+            "- The student has an ENROLLED enrollment for the course offering\n\n"
+            "No cron job is needed — visibility is enforced at query time."
         ),
         responses={200: ExaminationSerializer(many=True)},
     )
@@ -244,6 +279,7 @@ class StudentActiveExamsView(APIView):
                 start_window__lte=now,
                 end_window__gt=now,
                 course_offering__enrollments__student=student,
+                course_offering__enrollments__status=EnrollmentStatusChoices.ENROLLED,
             )
             .select_related("course_offering__course", "lecturer")
             .prefetch_related("questions")
@@ -255,17 +291,19 @@ class StudentActiveExamsView(APIView):
 
 class StartExamView(APIView):
     def get_permissions(self):
-        return [IsAuthenticated()]
+        return [IsAuthenticated(), HasRole("STUDENT")()]
 
     @extend_schema(
         tags=["Attempt"],
         summary="Start an examination for the logged-in student",
         description=(
-            "Creates an ExamAttempt if the student is enrolled, the exam is "
-            "ACTIVE, the current server time is within the exam window, and "
-            "the student has no existing attempt (unless the exam allows "
-            "retakes). Returns the attempt plus the exam questions with "
-            "correct answers hidden."
+            "**Role: STUDENT**\n\n"
+            "Creates an ExamAttempt if all conditions are met:\n"
+            "- Student is enrolled in the course offering\n"
+            "- Exam status is ACTIVE\n"
+            "- Current server time is within [start_window, end_window)\n"
+            "- Student has no existing attempt (unless `allow_retake` is set)\n\n"
+            "Returns the attempt plus exam questions with correct answers hidden."
         ),
         responses={
             201: ExamAttemptSerializer,
@@ -331,16 +369,20 @@ class StartExamView(APIView):
 
 class AutoSaveAnswerView(APIView):
     def get_permissions(self):
-        return [IsAuthenticated()]
+        return [IsAuthenticated(), HasRole("STUDENT")()]
 
     @extend_schema(
         tags=["Attempt"],
         summary="Auto-save a student answer (upsert)",
         description=(
+            "**Role: STUDENT**\n\n"
             "Creates or updates the student's answer to one question of one "
             "attempt. The attempt must belong to the logged-in student and "
-            "must not be submitted yet. MCQ questions are answered via "
-            "selected_option; text questions via submitted_text."
+            "must not be submitted yet.\n\n"
+            "MCQ questions are answered via `selected_option` (option ID);\n"
+            "text/essay questions via `submitted_text`.\n\n"
+            "**Idempotent**: sending the same payload twice does not "
+            "duplicate rows (upsert on `(exam_attempt, question)`)."
         ),
         request=StudentAnswerSerializer,
         responses={
@@ -413,3 +455,106 @@ class AutoSaveAnswerView(APIView):
                 defaults={"selected_option": None, "submitted_text": submitted_text},
             )
         return Response(StudentAnswerSerializer(answer).data)
+
+
+class SubmitExamView(APIView):
+    def get_permissions(self):
+        return [IsAuthenticated(), HasRole("STUDENT")()]
+
+    @extend_schema(
+        tags=["Attempt"],
+        summary="Submit (freeze) an exam attempt",
+        description=(
+            "**Role: STUDENT**\n\n"
+            "Freezes the student's attempt and hands off grading to Celery.\n\n"
+            "Rules enforced:\n"
+            "- The attempt must belong to the logged-in student\n"
+            "- The attempt must not already be submitted\n"
+            "- Submission **is rejected** if `now() >= end_window` **or** "
+            "`now() > start_time + duration_minutes` (late submissions "
+            "are never accepted — §9.5)\n\n"
+            "On success:\n"
+            "- `submission_time` is set to `now()`\n"
+            "- `is_disrupted` is set if the client detected a timeout/disconnect\n"
+            "- A Celery task `grade_exam_attempt` is enqueued (async, "
+            "handoff to Phase 4 grading logic)"
+        ),
+        request=inline_serializer(
+            name="SubmitExamRequest",
+            fields={
+                "is_disrupted": serializers.BooleanField(
+                    required=False,
+                    default=False,
+                    help_text="Set to true if the client detected a browser crash or disconnect.",
+                ),
+            },
+        ),
+        responses={
+            200: ExamAttemptSerializer,
+            400: OpenApiResponse(description="Already submitted or window expired."),
+            403: OpenApiResponse(description="Not your attempt."),
+        },
+    )
+    def post(self, request, pk):
+        exam = get_examination(pk)
+        if not exam:
+            return Response(
+                {"detail": "Examination not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        student = getattr(request.user, "student_profile", None)
+        if student is None:
+            return Response(
+                {"detail": "Authenticated user has no student profile."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            attempt = ExamAttempt.objects.get(
+                examination=exam, student=student
+            )
+        except ExamAttempt.DoesNotExist:
+            return Response(
+                {"detail": "No attempt found for this examination."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if attempt.submission_time is not None:
+            return Response(
+                {"detail": "This attempt has already been submitted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+
+        # ── Late-rejection gate (§9.5) ────────────────────────────────
+        deadline_by_window = exam.end_window
+        deadline_by_duration = attempt.start_time + timezone.timedelta(
+            minutes=exam.duration_minutes
+        )
+        effective_deadline = min(deadline_by_window, deadline_by_duration)
+
+        if now >= effective_deadline:
+            return Response(
+                {
+                    "detail": (
+                        "Submission rejected: the exam window or duration "
+                        "has expired. You can no longer submit this attempt."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        is_disrupted = request.data.get("is_disrupted", False)
+
+        # ── Freeze the attempt ────────────────────────────────────────
+        attempt.submission_time = now
+        attempt.is_disrupted = is_disrupted
+        attempt.save(update_fields=["submission_time", "is_disrupted", "updated_at"])
+
+        # ── Enqueue async grading (handoff to Phase 4) ───────────────
+        from exams.tasks import grade_exam_attempt
+
+        grade_exam_attempt.delay(str(attempt.pk))
+
+        return Response(ExamAttemptSerializer(attempt).data)
