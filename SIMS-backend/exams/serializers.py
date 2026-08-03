@@ -1,8 +1,35 @@
+from django.utils import timezone
+
 from academics.models import CourseOffering
+from questions.models import Question, QuestionOption
 from questions.serializers import QuestionSerializer
 from rest_framework import serializers
 
-from exams.models import Examination, ExamStatusChoices
+from exams.models import (
+    ExamAttempt,
+    Examination,
+    ExamStatusChoices,
+    StudentAnswer,
+)
+
+
+class ExamScheduleSerializer(serializers.Serializer):
+    start_window = serializers.DateTimeField()
+    end_window = serializers.DateTimeField()
+    duration_minutes = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        start_window = attrs["start_window"]
+        end_window = attrs["end_window"]
+        if start_window <= timezone.now():
+            raise serializers.ValidationError(
+                {"start_window": "The exam start time must be in the future."}
+            )
+        if end_window <= start_window:
+            raise serializers.ValidationError(
+                {"end_window": "The exam end time must be after the start time."}
+            )
+        return attrs
 
 
 class CourseOfferingBriefSerializer(serializers.ModelSerializer):
@@ -76,3 +103,58 @@ class ExaminationSerializer(serializers.ModelSerializer):
                 "(no skipping, no rollback)."
             )
         return value
+
+
+class ExamAttemptSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamAttempt
+        fields = (
+            "id",
+            "examination",
+            "student",
+            "start_time",
+            "submission_time",
+            "is_disrupted",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class StudentQuestionOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuestionOption
+        fields = ("id", "option_text")
+
+
+class StudentQuestionSerializer(serializers.ModelSerializer):
+    options = StudentQuestionOptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Question
+        fields = ("id", "question_text", "question_type", "total_points", "options")
+
+
+class StudentAnswerSerializer(serializers.ModelSerializer):
+    question_text = serializers.CharField(source="question.question_text", read_only=True)
+
+    class Meta:
+        model = StudentAnswer
+        fields = (
+            "id",
+            "exam_attempt",
+            "question",
+            "question_text",
+            "selected_option",
+            "submitted_text",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "exam_attempt",
+            "question",
+            "question_text",
+            "created_at",
+            "updated_at",
+        )

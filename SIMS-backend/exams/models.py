@@ -37,6 +37,7 @@ class Examination(BaseModel):
     start_window = models.DateTimeField()
     end_window = models.DateTimeField()
     duration_minutes = models.PositiveIntegerField()
+    allow_retake = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.title} ({self.course_offering.course.course_code})"
@@ -68,9 +69,6 @@ class ExamAttempt(BaseModel):
     start_time = models.DateTimeField()
     submission_time = models.DateTimeField(null=True, blank=True)
     is_disrupted = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ('examination', 'student')
 
     def __str__(self):
         return f"Attempt: {self.student.student_identifier} - {self.examination.title}"
