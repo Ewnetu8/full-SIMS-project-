@@ -23,3 +23,21 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+# Suppress django.request error logging during tests to avoid a Python 3.14
+# incompatibility in django.template.context.__copy__ (triggered when the
+# test client tries to render the 4xx debug page internally).
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'null': {'class': 'logging.NullHandler'},
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['null'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}

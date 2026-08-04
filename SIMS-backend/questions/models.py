@@ -34,6 +34,7 @@ class Question(BaseModel):
     )
     total_points = models.DecimalField(max_digits=5, decimal_places=2)
     tags = models.ManyToManyField(Tag, related_name='questions', blank=True)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return f"[{self.question_type}] {self.question_text[:50]}"
