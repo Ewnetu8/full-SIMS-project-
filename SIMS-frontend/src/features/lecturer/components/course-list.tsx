@@ -6,7 +6,9 @@ import * as React from 'react';
 
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { lecturerService } from '../services';
+
 import type { Course } from '../types';
 
 export function LecturerCourseList() {

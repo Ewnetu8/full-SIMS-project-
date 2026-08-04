@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+
 import { cn } from '@/lib';
 
 export interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {

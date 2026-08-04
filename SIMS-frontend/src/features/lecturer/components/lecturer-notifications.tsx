@@ -5,7 +5,9 @@ import { Bell, Brain, CheckCheck, Megaphone, Send, Sparkles } from 'lucide-react
 import * as React from 'react';
 
 import { Badge, Button, Card, CardContent } from '@/components/ui';
+
 import { lecturerService } from '../services';
+
 import type { LecturerNotification } from '../types';
 
 const TYPE_CONFIG: Record<

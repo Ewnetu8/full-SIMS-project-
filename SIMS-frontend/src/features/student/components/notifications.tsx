@@ -3,12 +3,14 @@
 import { Bell, CheckCheck, Info, Sparkles } from 'lucide-react';
 import * as React from 'react';
 
-import { Breadcrumb } from '@/components/navigation';
-import { PageHeader } from '@/components/layout';
-import { Button, Card, CardContent } from '@/components/ui';
 import { EmptyState } from '@/components/feedback';
+import { PageHeader } from '@/components/layout';
+import { Breadcrumb } from '@/components/navigation';
+import { Button, Card, CardContent } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { studentService } from '../services';
+
 import type { StudentNotification } from '../types';
 
 const icons = { info: <Info className="h-5 w-5" />, success: <CheckCheck className="h-5 w-5" />, warning: <Bell className="h-5 w-5" />, ai: <Sparkles className="h-5 w-5" /> };

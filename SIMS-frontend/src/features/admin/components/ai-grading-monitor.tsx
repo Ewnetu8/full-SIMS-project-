@@ -26,7 +26,9 @@ import {
   DialogTitle,
   Progress,
 } from '@/components/ui';
+
 import { useAdminStore } from '../store';
+
 import type { AIGradingJob } from '../types';
 
 export function AIGradingMonitor() {
@@ -87,10 +89,10 @@ export function AIGradingMonitor() {
 
       {/* Stats Breakdown Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-4 border-l-4 border-l-amber-500">
+        <Card className="p-4 border-l-4 border-l-warning">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Pending in Queue</span>
-            <Clock className="h-4 w-4 text-amber-500" />
+            <Clock className="h-4 w-4 text-accent" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-2xl font-bold text-foreground">{pendingCount}</span>
@@ -109,24 +111,24 @@ export function AIGradingMonitor() {
           </div>
         </Card>
 
-        <Card className="p-4 border-l-4 border-l-emerald-500">
+        <Card className="p-4 border-l-4 border-l-success">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Completed Batches</span>
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <CheckCircle2 className="h-4 w-4 text-success" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-2xl font-bold text-foreground">{completedCount}</span>
-            <span className="text-[11px] text-emerald-500 font-medium">95.8% avg confidence</span>
+            <span className="text-[11px] text-success font-medium">95.8% avg confidence</span>
           </div>
         </Card>
 
-        <Card className="p-4 border-l-4 border-l-rose-500">
+        <Card className="p-4 border-l-4 border-l-destructive">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Failed Jobs (Flagged)</span>
-            <AlertTriangle className="h-4 w-4 text-rose-500" />
+            <AlertTriangle className="h-4 w-4 text-destructive" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-rose-500">{failedCount}</span>
+            <span className="text-2xl font-bold text-destructive">{failedCount}</span>
             <span className="text-[11px] text-muted-foreground">Requires attention</span>
           </div>
         </Card>
@@ -136,7 +138,7 @@ export function AIGradingMonitor() {
       <Card className="p-5">
         <h2 className="text-base font-semibold text-foreground mb-4 flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-amber-500" /> AI Grading Jobs Queue
+            <Zap className="h-4 w-4 text-accent" /> AI Grading Jobs Queue
           </span>
           {isQueuePaused && (
             <Badge variant="warning" className="text-[11px]">
@@ -215,14 +217,14 @@ export function AIGradingMonitor() {
                 {job.confidenceAverage && (
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
                     <span>Started: {job.startedAt}</span>
-                    <span className="font-medium text-emerald-400">
+                    <span className="font-medium text-success">
                       Confidence Rating: {job.confidenceAverage}%
                     </span>
                   </div>
                 )}
 
                 {job.errorReason && (
-                  <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium flex items-center gap-2">
+                  <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>{job.errorReason}</span>
                   </div>
@@ -252,7 +254,7 @@ export function AIGradingMonitor() {
 
               <div>
                 <span className="text-xs font-semibold text-muted-foreground">Raw Process Stream Output:</span>
-                <pre className="mt-1.5 p-3 rounded-lg bg-black text-emerald-400 font-mono text-[11px] h-48 overflow-y-auto leading-relaxed border border-border">
+                <pre className="mt-1.5 p-3 rounded-lg bg-black text-success font-mono text-[11px] h-48 overflow-y-auto leading-relaxed border border-border">
 {`[${inspectingJob.startedAt}] [INFO] Initialized worker process for ${inspectingJob.id}
 [${inspectingJob.startedAt}] [INFO] Fetching submission payloads for exam ${inspectingJob.examId}...
 [${inspectingJob.startedAt}] [INFO] Loaded ${inspectingJob.totalSubmissions} student answer sheets.

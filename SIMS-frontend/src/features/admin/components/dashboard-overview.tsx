@@ -28,6 +28,7 @@ import * as React from 'react';
 
 import { Badge, Button, Card, Progress } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { useAdminStore } from '../store';
 
 export function DashboardOverview() {
@@ -45,16 +46,16 @@ export function DashboardOverview() {
   const publishedExamsCount = exams.filter((e) => e.status === 'published').length || 32;
 
   const statCards = [
-    { label: 'Total Students', value: totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-blue-500', bg: 'bg-blue-500/10', trend: '+12% this term' },
-    { label: 'Total Lecturers', value: totalLecturers.toString(), icon: UserCheck, color: 'text-indigo-500', bg: 'bg-indigo-500/10', trend: '4 departments' },
-    { label: 'Administrators', value: totalAdmins.toString(), icon: Shield, color: 'text-emerald-500', bg: 'bg-emerald-500/10', trend: 'Full access' },
-    { label: 'Active Courses', value: totalCourses.toString(), icon: BookOpen, color: 'text-amber-500', bg: 'bg-amber-500/10', trend: 'Spring 2026' },
-    { label: 'Departments', value: totalDepts.toString(), icon: Building2, color: 'text-purple-500', bg: 'bg-purple-500/10', trend: 'Academic units' },
-    { label: 'Total Exams', value: totalExamsCount.toString(), icon: ClipboardCheck, color: 'text-sky-500', bg: 'bg-sky-500/10', trend: 'This academic year' },
-    { label: 'Active Exams Now', value: activeExamsCount.toString(), icon: Zap, color: 'text-rose-500', bg: 'bg-rose-500/10', trend: 'Live sessions' },
-    { label: 'Pending AI Grading', value: pendingAIGradingCount.toString(), icon: Brain, color: 'text-ai-primary', bg: 'bg-ai-primary/10', trend: 'Queue processing' },
-    { label: 'Published Results', value: publishedExamsCount.toString(), icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-400/10', trend: 'Verified scores' },
-    { label: 'System Health', value: '99.9%', icon: Activity, color: 'text-green-500', bg: 'bg-green-500/10', trend: 'All services online' },
+    { label: 'Total Students', value: totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-primary', bg: 'bg-primary/10', trend: '+12% this term' },
+    { label: 'Total Lecturers', value: totalLecturers.toString(), icon: UserCheck, color: 'text-primary', bg: 'bg-primary/10', trend: '4 departments' },
+    { label: 'Administrators', value: totalAdmins.toString(), icon: Shield, color: 'text-primary', bg: 'bg-primary/10', trend: 'Full access' },
+    { label: 'Active Courses', value: totalCourses.toString(), icon: BookOpen, color: 'text-accent', bg: 'bg-accent/10', trend: 'Spring 2026' },
+    { label: 'Departments', value: totalDepts.toString(), icon: Building2, color: 'text-primary', bg: 'bg-primary/10', trend: 'Academic units' },
+    { label: 'Total Exams', value: totalExamsCount.toString(), icon: ClipboardCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'This academic year' },
+    { label: 'Active Exams Now', value: activeExamsCount.toString(), icon: Zap, color: 'text-accent', bg: 'bg-accent/10', trend: 'Live sessions' },
+    { label: 'Pending AI Grading', value: pendingAIGradingCount.toString(), icon: Brain, color: 'text-primary', bg: 'bg-primary/10', trend: 'Queue processing' },
+    { label: 'Published Results', value: publishedExamsCount.toString(), icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10', trend: 'Verified scores' },
+    { label: 'System Health', value: '99.9%', icon: Activity, color: 'text-success', bg: 'bg-success/10', trend: 'All services online' },
   ];
 
   return (
@@ -127,7 +128,7 @@ export function DashboardOverview() {
         <Card className="p-5 lg:col-span-1 flex flex-col justify-between">
           <div>
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-500" /> Quick Administrative Actions
+              <Zap className="h-4 w-4 text-accent" /> Quick Administrative Actions
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
               Shortcuts for routine institution administration tasks.
@@ -140,7 +141,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.USERS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <UserCheck className="h-4 w-4 text-blue-500" /> Manage Users & Roles
+                <UserCheck className="h-4 w-4 text-primary" /> Manage Users & Roles
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -150,7 +151,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.DEPARTMENTS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Building2 className="h-4 w-4 text-purple-500" /> Add / Manage Departments
+                <Building2 className="h-4 w-4 text-primary" /> Add / Manage Departments
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -160,7 +161,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.COURSES)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <BookOpen className="h-4 w-4 text-emerald-500" /> Assign Courses & Lecturers
+                <BookOpen className="h-4 w-4 text-primary" /> Assign Courses & Lecturers
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -170,7 +171,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.SETTINGS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Server className="h-4 w-4 text-indigo-500" /> Configure System Settings
+                <Server className="h-4 w-4 text-primary" /> Configure System Settings
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -182,14 +183,14 @@ export function DashboardOverview() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Activity className="h-4 w-4 text-emerald-500" /> Infrastructure & AI Engine Health
+                <Activity className="h-4 w-4 text-success" /> Infrastructure & AI Engine Health
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Real-time server metrics, database load, and AI grading cluster status.
               </p>
             </div>
-            <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> All Systems Nominal
+            <Badge variant="outline" className="border-success/30 text-success bg-success/10 gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-success animate-pulse" /> All Systems Nominal
             </Badge>
           </div>
 
@@ -198,7 +199,7 @@ export function DashboardOverview() {
             <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Cpu className="h-3.5 w-3.5 text-blue-500" /> CPU Cluster Load
+                  <Cpu className="h-3.5 w-3.5 text-primary" /> CPU Cluster Load
                 </span>
                 <span className="font-semibold text-foreground">28.4%</span>
               </div>
@@ -210,7 +211,7 @@ export function DashboardOverview() {
             <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <HardDrive className="h-3.5 w-3.5 text-indigo-500" /> Memory Allocation
+                  <HardDrive className="h-3.5 w-3.5 text-primary" /> Memory Allocation
                 </span>
                 <span className="font-semibold text-foreground">54.2%</span>
               </div>
@@ -222,7 +223,7 @@ export function DashboardOverview() {
             <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Database className="h-3.5 w-3.5 text-emerald-500" /> DB Connection Pool
+                  <Database className="h-3.5 w-3.5 text-success" /> DB Connection Pool
                 </span>
                 <span className="font-semibold text-foreground">48 / 200</span>
               </div>
@@ -236,7 +237,7 @@ export function DashboardOverview() {
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Brain className="h-3.5 w-3.5 text-ai-primary" /> AI Evaluation Cluster
                 </span>
-                <span className="font-semibold text-emerald-500">ONLINE</span>
+                <span className="font-semibold text-success">ONLINE</span>
               </div>
               <Progress value={65} className="h-2" />
               <span className="text-[10px] text-muted-foreground">GPT-4o fine-tuned • 95.8% avg confidence</span>
@@ -252,7 +253,7 @@ export function DashboardOverview() {
           <div className="flex items-center justify-between border-b border-border pb-3">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-sky-500" /> Recent System Activity & Audit Trail
+                <Clock className="h-4 w-4 text-primary" /> Recent System Activity & Audit Trail
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Latest security events and administrative actions.
@@ -338,7 +339,7 @@ export function DashboardOverview() {
                   </div>
                   <Progress value={progressPct} className="h-1.5" />
                   {job.errorReason && (
-                    <p className="text-[10px] text-rose-500 font-medium">⚠️ {job.errorReason}</p>
+                    <p className="text-[10px] text-destructive font-medium">⚠️ {job.errorReason}</p>
                   )}
                 </div>
               );

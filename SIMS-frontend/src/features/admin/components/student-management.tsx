@@ -23,7 +23,9 @@ import {
   DialogTitle,
   SearchInput,
 } from '@/components/ui';
+
 import { useAdminStore } from '../store';
+
 import type { StudentProfile } from '../types';
 
 export function StudentManagement() {
@@ -63,7 +65,7 @@ export function StudentManagement() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <GraduationCap className="h-6 w-6 text-blue-500" /> Student Directory
+          <GraduationCap className="h-6 w-6 text-primary" /> Student Directory
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           View all enrolled student profiles, academic standings, programs, and course enrollments.
@@ -134,7 +136,7 @@ export function StudentManagement() {
                     <td className="px-4 py-3.5 font-mono text-xs font-semibold text-primary">{std.studentId}</td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold text-xs shrink-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
                           {std.firstName[0]}
                           {std.lastName[0]}
                         </div>
@@ -150,7 +152,7 @@ export function StudentManagement() {
                     <td className="px-4 py-3.5 text-xs text-foreground font-medium">{std.program}</td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground">{std.academicYear}</td>
                     <td className="px-4 py-3.5">
-                      <Badge variant="outline" className="font-mono font-bold text-emerald-500 bg-emerald-500/10 border-emerald-500/20">
+                      <Badge variant="outline" className="font-mono font-bold text-success bg-success/10 border-success/20">
                         {std.gpa.toFixed(2)}
                       </Badge>
                     </td>
@@ -205,13 +207,13 @@ export function StudentManagement() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-blue-500" /> Student Profile & Academic Record
+                <GraduationCap className="h-5 w-5 text-primary" /> Student Profile & Academic Record
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4 py-3">
               <div className="flex items-center gap-4 border-b border-border pb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold text-xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl">
                   {selectedStudent.firstName[0]}
                   {selectedStudent.lastName[0]}
                 </div>
@@ -254,7 +256,7 @@ export function StudentManagement() {
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Award className="h-3.5 w-3.5" /> Cumulative GPA:
                   </span>
-                  <span className="font-mono font-bold text-emerald-500">{selectedStudent.gpa.toFixed(2)} / 4.00</span>
+                  <span className="font-mono font-bold text-success">{selectedStudent.gpa.toFixed(2)} / 4.00</span>
                 </div>
 
                 <div className="flex justify-between py-1">

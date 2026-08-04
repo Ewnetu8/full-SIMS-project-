@@ -1,14 +1,15 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import { StatsCard } from '@/components/data-display';
 import { PageHeader } from '@/components/layout';
 import { Breadcrumb } from '@/components/navigation';
-import { StatsCard } from '@/components/data-display';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { studentService } from '../services';
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));

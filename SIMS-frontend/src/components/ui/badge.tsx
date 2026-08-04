@@ -29,7 +29,7 @@ const badgeVariants = cva(
         info:
           'border-transparent bg-info/15 text-info dark:bg-info/20',
         ai:
-          'border-transparent text-white bg-[linear-gradient(135deg,var(--ai-primary),var(--ai-accent))]',
+          'border-transparent text-accent-foreground bg-accent',
       },
       size: {
         sm: 'px-2 py-px text-[10px]',

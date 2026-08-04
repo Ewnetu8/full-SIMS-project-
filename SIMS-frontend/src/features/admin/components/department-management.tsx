@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -34,9 +35,10 @@ import {
   SearchInput,
   Textarea,
 } from '@/components/ui';
-import { Label } from '@/components/forms';
 import { ROUTES } from '@/constants';
+
 import { useAdminStore } from '../store';
+
 import type { Department } from '../types';
 
 export function DepartmentManagement() {
@@ -162,7 +164,7 @@ export function DepartmentManagement() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Building2 className="h-6 w-6 text-purple-500" /> Academic Departments
+            <Building2 className="h-6 w-6 text-primary" /> Academic Departments
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage institutional faculties, departments, Heads of Department (HOD), and course allocations.
@@ -192,7 +194,7 @@ export function DepartmentManagement() {
             <div className="space-y-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500 font-bold font-mono text-base">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold font-mono text-base">
                     {dept.code}
                   </div>
                   <div>
@@ -220,10 +222,10 @@ export function DepartmentManagement() {
                         setFormData({ ...formData, hodId: dept.headOfDepartment.id });
                       }}
                     >
-                      <UserCheck className="h-4 w-4 mr-2 text-indigo-400" /> Assign HOD
+                      <UserCheck className="h-4 w-4 mr-2 text-primary" /> Assign HOD
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="text-rose-500 focus:text-rose-500"
+                      className="text-destructive focus:text-destructive"
                       onClick={() => setDeletingDept(dept)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" /> Delete Department
@@ -237,7 +239,7 @@ export function DepartmentManagement() {
               {/* Head of Department Badge */}
               <div className="p-2.5 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <UserCheck className="h-4 w-4 text-indigo-500" />
+                  <UserCheck className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-[10px] uppercase font-semibold text-muted-foreground">Head of Department</p>
                     <p className="text-xs font-semibold text-foreground">{dept.headOfDepartment.name}</p>
@@ -367,7 +369,7 @@ export function DepartmentManagement() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-indigo-500" /> Assign Head of Department
+                <UserCheck className="h-5 w-5 text-primary" /> Assign Head of Department
               </DialogTitle>
               <DialogDescription>
                 Select a senior faculty member to serve as HOD for {assigningHODDept.name}.

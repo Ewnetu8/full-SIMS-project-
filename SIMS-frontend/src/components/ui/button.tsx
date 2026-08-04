@@ -31,9 +31,9 @@ const buttonVariants = cva(
           'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
         link: 'text-primary underline-offset-4 hover:underline p-0 h-auto',
         ai: [
-          'text-white shadow-sm',
-          'bg-[linear-gradient(135deg,var(--ai-primary),var(--ai-accent))]',
-          'hover:opacity-90 hover:shadow-md',
+          'text-accent-foreground shadow-sm',
+          'bg-accent',
+          'hover:bg-accent/90 hover:shadow-md',
         ],
       },
       size: {

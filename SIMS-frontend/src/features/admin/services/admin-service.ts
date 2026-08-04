@@ -1,3 +1,18 @@
+import {
+  INITIAL_USERS,
+  INITIAL_STUDENTS,
+  INITIAL_LECTURERS,
+  INITIAL_DEPARTMENTS,
+  INITIAL_COURSES,
+  INITIAL_EXAMS,
+  INITIAL_AI_JOBS,
+  INITIAL_AUDIT_LOGS,
+  INITIAL_SETTINGS,
+  INITIAL_NOTIFICATIONS,
+  INITIAL_DASHBOARD_STATS,
+  INITIAL_REPORT_DATA,
+} from '../mock';
+
 import type {
   AdminUser,
   StudentProfile,
@@ -13,20 +28,6 @@ import type {
   AdminReportData,
 } from '../types';
 
-import {
-  INITIAL_USERS,
-  INITIAL_STUDENTS,
-  INITIAL_LECTURERS,
-  INITIAL_DEPARTMENTS,
-  INITIAL_COURSES,
-  INITIAL_EXAMS,
-  INITIAL_AI_JOBS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_SETTINGS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_DASHBOARD_STATS,
-  INITIAL_REPORT_DATA,
-} from '../mock';
 
 // Helper to simulate asynchronous API delay
 const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));

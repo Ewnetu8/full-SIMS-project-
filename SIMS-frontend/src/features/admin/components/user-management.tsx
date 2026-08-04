@@ -20,6 +20,7 @@ import {
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -37,8 +38,10 @@ import {
   Input,
   SearchInput,
 } from '@/components/ui';
-import { Label } from '@/components/forms';
+
 import { useAdminStore } from '../store';
+import { authApi } from '@/features/auth/services';
+
 import type { AdminUser, UserRole, UserStatus } from '../types';
 
 export function UserManagement() {
@@ -63,6 +66,7 @@ export function UserManagement() {
   const [editingUser, setEditingUser] = React.useState<AdminUser | null>(null);
   const [viewingUser, setViewingUser] = React.useState<AdminUser | null>(null);
   const [deletingUser, setDeletingUser] = React.useState<AdminUser | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -101,36 +105,57 @@ export function UserManagement() {
     });
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
     if (!formData.firstName || !formData.lastName || !formData.email) {
       toast.error('Missing fields', { description: 'First name, last name, and email are required.' });
       return;
     }
 
-    if (editingUser) {
-      updateUser(editingUser.id, {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        role: formData.role,
-        department: formData.department,
-        phone: formData.phone,
+    setIsSubmitting(true);
+    try {
+      if (editingUser) {
+        updateUser(editingUser.id, {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          role: formData.role,
+          department: formData.department,
+          phone: formData.phone,
+        });
+        toast.success('User updated', { description: `${formData.firstName} ${formData.lastName} account updated successfully.` });
+        setEditingUser(null);
+      } else {
+        // Use default passwords for university-managed accounts since admin sets them up
+        const generatedPassword = `${formData.firstName}123!`;
+        
+        await authApi.register({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          role: formData.role,
+          password: generatedPassword,
+          confirmPassword: generatedPassword,
+        });
+        
+        addUser({
+          userId: formData.userId || `USR-${Date.now()}`,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          role: formData.role,
+          department: formData.department,
+          status: 'active',
+          phone: formData.phone,
+        });
+        toast.success('User created', { description: `Account for ${formData.firstName} ${formData.lastName} created.` });
+        setIsAddModalOpen(false);
+      }
+    } catch (error) {
+      toast.error('Failed to save user', { 
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.' 
       });
-      toast.success('User updated', { description: `${formData.firstName} ${formData.lastName} account updated successfully.` });
-      setEditingUser(null);
-    } else {
-      addUser({
-        userId: formData.userId || `USR-${Date.now()}`,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        role: formData.role,
-        department: formData.department,
-        status: 'active',
-        phone: formData.phone,
-      });
-      toast.success('User created', { description: `Account for ${formData.firstName} ${formData.lastName} created.` });
-      setIsAddModalOpen(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -291,9 +316,9 @@ export function UserManagement() {
                         }
                         className="capitalize gap-1"
                       >
-                        {user.role === 'admin' && <Shield className="h-3 w-3 text-amber-400" />}
-                        {user.role === 'lecturer' && <UserCheck className="h-3 w-3 text-indigo-400" />}
-                        {user.role === 'student' && <GraduationCap className="h-3 w-3 text-blue-400" />}
+                        {user.role === 'admin' && <Shield className="h-3 w-3 text-accent" />}
+                        {user.role === 'lecturer' && <UserCheck className="h-3 w-3 text-primary" />}
+                        {user.role === 'student' && <GraduationCap className="h-3 w-3 text-primary" />}
                         {user.role}
                       </Badge>
                     </td>
@@ -336,16 +361,16 @@ export function UserManagement() {
                           <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
                             {user.status === 'active' ? (
                               <>
-                                <XCircle className="h-4 w-4 mr-2 text-amber-500" /> Deactivate
+                                <XCircle className="h-4 w-4 mr-2 text-accent" /> Deactivate
                               </>
                             ) : (
                               <>
-                                <CheckCircle className="h-4 w-4 mr-2 text-emerald-500" /> Activate
+                                <CheckCircle className="h-4 w-4 mr-2 text-success" /> Activate
                               </>
                             )}
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-rose-500 focus:text-rose-500"
+                            className="text-destructive focus:text-destructive"
                             onClick={() => setDeletingUser(user)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" /> Delete Account
@@ -469,8 +494,8 @@ export function UserManagement() {
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveUser}>
-              {editingUser ? 'Update User' : 'Create User'}
+            <Button onClick={handleSaveUser} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : editingUser ? 'Update User' : 'Create User'}
             </Button>
           </DialogFooter>
         </DialogContent>

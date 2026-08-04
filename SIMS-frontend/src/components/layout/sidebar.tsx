@@ -83,9 +83,7 @@ export function Sidebar({
       <div className="flex h-14 items-center border-b border-sidebar-border px-4 shrink-0">
         {logo ?? (
           <Link href="/" className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-ai-primary text-white text-sm font-bold shadow-sm">
-              E
-            </span>
+            <img src="/images/aastu-logo.jpg" alt="AASTU Logo" className="h-7 w-auto rounded-md bg-white p-0.5 shrink-0" />
             <AnimatePresence>
               {!collapsed && (
                 <motion.span
@@ -96,7 +94,7 @@ export function Sidebar({
                   transition={{ duration: 0.2 }}
                   className="font-semibold text-sidebar-foreground text-sm overflow-hidden whitespace-nowrap"
                 >
-                  ExamSphere
+                  AASTU Grading
                 </motion.span>
               )}
             </AnimatePresence>
@@ -164,7 +162,7 @@ function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
         'group flex items-center gap-3 rounded-lg px-2 py-2 text-sm',
         'transition-all duration-200 relative',
         isActive
-          ? 'bg-sidebar-primary text-white font-medium shadow-sm'
+          ? 'border-l-3 border-sidebar-primary bg-sidebar-accent text-sidebar-foreground font-medium'
           : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent',
       )}
       aria-current={isActive ? 'page' : undefined}

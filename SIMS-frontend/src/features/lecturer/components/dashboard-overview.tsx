@@ -19,7 +19,10 @@ import * as React from 'react';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
 import { ROUTES } from '@/constants';
 import { useAuthStore } from '@/features/auth/store';
+import { getUserDisplayName } from '@/utils/string';
+
 import { lecturerService } from '../services';
+
 import type { Course, LecturerExam, StudentSubmission } from '../types';
 
 export function LecturerDashboardOverview() {
@@ -63,7 +66,7 @@ export function LecturerDashboardOverview() {
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
-      <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-r from-primary/10 via-ai-primary/10 to-background p-6 sm:p-8">
+      <Card className="relative overflow-hidden border-primary/20 bg-primary/5 p-6 sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -71,7 +74,7 @@ export function LecturerDashboardOverview() {
               Lecturer Control Center
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Welcome back, {user?.firstName ?? 'Lecturer'}
+              Welcome back, {user ? getUserDisplayName(user).split(' ')[0] : 'Lecturer'}
             </h1>
             <p className="text-sm text-muted-foreground max-w-xl">
               Manage your course examinations, evaluate AI-graded submissions, and track student performance metrics.

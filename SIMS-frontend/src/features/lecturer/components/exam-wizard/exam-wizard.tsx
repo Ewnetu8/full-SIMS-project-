@@ -6,13 +6,16 @@ import * as React from 'react';
 
 import { Button } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { useLecturerStore } from '../../store';
-import type { ExamWizardStep, LecturerExam } from '../../types';
+
 import { StepBasicInfo } from './step-basic-info';
 import { StepQuestionBuilder } from './step-question-builder';
 import { StepReview } from './step-review';
 import { StepSettings } from './step-settings';
 import { WizardNavigation } from './wizard-navigation';
+
+import type { ExamWizardStep, LecturerExam } from '../../types';
 
 const STEP_ORDER: ExamWizardStep[] = ['basic_info', 'settings', 'questions', 'review'];
 

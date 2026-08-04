@@ -13,11 +13,15 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { DashboardLayout } from '@/components/layout';
-import type { NavItem } from '@/components/layout/sidebar';
 import { NotificationDropdown } from '@/components/navigation';
 import { Button } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
+import { useRouteProtection } from '@/features/auth/hooks';
 import { lecturerService } from '../services';
+
+import type { NavItem } from '@/components/layout/sidebar';
+import type { Notification } from '@/components/navigation/notification-dropdown';
 
 const lecturerNavigation: NavItem[] = [
   { label: 'Overview', href: ROUTES.LECTURER.DASHBOARD, icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -31,10 +35,23 @@ const lecturerNavigation: NavItem[] = [
 
 export function LecturerShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+
+  useRouteProtection(['lecturer']);
 
   React.useEffect(() => {
-    lecturerService.getNotifications().then(setNotifications);
+    lecturerService.getNotifications().then((data) => {
+      setNotifications(
+        data.map((n) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          time: n.timestamp,
+          read: n.read,
+          type: n.type === 'ai_grading' ? 'ai' : n.type === 'submission' ? 'success' : 'info',
+        }))
+      );
+    });
   }, []);
 
   const unread = notifications.filter((n) => !n.read);

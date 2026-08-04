@@ -10,6 +10,8 @@ import { UserDropdown } from '@/components/navigation';
 import { IconButton, Tooltip } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/store';
 import { cn } from '@/lib';
+import { getUserDisplayName } from '@/utils/string';
+import { toast } from '@/components/feedback';
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -49,13 +51,14 @@ export function TopNav({
 
   const handleLogout = async () => {
     await logout();
+    toast.success('You have been logged out successfully.', { id: 'auth-logout' });
     router.replace('/login');
   };
 
   const defaultUserMenu = user ? (
     <UserDropdown
       user={{
-        name: `${user.firstName} ${user.lastName}`.trim(),
+        name: getUserDisplayName(user),
         email: user.email,
         role: user.role,
         avatarUrl: user.avatarUrl,
@@ -88,12 +91,10 @@ export function TopNav({
       <Link
         href="/"
         className="flex items-center gap-2 lg:hidden"
-        aria-label="ExamSphere home"
+        aria-label="AASTU home"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-primary to-ai-primary text-white text-xs font-bold">
-          E
-        </span>
-        <span className="font-semibold text-sm">ExamSphere</span>
+        <img src="/images/aastu-logo.jpg" alt="AASTU Logo" className="h-6 w-auto rounded-md bg-white p-0.5 shrink-0" />
+        <span className="font-semibold text-sm">AASTU Grading</span>
       </Link>
 
       {/* Centre slot */}

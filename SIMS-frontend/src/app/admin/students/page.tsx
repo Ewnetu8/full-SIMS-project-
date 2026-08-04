@@ -1,5 +1,6 @@
-import type { Metadata } from 'next';
 import { AdminShell, StudentManagement } from '@/features/admin/components';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Student Directory — ExamSphere Admin',

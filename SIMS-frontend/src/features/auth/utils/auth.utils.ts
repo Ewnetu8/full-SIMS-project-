@@ -31,8 +31,6 @@ export const PUBLIC_ROUTES = [
 /** Routes that redirect authenticated users away (e.g., login page). */
 export const AUTH_ONLY_ROUTES = [
   ROUTES.LOGIN,
-  ROUTES.FORGOT_PASSWORD,
-  ROUTES.RESET_PASSWORD,
 ] as const;
 
 /** Top-level path prefixes that require authentication. */

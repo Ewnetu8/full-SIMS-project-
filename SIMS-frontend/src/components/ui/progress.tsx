@@ -28,7 +28,7 @@ const indicatorClasses = {
   success:     'bg-success',
   warning:     'bg-warning',
   destructive: 'bg-destructive',
-  ai:          'bg-[linear-gradient(90deg,var(--ai-primary),var(--ai-accent))]',
+  ai:          'bg-primary',
 } as const;
 
 const sizeClasses = {

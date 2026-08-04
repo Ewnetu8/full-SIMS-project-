@@ -30,7 +30,7 @@
     "plugins": [{ "name": "next" }],
 
     /* ── Absolute Import Aliases ──────────────────────────────────────────── */
-    "baseUrl": ".",
+     "baseUrl": ".",
     "ignoreDeprecations": "5.0",
     "paths": {
       "@/*":            ["./src/*"],

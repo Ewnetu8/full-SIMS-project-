@@ -9,7 +9,7 @@ import { ROUTES } from '@/constants';
 
 export default function AccessDeniedPage() {
   return (
-    <AppLayout className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(244,63,94,0.12),_transparent_35%)] px-4 py-10">
+    <AppLayout className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_color-mix(in_srgb,var(--destructive)_12%,transparent),_transparent_35%)] px-4 py-10">
       <Card className="w-full max-w-lg border-destructive/20 bg-card/90 shadow-xl">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">

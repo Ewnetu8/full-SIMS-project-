@@ -1,7 +1,9 @@
 'use client';
 
 import { CheckCircle2 } from 'lucide-react';
+
 import { cn } from '@/lib';
+
 import type { ExamWizardStep } from '../../types';
 
 const STEPS: { key: ExamWizardStep; label: string; description: string }[] = [

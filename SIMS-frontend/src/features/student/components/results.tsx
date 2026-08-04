@@ -4,11 +4,12 @@ import { ArrowRight, Brain, CheckCircle2, CircleAlert, Sparkles } from 'lucide-r
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { Breadcrumb } from '@/components/navigation';
-import { PageHeader } from '@/components/layout';
-import { Button, Card, CardContent, CardHeader, CardTitle, Progress } from '@/components/ui';
 import { EmptyState } from '@/components/feedback';
+import { PageHeader } from '@/components/layout';
+import { Breadcrumb } from '@/components/navigation';
+import { Button, Card, CardContent, CardHeader, CardTitle, Progress } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { studentService } from '../services';
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));

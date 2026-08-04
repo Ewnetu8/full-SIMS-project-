@@ -3,12 +3,14 @@
 import { KeyRound, Save, UserRound } from 'lucide-react';
 import * as React from 'react';
 
-import { Breadcrumb } from '@/components/navigation';
-import { PageHeader } from '@/components/layout';
-import { Avatar, Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { SuccessState, toast } from '@/components/feedback';
+import { PageHeader } from '@/components/layout';
+import { Breadcrumb } from '@/components/navigation';
+import { Avatar, Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { studentService } from '../services';
+
 import type { StudentProfile } from '../types';
 
 const fields: Array<{ key: keyof StudentProfile; label: string; type?: string }> = [{ key: 'fullName', label: 'Full name' }, { key: 'studentId', label: 'Student ID' }, { key: 'email', label: 'Email address', type: 'email' }, { key: 'department', label: 'Department' }, { key: 'program', label: 'Program' }, { key: 'yearOfStudy', label: 'Year of study' }];

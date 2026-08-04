@@ -19,12 +19,15 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { DashboardLayout } from '@/components/layout';
-import type { NavItem } from '@/components/layout/sidebar';
 import { Breadcrumb } from '@/components/navigation';
 import { NotificationDropdown } from '@/components/navigation';
 import { Button } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { useAdminStore } from '../store';
+import { useRouteProtection } from '@/features/auth/hooks';
+
+import type { NavItem } from '@/components/layout/sidebar';
 
 const adminNavigation: NavItem[] = [
   { label: 'Overview', href: ROUTES.ADMIN.DASHBOARD, icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -51,6 +54,8 @@ export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
   const router = useRouter();
   const { notifications, markAllNotificationsRead } = useAdminStore();
 
+  useRouteProtection(['admin']);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
@@ -68,7 +73,7 @@ export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
               Add User
             </Button>
             {unreadCount > 0 && (
-              <span className="hidden text-xs font-medium text-amber-500 sm:inline bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+              <span className="hidden text-xs font-medium text-accent sm:inline bg-accent/10 px-2.5 py-1 rounded-full border border-accent/20">
                 {unreadCount} admin alert{unreadCount > 1 ? 's' : ''}
               </span>
             )}

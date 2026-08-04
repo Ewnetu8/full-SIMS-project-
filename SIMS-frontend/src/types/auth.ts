@@ -25,8 +25,8 @@ export interface BaseUser {
  */
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
-  expiresAt: number; // Unix timestamp (ms)
+  refreshToken?: string;
+  expiresAt?: number; // Unix timestamp (ms)
 }
 
 /**
