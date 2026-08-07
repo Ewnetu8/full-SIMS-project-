@@ -36,10 +36,23 @@ function createApiClient(): AxiosInstance {
   // ── Request Interceptor ──────────────────────────────────────────────────────
   client.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      const token = useAuthStore.getState().tokens?.accessToken;
-      if (token) {
-        config.headers.set('Authorization', `Bearer ${token}`);
+      // Don't add auth token to login, register, or refresh endpoints
+      const isAuthEndpoint =
+        config.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
+        config.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
+        config.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
+
+      if (!isAuthEndpoint) {
+        const token = useAuthStore.getState().tokens?.accessToken;
+        if (token) {
+          config.headers.set('Authorization', `Bearer ${token}`);
+        }
       }
+      
+      // Log the full URL being called
+      const fullUrl = `${config.baseURL}${config.url}`;
+      console.log('🌐 API Request:', config.method?.toUpperCase(), fullUrl);
+      
       return config;
     },
     (error: unknown) => Promise.reject(error),
@@ -87,17 +100,21 @@ function createApiClient(): AxiosInstance {
       if (response.status === 401 && !isAuthEndpoint) {
         try {
           // Attempt to refresh the token using raw axios to avoid interceptor loops
-          const refreshRes = await axios.post<{ access_token?: string; access?: string; accessToken?: string }>(
+          const refreshRes = await axios.post<{ access?: string }>(
             `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
             {},
             { withCredentials: true }
           );
           
-          // The exact field name depends on the backend framework (access, access_token, etc)
-          const newAccessToken = refreshRes.data.access || refreshRes.data.access_token || refreshRes.data.accessToken || '';
+          // Backend returns { access: "token" }
+          const newAccessToken = refreshRes.data.access || '';
           
           if (newAccessToken) {
-            useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
+            useAuthStore.getState().refreshSession({ 
+              accessToken: newAccessToken,
+              refreshToken: undefined,
+              expiresAt: Date.now() + 15 * 60 * 1000,
+            });
             // Retry the original request
             if (error.config) {
               error.config.headers.set('Authorization', `Bearer ${newAccessToken}`);
