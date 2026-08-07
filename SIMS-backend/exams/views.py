@@ -22,6 +22,7 @@ from exams.serializers import (
     StudentAnswerSerializer,
     StudentQuestionSerializer,
 )
+from exams.services import gradeability_errors
 
 
 def get_examination(pk):
@@ -214,7 +215,10 @@ class ScheduleExaminationView(APIView):
             "- `start_window` must be in the **future** (server clock)\n"
             "- `end_window` must be after `start_window`\n"
             "- `duration_minutes` must be positive\n"
-            "- Exam must currently be in DRAFT status"
+            "- Exam must currently be in DRAFT status\n"
+            "- Every question must be deterministically auto-gradable "
+            "(objective-grading mode): no ESSAY or SHORT_ANSWER questions "
+            "(both require AI grading), MCQ with exactly one correct option"
         ),
         request=ExamScheduleSerializer,
         responses={
@@ -236,6 +240,19 @@ class ScheduleExaminationView(APIView):
         serializer = ExamScheduleSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        gradeability = gradeability_errors(obj)
+        if gradeability:
+            return Response(
+                {
+                    "detail": (
+                        "This examination cannot be scheduled because it is "
+                        "not fully auto-gradable."
+                    ),
+                    "errors": gradeability,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         obj.start_window = serializer.validated_data["start_window"]
         obj.end_window = serializer.validated_data["end_window"]
@@ -550,7 +567,15 @@ class SubmitExamView(APIView):
         # ── Freeze the attempt ────────────────────────────────────────
         attempt.submission_time = now
         attempt.is_disrupted = is_disrupted
-        attempt.save(update_fields=["submission_time", "is_disrupted", "updated_at"])
+        attempt.grading_status = ExamAttempt.GradingStatusChoices.GRADING_PENDING
+        attempt.save(
+            update_fields=[
+                "submission_time",
+                "is_disrupted",
+                "grading_status",
+                "updated_at",
+            ]
+        )
 
         # ── Enqueue async grading (handoff to Phase 4) ───────────────
         from exams.tasks import grade_exam_attempt
