@@ -18,6 +18,9 @@ export type { SearchInputProps }             from './search-input';
 export { Textarea }                          from './textarea';
 export type { TextareaProps }                from './textarea';
 
+export { Label }                             from './label';
+export type { LabelProps }                   from './label';
+
 export {
   Select, SelectGroup, SelectValue,
   SelectTrigger, SelectContent, SelectLabel,
