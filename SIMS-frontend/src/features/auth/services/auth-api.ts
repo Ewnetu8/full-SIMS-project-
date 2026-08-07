@@ -39,49 +39,83 @@ export const authApi = {
    */
   register: (data: any): Promise<{ message: string; user?: BaseUser }> =>
     apiClient
-      .post<{ message: string; user?: BaseUser }>(API_ENDPOINTS.AUTH.REGISTER, data)
+      .post<any>(API_ENDPOINTS.AUTH.REGISTER, data)
       .then((r) => {
-        if (r.data?.user) {
-          const u = r.data.user as any;
-          if (u.first_name) { u.firstName = u.first_name; delete u.first_name; }
-          if (u.last_name) { u.lastName = u.last_name; delete u.last_name; }
-          if (u.role) u.role = u.role.toLowerCase();
+        const backendResponse = r.data;
+        
+        if (backendResponse?.user) {
+          const user: any = { ...backendResponse.user };
+          if (user.first_name) { 
+            user.firstName = user.first_name; 
+            delete user.first_name; 
+          }
+          if (user.last_name) { 
+            user.lastName = user.last_name; 
+            delete user.last_name; 
+          }
+          if (user.role) {
+            user.role = user.role.toLowerCase();
+          }
+          
+          return {
+            message: 'Registration successful',
+            user,
+          };
         }
-        return r.data;
+        
+        return { message: backendResponse.message || 'Registration successful' };
       }),
 
   /**
    * POST /api/v1/auth/login
    */
-  login: (credentials: LoginCredentials): Promise<AuthLoginResponse> =>
-    apiClient
-      .post<AuthLoginResponse>(API_ENDPOINTS.AUTH.LOGIN, credentials)
+  login: (credentials: LoginCredentials): Promise<AuthLoginResponse> => {
+    console.log('🚀 authApi.login called');
+    console.log('📍 Endpoint:', API_ENDPOINTS.AUTH.LOGIN);
+    console.log('📧 Email:', credentials.email);
+    
+    return apiClient
+      .post<any>(API_ENDPOINTS.AUTH.LOGIN, credentials)
       .then(async (r) => {
-        if (r.data?.user) {
-          const u = r.data.user as any;
-          if (u.first_name) { u.firstName = u.first_name; delete u.first_name; }
-          if (u.last_name) { u.lastName = u.last_name; delete u.last_name; }
-          if (u.role) u.role = u.role.toLowerCase();
+        console.log('✅ Backend response received:', r.status);
+        console.log('📦 Response data:', r.data);
+        
+        // Transform Django backend response to frontend format
+        const backendResponse = r.data;
+        
+        // Transform user fields
+        const user: any = { ...backendResponse.user };
+        if (user.first_name) { 
+          user.firstName = user.first_name; 
+          delete user.first_name; 
+        }
+        if (user.last_name) { 
+          user.lastName = user.last_name; 
+          delete user.last_name; 
+        }
+        if (user.role) {
+          user.role = user.role.toLowerCase();
         }
         
-        // Synchronize Next.js edge middleware session cookie
-        try {
-          await fetch('/api/auth/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: r.data.user.id,
-              role: r.data.user.role,
-              exp: r.data.tokens?.expiresAt || Date.now() + 8 * 60 * 60 * 1000,
-              rememberMe: credentials.rememberMe,
-            }),
-          });
-        } catch (e) {
-          console.error('Failed to sync session cookie:', e);
-        }
+        // Transform tokens - backend returns 'access' but frontend expects 'accessToken'
+        const tokens = {
+          accessToken: backendResponse.access,
+          refreshToken: undefined, // Refresh token is in HTTP-only cookie
+          expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutes (default JWT expiry)
+        };
 
-        return r.data;
-      }),
+        return {
+          user,
+          tokens,
+          message: 'Login successful',
+        };
+      })
+      .catch((error) => {
+        console.error('❌ Login API error:', error);
+        console.error('Error details:', error.response?.data);
+        throw error;
+      });
+  },
 
   /**
    * POST /api/v1/auth/logout
@@ -89,13 +123,7 @@ export const authApi = {
   logout: (): Promise<void> =>
     apiClient
       .post<void>(API_ENDPOINTS.AUTH.LOGOUT, {})
-      .then(async () => {
-        try {
-          await fetch('/api/auth/session', { method: 'DELETE' });
-        } catch (e) {
-          console.error('Failed to clear session cookie:', e);
-        }
-      }),
+      .then(() => {}),
 
   /**
    * POST /api/v1/auth/forgot-password
@@ -118,22 +146,40 @@ export const authApi = {
    */
   refreshToken: (): Promise<RefreshTokenResponse> =>
     apiClient
-      .post<RefreshTokenResponse>(API_ENDPOINTS.AUTH.REFRESH, {})
-      .then((r) => r.data),
+      .post<any>(API_ENDPOINTS.AUTH.REFRESH, {})
+      .then((r) => {
+        // Backend returns { access: "token" }
+        // Frontend expects { tokens: { accessToken: "token" } }
+        return {
+          tokens: {
+            accessToken: r.data.access,
+            refreshToken: undefined, // In HTTP-only cookie
+            expiresAt: Date.now() + 15 * 60 * 1000,
+          },
+        };
+      }),
 
   /**
    * GET /api/v1/auth/me
    */
   getMe: (): Promise<{ user: BaseUser }> =>
     apiClient
-      .get<{ user: BaseUser }>(API_ENDPOINTS.AUTH.ME)
+      .get<any>(API_ENDPOINTS.AUTH.ME)
       .then((r) => {
-        if (r.data?.user) {
-          const u = r.data.user as any;
-          if (u.first_name) { u.firstName = u.first_name; delete u.first_name; }
-          if (u.last_name) { u.lastName = u.last_name; delete u.last_name; }
-          if (u.role) u.role = u.role.toLowerCase();
+        // Transform user fields
+        const user: any = { ...r.data };
+        if (user.first_name) { 
+          user.firstName = user.first_name; 
+          delete user.first_name; 
         }
-        return r.data;
+        if (user.last_name) { 
+          user.lastName = user.last_name; 
+          delete user.last_name; 
+        }
+        if (user.role) {
+          user.role = user.role.toLowerCase();
+        }
+        
+        return { user };
       }),
 };
