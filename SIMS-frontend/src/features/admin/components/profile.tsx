@@ -4,6 +4,7 @@ import { User, Shield, Mail, Calendar, Key, Save, CheckCircle2 } from 'lucide-re
 import * as React from 'react';
 
 import { toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import { Avatar, Badge, Button, Card, Input } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/store';
@@ -74,11 +75,9 @@ export function AdminProfile() {
       };
 
       updateProfile(updatedUser);
-      toast.success('Profile updated successfully', {
-        description: 'Your administrator profile details have been saved.',
-      });
-    } catch {
-      toast.error('Failed to update profile');
+      toast.success('Admin profile updated successfully.');
+    } catch (err: any) {
+      toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

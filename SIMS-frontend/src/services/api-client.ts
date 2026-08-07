@@ -73,7 +73,7 @@ function createApiClient(): AxiosInstance {
       if (!response) {
         // Network error or timeout — no HTTP status available
         return Promise.reject(
-          new Error('Network error. Please check your internet connection.'),
+          new Error("We couldn't connect to the server. Please check your connection and try again."),
         );
       }
 
@@ -133,10 +133,10 @@ function createApiClient(): AxiosInstance {
             {},
             { withCredentials: true }
           );
-          
+
           // The exact field name depends on the backend framework (access, access_token, etc)
           const newAccessToken = refreshRes.data.access || refreshRes.data.access_token || refreshRes.data.accessToken || '';
-          
+
           if (newAccessToken) {
             useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
             // Retry the original request

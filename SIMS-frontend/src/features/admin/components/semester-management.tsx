@@ -4,6 +4,7 @@ import { Clock, Plus, Edit2, Trash2 } from 'lucide-react';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Badge,
@@ -111,25 +112,19 @@ export function SemesterManagement() {
         await updateSemester(editingSemester.id, {
           semester_index: formData.semesterIndex,
         });
-        toast.success('Semester updated', { description: `Semester updated successfully.` });
+        toast.success('Semester updated successfully.');
         setEditingSemester(null);
       } else {
         await addSemester({
           academic_year: formData.academicYear.trim(),
           semester_index: formData.semesterIndex,
         });
-        toast.success('Semester created', { description: `New semester created successfully.` });
+        toast.success('Semester created successfully.');
         setIsAddModalOpen(false);
       }
     } catch (err: any) {
-      if (err?.response?.data && typeof err.response.data === 'object') {
-        const apiErrors: Record<string, string> = {};
-        Object.entries(err.response.data).forEach(([key, val]) => {
-          apiErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
-        });
-        setFieldErrors(apiErrors);
-      }
-      toast.error('Operation failed', { description: err?.message || 'Could not save semester.' });
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -139,10 +134,10 @@ export function SemesterManagement() {
     if (!deletingSemester) return;
     try {
       await deleteSemester(deletingSemester.id);
-      toast.success('Semester deleted', { description: `Semester deleted.` });
+      toast.success('Semester deleted successfully.');
       setDeletingSemester(null);
     } catch (err: any) {
-      toast.error('Delete failed', { description: err?.message || 'Could not delete semester.' });
+      toast.error(getUserFriendlyErrorMessage(err));
     }
   };
 

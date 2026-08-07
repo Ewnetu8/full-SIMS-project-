@@ -20,6 +20,7 @@ import {
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Badge,
@@ -140,13 +141,13 @@ export function UserManagement() {
     }
 
     if (formData.role === 'student' && !formData.studentIdentifier.trim()) {
-      errors.studentIdentifier = 'Student Identifier (ID) is required for Student role.';
-      errors.student_identifier = 'Student Identifier (ID) is required for Student role.';
+      errors.studentIdentifier = "Please enter the student's ID before creating the account.";
+      errors.student_identifier = "Please enter the student's ID before creating the account.";
     }
 
     if (formData.role === 'lecturer' && !formData.facultyIdentifier.trim()) {
-      errors.facultyIdentifier = 'Faculty Identifier (ID) is required for Lecturer role.';
-      errors.faculty_identifier = 'Faculty Identifier (ID) is required for Lecturer role.';
+      errors.facultyIdentifier = "Please enter the lecturer's faculty ID before creating the account.";
+      errors.faculty_identifier = "Please enter the lecturer's faculty ID before creating the account.";
     }
 
     setFieldErrors(errors);
@@ -167,7 +168,7 @@ export function UserManagement() {
           role: formData.role,
           department: selectedDept?.name || editingUser.department,
         });
-        toast.success('User updated', { description: `${formData.firstName} ${formData.lastName} account updated successfully.` });
+        toast.success('User account updated successfully.');
         setEditingUser(null);
       } else {
         await addUser({
@@ -180,59 +181,39 @@ export function UserManagement() {
           faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
           department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : null,
         });
-        toast.success('User created', { description: `Account for ${formData.email} created successfully.` });
+        toast.success('User account created successfully.');
         setIsAddModalOpen(false);
         fetchUsers();
       }
     } catch (error: any) {
-      const apiErrors: Record<string, string> = {};
-
-      const extractErrors = (errObj: any) => {
-        if (errObj && typeof errObj === 'object') {
-          Object.entries(errObj).forEach(([key, val]) => {
-            const messageStr = Array.isArray(val) ? val.join(' ') : String(val);
-            apiErrors[key] = messageStr;
-            if (key === 'student_identifier') apiErrors.studentIdentifier = messageStr;
-            if (key === 'faculty_identifier') apiErrors.facultyIdentifier = messageStr;
-            if (key === 'first_name') apiErrors.firstName = messageStr;
-            if (key === 'last_name') apiErrors.lastName = messageStr;
-            if (key === 'department_id') apiErrors.departmentId = messageStr;
-          });
-        }
-      };
-
-      if (error?.errors) {
-        extractErrors(error.errors);
-      } else if (error?.response?.data) {
-        extractErrors(error.response.data);
-      }
-
-      setFieldErrors(apiErrors);
-
-      const errorMessage =
-        (Object.keys(apiErrors).length > 0 ? Object.values(apiErrors).join('. ') : null) ||
-        error?.message ||
-        'Validation or server error occurred.';
-
-      toast.error('Failed to save user', {
-        description: errorMessage,
-      });
+      const parsedFields = parseFieldErrors(error);
+      setFieldErrors(parsedFields);
+      const friendlyMessage = getUserFriendlyErrorMessage(error);
+      toast.error(friendlyMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = (user: AdminUser) => {
+  const handleToggleStatus = async (user: AdminUser) => {
     const nextStatus: UserStatus = user.status === 'active' ? 'inactive' : 'active';
-    updateUser(user.id, { status: nextStatus });
-    toast.success(`User ${nextStatus}`, { description: `${user.firstName} ${user.lastName} is now ${nextStatus}.` });
+    try {
+      await updateUser(user.id, { status: nextStatus });
+      toast.success(`User status updated to ${nextStatus}.`);
+    } catch (error) {
+      toast.error(getUserFriendlyErrorMessage(error));
+    }
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingUser) {
-      deleteUser(deletingUser.id);
-      toast.success('User deleted', { description: `${deletingUser.firstName} ${deletingUser.lastName} deleted.` });
-      setDeletingUser(null);
+      try {
+        await deleteUser(deletingUser.id);
+        toast.success('User account deleted successfully.');
+        setDeletingUser(null);
+      } catch (error) {
+        toast.error(getUserFriendlyErrorMessage(error));
+      }
     }
   };
 

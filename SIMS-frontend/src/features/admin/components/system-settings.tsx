@@ -13,6 +13,7 @@ import {
 import * as React from 'react';
 
 import { toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Button,
@@ -33,10 +34,12 @@ export function SystemSettings() {
   const [formData, setFormData] = React.useState({ ...settings });
 
   const handleSave = () => {
-    updateSettings(formData);
-    toast.success('Settings Saved', {
-      description: 'System settings updated successfully across institutional portal.',
-    });
+    try {
+      updateSettings(formData);
+      toast.success('System settings saved successfully.');
+    } catch (err) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
   const selectClass =

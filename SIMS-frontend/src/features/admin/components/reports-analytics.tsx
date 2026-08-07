@@ -13,6 +13,7 @@ import {
   AppPieChart,
 } from '@/components/charts';
 import { toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import { Button } from '@/components/ui';
 
 import { INITIAL_REPORT_DATA } from '../mock';
@@ -21,9 +22,11 @@ export function ReportsAnalytics() {
   const [timeRange, setTimeRange] = React.useState('semester');
 
   const handleExport = () => {
-    toast.success('Report Exported', {
-      description: 'Institutional analytics summary exported as PDF/CSV artifact.',
-    });
+    try {
+      toast.success('Institutional analytics report exported successfully.');
+    } catch (err) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
   const performanceData = INITIAL_REPORT_DATA.performanceTrends.map((p) => ({

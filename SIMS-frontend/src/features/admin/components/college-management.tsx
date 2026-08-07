@@ -4,6 +4,7 @@ import { Landmark, Plus, Edit2, Trash2, Search } from 'lucide-react';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Button,
@@ -111,7 +112,7 @@ export function CollegeManagement() {
           name: formData.name,
           code: formData.code.toUpperCase(),
         });
-        toast.success('College updated', { description: `${formData.name} updated successfully.` });
+        toast.success('College updated successfully.');
         setEditingCollege(null);
       } else {
         await addCollege({
@@ -119,18 +120,12 @@ export function CollegeManagement() {
           code: formData.code.toUpperCase(),
           university: formData.university || undefined,
         });
-        toast.success('College created', { description: `New college ${formData.name} created successfully.` });
+        toast.success('College created successfully.');
         setIsAddModalOpen(false);
       }
     } catch (err: any) {
-      if (err?.response?.data && typeof err.response.data === 'object') {
-        const apiErrors: Record<string, string> = {};
-        Object.entries(err.response.data).forEach(([key, val]) => {
-          apiErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
-        });
-        setFieldErrors(apiErrors);
-      }
-      toast.error('Operation failed', { description: err?.message || 'Could not save college.' });
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -140,10 +135,10 @@ export function CollegeManagement() {
     if (!deletingCollege) return;
     try {
       await deleteCollege(deletingCollege.id);
-      toast.success('College deleted', { description: `${deletingCollege.name} deleted.` });
+      toast.success('College deleted successfully.');
       setDeletingCollege(null);
     } catch (err: any) {
-      toast.error('Delete failed', { description: err?.message || 'Could not delete college.' });
+      toast.error(getUserFriendlyErrorMessage(err));
     }
   };
 

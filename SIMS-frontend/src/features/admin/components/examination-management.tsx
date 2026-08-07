@@ -13,6 +13,7 @@ import {
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import {
   Badge,
   Button,
@@ -52,18 +53,22 @@ export function ExaminationManagement() {
   }, [fetchExams]);
 
   const handleArchive = (exam: AdminExamOverview) => {
-    archiveExam(exam.id);
-    toast.success('Exam archived', { description: `${exam.title} archived.` });
+    try {
+      archiveExam(exam.id);
+      toast.success('Exam archived successfully.');
+    } catch (err: any) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
   const handleDeleteConfirm = async () => {
     if (deletingExam) {
       try {
         await deleteExam(deletingExam.id);
-        toast.success('Exam removed', { description: `${deletingExam.title} deleted.` });
+        toast.success('Exam record deleted successfully.');
         setDeletingExam(null);
       } catch (err: any) {
-        toast.error('Delete failed', { description: err?.message || 'Could not delete exam.' });
+        toast.error(getUserFriendlyErrorMessage(err));
       }
     }
   };

@@ -10,6 +10,7 @@ import {
 import * as React from 'react';
 
 import { toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { CollegeDepartmentSelect, Label } from '@/components/forms';
 import {
   Badge,
@@ -134,7 +135,7 @@ export function CourseManagement() {
           title: formData.title,
           credit_hours: formData.creditHours,
         });
-        toast.success('Course updated', { description: `${formData.code} - ${formData.title} updated successfully.` });
+        toast.success('Course updated successfully.');
         setEditingCourse(null);
       } else {
         await addCourse({
@@ -144,29 +145,25 @@ export function CourseManagement() {
           program: formData.programId || undefined,
           intended_class_standing: formData.intendedClassStanding || undefined,
         });
-        toast.success('Course created', { description: `${formData.code} created successfully.` });
+        toast.success('Course created successfully.');
         setIsAddModalOpen(false);
       }
     } catch (err: any) {
-      if (err?.response?.data && typeof err.response.data === 'object') {
-        const apiErrors: Record<string, string> = {};
-        Object.entries(err.response.data).forEach(([key, val]) => {
-          apiErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
-        });
-        setFieldErrors(apiErrors);
-      }
-      toast.error('Operation failed', { description: err?.message || 'Could not save course.' });
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleToggleArchive = (course: Course) => {
-    toggleCourseArchive(course.id);
-    const isArchived = course.status === 'active';
-    toast.success(`Course ${isArchived ? 'archived' : 'restored'}`, {
-      description: `${course.code} is now ${isArchived ? 'archived' : 'active'}.`,
-    });
+    try {
+      toggleCourseArchive(course.id);
+      const isArchived = course.status === 'active';
+      toast.success(`Course ${isArchived ? 'archived' : 'restored'} successfully.`);
+    } catch (err: any) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
   const filteredCourses = courses.filter((c) => {

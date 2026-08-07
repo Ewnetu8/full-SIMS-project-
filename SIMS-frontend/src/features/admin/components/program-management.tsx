@@ -4,6 +4,7 @@ import { Layers, Plus, Edit2, Trash2 } from 'lucide-react';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Badge,
@@ -179,35 +180,17 @@ export function ProgramManagement() {
     try {
       if (editingProgram) {
         await updateProgram(editingProgram.id, payload);
-        toast.success('Program updated', { description: `${formData.name.trim()} updated successfully.` });
+        toast.success('Program updated successfully.');
         setEditingProgram(null);
       } else {
         await addProgram(payload);
-        toast.success('Program created', { description: `New program ${formData.name.trim()} created successfully.` });
+        toast.success('Program created successfully.');
         setIsAddModalOpen(false);
       }
       await fetchPrograms();
     } catch (err: any) {
-      const apiErrors: Record<string, string> = {};
-      const backendErrors = err?.errors || err?.response?.data;
-
-      if (backendErrors && typeof backendErrors === 'object') {
-        Object.entries(backendErrors).forEach(([key, val]) => {
-          apiErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
-        });
-        setFieldErrors(apiErrors);
-      }
-
-      const errorMsg =
-        (backendErrors && typeof backendErrors === 'object'
-          ? Object.entries(backendErrors)
-              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`)
-              .join(' | ')
-          : null) ||
-        err?.message ||
-        'Could not save program.';
-
-      toast.error('Operation failed', { description: errorMsg });
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -217,10 +200,11 @@ export function ProgramManagement() {
     if (!deletingProgram) return;
     try {
       await deleteProgram(deletingProgram.id);
-      toast.success('Program deleted', { description: `${deletingProgram.name} deleted.` });
+      toast.success('Program deleted successfully.');
       setDeletingProgram(null);
+      await fetchPrograms();
     } catch (err: any) {
-      toast.error('Delete failed', { description: err?.message || 'Could not delete program.' });
+      toast.error(getUserFriendlyErrorMessage(err));
     }
   };
 

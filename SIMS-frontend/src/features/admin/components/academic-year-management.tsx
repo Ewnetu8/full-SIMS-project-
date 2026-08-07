@@ -4,6 +4,7 @@ import { Calendar, Plus, Edit2, Trash2 } from 'lucide-react';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Button,
@@ -106,7 +107,7 @@ export function AcademicYearManagement() {
           start_boundary: formData.start_boundary,
           end_boundary: formData.end_boundary,
         });
-        toast.success('Academic Year updated', { description: `${formData.display_label} updated.` });
+        toast.success('Academic year updated successfully.');
         setEditingYear(null);
       } else {
         await addAcademicYear({
@@ -114,18 +115,12 @@ export function AcademicYearManagement() {
           start_boundary: formData.start_boundary,
           end_boundary: formData.end_boundary,
         });
-        toast.success('Academic Year created', { description: `New academic year ${formData.display_label} created.` });
+        toast.success('Academic year created successfully.');
         setIsAddModalOpen(false);
       }
     } catch (err: any) {
-      if (err?.response?.data && typeof err.response.data === 'object') {
-        const apiErrors: Record<string, string> = {};
-        Object.entries(err.response.data).forEach(([key, val]) => {
-          apiErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
-        });
-        setFieldErrors(apiErrors);
-      }
-      toast.error('Operation failed', { description: err?.message || 'Could not save academic year.' });
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -135,10 +130,10 @@ export function AcademicYearManagement() {
     if (!deletingYear) return;
     try {
       await deleteAcademicYear(deletingYear.id);
-      toast.success('Academic Year deleted', { description: `${deletingYear.displayLabel} deleted.` });
+      toast.success('Academic year deleted successfully.');
       setDeletingYear(null);
     } catch (err: any) {
-      toast.error('Delete failed', { description: err?.message || 'Could not delete academic year.' });
+      toast.error(getUserFriendlyErrorMessage(err));
     }
   };
 

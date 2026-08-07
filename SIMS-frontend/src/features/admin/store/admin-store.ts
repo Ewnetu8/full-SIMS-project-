@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { adminService, type RegisterUserPayload } from '../services/admin-service';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
 
 import type {
   AdminUser,
@@ -247,11 +248,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       const users = await adminService.getUsers();
       set({ users, isLoadingUsers: false, usersError: null });
     } catch (err: any) {
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Unable to load users. Please check your connection and try again.';
-      set({ users: [], isLoadingUsers: false, usersError: errorMessage });
+      set({ users: [], isLoadingUsers: false, usersError: getUserFriendlyErrorMessage(err) });
     }
   },
 
@@ -285,11 +282,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       const departments = await adminService.getDepartments();
       set({ departments, isLoadingDepartments: false, departmentsError: null });
     } catch (err: any) {
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Unable to retrieve department records from the server. Please verify your connection and try again.';
-      set({ departments: [], isLoadingDepartments: false, departmentsError: errorMessage });
+      set({ departments: [], isLoadingDepartments: false, departmentsError: getUserFriendlyErrorMessage(err) });
     }
   },
 

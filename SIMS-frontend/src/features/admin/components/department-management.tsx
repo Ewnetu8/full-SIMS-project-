@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Badge,
@@ -143,7 +144,7 @@ export function DepartmentManagement() {
           name: formData.name.trim(),
           college: formData.collegeId || undefined,
         });
-        toast.success('Department updated', { description: `${formData.name.trim()} updated successfully.` });
+        toast.success('Department updated successfully.');
         setEditingDept(null);
       } else {
         await addDepartment({
@@ -151,31 +152,13 @@ export function DepartmentManagement() {
           name: formData.name.trim(),
           college: formData.collegeId || undefined,
         });
-        toast.success('Department created', { description: `New department ${formData.name.trim()} created successfully.` });
+        toast.success('Department created successfully.');
         setIsAddModalOpen(false);
       }
       await fetchDepartments();
     } catch (err: any) {
-      const apiErrors: Record<string, string> = {};
-      const backendErrors = err?.errors || err?.response?.data;
-
-      if (backendErrors && typeof backendErrors === 'object') {
-        Object.entries(backendErrors).forEach(([key, val]) => {
-          apiErrors[key] = Array.isArray(val) ? val.join(' ') : String(val);
-        });
-        setFieldErrors(apiErrors);
-      }
-
-      const errorMsg =
-        (err?.errors && typeof err.errors === 'object'
-          ? Object.entries(err.errors)
-              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`)
-              .join(' | ')
-          : null) ||
-        err?.message ||
-        'Could not save department.';
-
-      toast.error('Operation failed', { description: errorMsg });
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -189,9 +172,7 @@ export function DepartmentManagement() {
           name: assigningHODDept.name,
           code: assigningHODDept.code,
         });
-        toast.success('Head of Department assigned', {
-          description: `Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName} assigned as HOD for ${assigningHODDept.name}.`,
-        });
+        toast.success(`Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName} assigned as HOD for ${assigningHODDept.name}.`);
       }
       setAssigningHODDept(null);
     }
@@ -201,11 +182,11 @@ export function DepartmentManagement() {
     if (deletingDept) {
       try {
         await deleteDepartment(deletingDept.id);
-        toast.success('Department deleted', { description: `${deletingDept.name} deleted.` });
+        toast.success('Department deleted successfully.');
         setDeletingDept(null);
         await fetchDepartments();
       } catch (err: any) {
-        toast.error('Delete failed', { description: err?.message || 'Could not delete department.' });
+        toast.error(getUserFriendlyErrorMessage(err));
       }
     }
   };
