@@ -78,19 +78,43 @@ function createApiClient(): AxiosInstance {
       }
 
       // Normalise the backend response into the ApiErrorResponse shape.
-      // Django REST Framework uses `detail` (string) for error messages,
-      // but our frontend ApiErrorResponse expects `message` + `statusCode`.
+      // Django REST Framework uses `detail` (string) for error messages or key-value dictionary for field validation errors.
       const raw = response.data as Record<string, unknown> | undefined;
+      let fieldErrors: Record<string, string[]> | undefined = (raw?.errors as Record<string, string[]>) ?? undefined;
+
+      if (!fieldErrors && raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const potentialErrors: Record<string, string[]> = {};
+        let hasFieldErrors = false;
+        Object.entries(raw).forEach(([k, v]) => {
+          if (k !== 'message' && k !== 'detail' && k !== 'statusCode' && k !== 'timestamp') {
+            const arr = Array.isArray(v) ? v.map(String) : [String(v)];
+            potentialErrors[k] = arr;
+            hasFieldErrors = true;
+          }
+        });
+        if (hasFieldErrors) {
+          fieldErrors = potentialErrors;
+        }
+      }
+
+      let messageStr =
+        (raw?.message as string) ||
+        (raw?.detail as string) ||
+        (typeof raw?.detail === 'object' && raw?.detail !== null ? JSON.stringify(raw.detail) : '') ||
+        '';
+
+      if (!messageStr && fieldErrors && Object.keys(fieldErrors).length > 0) {
+        const firstField = Object.keys(fieldErrors)[0];
+        if (firstField && fieldErrors[firstField]) {
+          const firstErr = fieldErrors[firstField]?.[0] || 'Validation error';
+          messageStr = `${firstField}: ${firstErr}`;
+        }
+      }
+
       const normalised: ApiErrorResponse = {
-        message:
-          (raw?.message as string) ||
-          (raw?.detail as string) ||
-          (typeof raw?.detail === 'object' && raw?.detail !== null
-            ? JSON.stringify(raw.detail)
-            : '') ||
-          '',
+        message: messageStr || response.statusText || 'An error occurred',
         statusCode: (raw?.statusCode as number) || response.status,
-        errors: (raw?.errors as Record<string, string[]>) ?? undefined,
+        errors: fieldErrors,
         timestamp: (raw?.timestamp as string) || new Date().toISOString(),
       };
 

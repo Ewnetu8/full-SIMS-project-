@@ -29,7 +29,6 @@ export interface RegisterUserPayload {
   first_name: string;
   last_name: string;
   role: 'STUDENT' | 'LECTURER' | 'ADMIN';
-  national_id_fan?: string | null;
   student_identifier?: string;
   faculty_identifier?: string;
   department_id?: string | null;
@@ -83,25 +82,13 @@ export const adminService = {
       role: roleUpper,
     };
 
-    if (data.national_id_fan && data.national_id_fan.trim()) {
-      payload.national_id_fan = data.national_id_fan.trim();
-    }
-
     // Dynamic Role-Specific Fields
     if (roleUpper === 'STUDENT') {
-      if (data.student_identifier && data.student_identifier.trim()) {
-        payload.student_identifier = data.student_identifier.trim();
-      }
-      if (data.department_id && isValidUuid(data.department_id)) {
-        payload.department_id = data.department_id;
-      }
+      payload.student_identifier = data.student_identifier ? data.student_identifier.trim() : '';
+      payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
     } else if (roleUpper === 'LECTURER') {
-      if (data.faculty_identifier && data.faculty_identifier.trim()) {
-        payload.faculty_identifier = data.faculty_identifier.trim();
-      }
-      if (data.department_id && isValidUuid(data.department_id)) {
-        payload.department_id = data.department_id;
-      }
+      payload.faculty_identifier = data.faculty_identifier ? data.faculty_identifier.trim() : '';
+      payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
     }
 
     if (process.env.NODE_ENV !== 'production') {

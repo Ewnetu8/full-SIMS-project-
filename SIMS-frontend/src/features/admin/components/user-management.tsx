@@ -20,7 +20,7 @@ import {
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
-import { CollegeDepartmentSelect, Label } from '@/components/forms';
+import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -50,14 +50,12 @@ export function UserManagement() {
     isLoadingUsers,
     usersError,
     departments,
-    colleges,
     userSearchQuery,
     userRoleFilter,
     userDeptFilter,
     userStatusFilter,
     fetchUsers,
     fetchDepartments,
-    fetchColleges,
     addUser,
     updateUser,
     deleteUser,
@@ -70,8 +68,7 @@ export function UserManagement() {
   React.useEffect(() => {
     fetchUsers();
     fetchDepartments();
-    fetchColleges();
-  }, [fetchUsers, fetchDepartments, fetchColleges]);
+  }, [fetchUsers, fetchDepartments]);
 
   // Modals & Drawers state
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
@@ -89,9 +86,7 @@ export function UserManagement() {
     role: 'student' as UserRole,
     studentIdentifier: '',
     facultyIdentifier: '',
-    collegeId: '',
     departmentId: '',
-    nationalIdFan: '',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -106,9 +101,7 @@ export function UserManagement() {
       role: 'student',
       studentIdentifier: '',
       facultyIdentifier: '',
-      collegeId: colleges[0]?.id || '',
       departmentId: departments[0]?.id || '',
-      nationalIdFan: '',
     });
     setIsAddModalOpen(true);
   };
@@ -125,9 +118,7 @@ export function UserManagement() {
       role: user.role,
       studentIdentifier: '',
       facultyIdentifier: '',
-      collegeId: userDept?.college || colleges[0]?.id || '',
       departmentId: userDept?.id || '',
-      nationalIdFan: '',
     });
   };
 
@@ -185,10 +176,9 @@ export function UserManagement() {
           email: formData.email,
           password: formData.password,
           role: formData.role.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN',
-          national_id_fan: formData.nationalIdFan || undefined,
           student_identifier: formData.role === 'student' ? formData.studentIdentifier : undefined,
           faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
-          department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : undefined,
+          department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : null,
         });
         toast.success('User created', { description: `Account for ${formData.email} created successfully.` });
         setIsAddModalOpen(false);
@@ -197,36 +187,32 @@ export function UserManagement() {
     } catch (error: any) {
       const apiErrors: Record<string, string> = {};
 
-      if (error?.errors && typeof error.errors === 'object') {
-        Object.entries(error.errors).forEach(([key, val]) => {
-          const messageStr = Array.isArray(val) ? val.join(' ') : String(val);
-          apiErrors[key] = messageStr;
-          // Map backend field names to camelCase form fields
-          if (key === 'student_identifier') apiErrors.studentIdentifier = messageStr;
-          if (key === 'faculty_identifier') apiErrors.facultyIdentifier = messageStr;
-          if (key === 'first_name') apiErrors.firstName = messageStr;
-          if (key === 'last_name') apiErrors.lastName = messageStr;
-          if (key === 'department_id') apiErrors.departmentId = messageStr;
-          if (key === 'national_id_fan') apiErrors.nationalIdFan = messageStr;
-        });
-      } else if (error?.response?.data && typeof error.response.data === 'object') {
-        Object.entries(error.response.data).forEach(([key, val]) => {
-          const messageStr = Array.isArray(val) ? val.join(' ') : String(val);
-          apiErrors[key] = messageStr;
-          if (key === 'student_identifier') apiErrors.studentIdentifier = messageStr;
-          if (key === 'faculty_identifier') apiErrors.facultyIdentifier = messageStr;
-          if (key === 'first_name') apiErrors.firstName = messageStr;
-          if (key === 'last_name') apiErrors.lastName = messageStr;
-          if (key === 'department_id') apiErrors.departmentId = messageStr;
-          if (key === 'national_id_fan') apiErrors.nationalIdFan = messageStr;
-        });
+      const extractErrors = (errObj: any) => {
+        if (errObj && typeof errObj === 'object') {
+          Object.entries(errObj).forEach(([key, val]) => {
+            const messageStr = Array.isArray(val) ? val.join(' ') : String(val);
+            apiErrors[key] = messageStr;
+            if (key === 'student_identifier') apiErrors.studentIdentifier = messageStr;
+            if (key === 'faculty_identifier') apiErrors.facultyIdentifier = messageStr;
+            if (key === 'first_name') apiErrors.firstName = messageStr;
+            if (key === 'last_name') apiErrors.lastName = messageStr;
+            if (key === 'department_id') apiErrors.departmentId = messageStr;
+          });
+        }
+      };
+
+      if (error?.errors) {
+        extractErrors(error.errors);
+      } else if (error?.response?.data) {
+        extractErrors(error.response.data);
       }
 
       setFieldErrors(apiErrors);
 
       const errorMessage =
+        (Object.keys(apiErrors).length > 0 ? Object.values(apiErrors).join('. ') : null) ||
         error?.message ||
-        (Object.keys(apiErrors).length > 0 ? Object.values(apiErrors)[0] : 'Validation or server error occurred.');
+        'Validation or server error occurred.';
 
       toast.error('Failed to save user', {
         description: errorMessage,
@@ -589,18 +575,6 @@ export function UserManagement() {
                 </select>
                 {fieldErrors.role && <p className="text-xs text-destructive mt-1">{fieldErrors.role}</p>}
               </div>
-
-              <div>
-                <Label htmlFor="nationalIdFan">National ID / FAN (Optional)</Label>
-                <Input
-                  id="nationalIdFan"
-                  value={formData.nationalIdFan}
-                  onChange={(e) => setFormData({ ...formData, nationalIdFan: e.target.value })}
-                  placeholder="e.g. FAN-987654"
-                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
-                />
-                {fieldErrors.national_id_fan && <p className="text-xs text-destructive mt-1">{fieldErrors.national_id_fan}</p>}
-              </div>
             </div>
 
             {/* Dynamic Role-Specific Fields */}
@@ -621,13 +595,24 @@ export function UserManagement() {
                   {fieldErrors.student_identifier && <p className="text-xs text-destructive mt-1">{fieldErrors.student_identifier}</p>}
                 </div>
 
-                <CollegeDepartmentSelect
-                  collegeValue={formData.collegeId}
-                  onCollegeChange={(colId) => setFormData((prev) => ({ ...prev, collegeId: colId }))}
-                  departmentValue={formData.departmentId}
-                  onDepartmentChange={(deptId) => setFormData((prev) => ({ ...prev, departmentId: deptId }))}
-                  departmentError={fieldErrors.department_id}
-                />
+                <div>
+                  <Label htmlFor="studentDepartment">Department</Label>
+                  <select
+                    id="studentDepartment"
+                    className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                    value={formData.departmentId}
+                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.departmentId && <p className="text-xs text-destructive mt-1">{fieldErrors.departmentId}</p>}
+                  {fieldErrors.department_id && <p className="text-xs text-destructive mt-1">{fieldErrors.department_id}</p>}
+                </div>
               </div>
             )}
 
@@ -648,13 +633,24 @@ export function UserManagement() {
                   {fieldErrors.faculty_identifier && <p className="text-xs text-destructive mt-1">{fieldErrors.faculty_identifier}</p>}
                 </div>
 
-                <CollegeDepartmentSelect
-                  collegeValue={formData.collegeId}
-                  onCollegeChange={(colId) => setFormData((prev) => ({ ...prev, collegeId: colId }))}
-                  departmentValue={formData.departmentId}
-                  onDepartmentChange={(deptId) => setFormData((prev) => ({ ...prev, departmentId: deptId }))}
-                  departmentError={fieldErrors.department_id}
-                />
+                <div>
+                  <Label htmlFor="lecturerDepartment">Department</Label>
+                  <select
+                    id="lecturerDepartment"
+                    className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                    value={formData.departmentId}
+                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.departmentId && <p className="text-xs text-destructive mt-1">{fieldErrors.departmentId}</p>}
+                  {fieldErrors.department_id && <p className="text-xs text-destructive mt-1">{fieldErrors.department_id}</p>}
+                </div>
               </div>
             )}
           </div>
