@@ -5,3 +5,4 @@
 export * from './questions-api';
 export * from './examinations-api';
 export * from './academic-api';
+export * from './lecturer-service';
