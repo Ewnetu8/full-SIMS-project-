@@ -34,9 +34,14 @@ export function StudentManagement() {
     departments,
     studentSearchQuery,
     studentDeptFilter,
+    fetchStudents,
     setStudentSearchQuery,
     setStudentDeptFilter,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
 
   const [selectedStudent, setSelectedStudent] = React.useState<StudentProfile | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);

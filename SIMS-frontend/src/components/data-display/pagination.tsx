@@ -198,8 +198,8 @@ function PaginationButton({ active, className, children, ...props }: PaginationB
         'flex h-8 min-w-8 items-center justify-center rounded-md border px-1.5 text-sm',
         'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
         active
-          ? 'border-primary bg-primary text-white font-medium'
-          : 'border-border bg-background hover:bg-accent hover:text-accent-foreground',
+          ? 'border-[#102A7A] bg-[#102A7A] text-white font-semibold dark:border-primary dark:bg-primary'
+          : 'border-border bg-white text-[#102A7A] hover:bg-[#B08A00] hover:text-[#102A7A] dark:bg-background dark:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground',
         'disabled:pointer-events-none disabled:opacity-40',
         className,
       )}

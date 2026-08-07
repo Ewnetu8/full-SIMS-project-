@@ -162,8 +162,8 @@ function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
         'group flex items-center gap-3 rounded-lg px-2 py-2 text-sm',
         'transition-all duration-200 relative',
         isActive
-          ? 'bg-sidebar-accent text-white [&_svg]:text-white font-semibold shadow-xs'
-          : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/10',
+          ? 'bg-[#102A7A] dark:bg-sidebar-accent text-white [&_svg]:text-white font-semibold shadow-xs'
+          : 'text-slate-600 dark:text-sidebar-muted [&_svg]:text-slate-500 dark:[&_svg]:text-sidebar-muted hover:bg-blue-50 dark:hover:bg-sidebar-accent/10 hover:text-[#102A7A] dark:hover:text-sidebar-foreground hover:[&_svg]:text-[#102A7A] dark:hover:[&_svg]:text-sidebar-foreground',
       )}
       aria-current={isActive ? 'page' : undefined}
     >

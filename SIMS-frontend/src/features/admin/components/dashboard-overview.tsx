@@ -33,17 +33,51 @@ import { useAdminStore } from '../store';
 
 export function DashboardOverview() {
   const router = useRouter();
-  const { users, students, lecturers, departments, courses, exams, aiJobs, auditLogs } = useAdminStore();
+  const {
+    users,
+    students,
+    lecturers,
+    departments,
+    colleges,
+    programs,
+    courses,
+    exams,
+    aiJobs,
+    auditLogs,
+    fetchUsers,
+    fetchStudents,
+    fetchLecturers,
+    fetchColleges,
+    fetchDepartments,
+    fetchPrograms,
+    fetchAcademicYears,
+    fetchCourses,
+    fetchExams,
+  } = useAdminStore();
 
-  const totalStudents = students.length || 1440;
-  const totalLecturers = lecturers.length || 42;
-  const totalAdmins = users.filter((u) => u.role === 'admin').length || 6;
-  const totalCourses = courses.length || 66;
-  const totalDepts = departments.length || 4;
-  const totalExamsCount = exams.length || 38;
-  const activeExamsCount = exams.filter((e) => e.status === 'active').length || 3;
-  const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length || 2;
-  const publishedExamsCount = exams.filter((e) => e.status === 'published').length || 32;
+  React.useEffect(() => {
+    fetchUsers();
+    fetchStudents();
+    fetchLecturers();
+    fetchColleges();
+    fetchDepartments();
+    fetchPrograms();
+    fetchAcademicYears();
+    fetchCourses();
+    fetchExams();
+  }, [fetchUsers, fetchStudents, fetchLecturers, fetchColleges, fetchDepartments, fetchPrograms, fetchAcademicYears, fetchCourses, fetchExams]);
+
+  const totalStudents = students.length;
+  const totalLecturers = lecturers.length;
+  const totalAdmins = users.filter((u) => u.role === 'admin').length;
+  const totalCourses = courses.length;
+  const totalDepts = departments.length;
+  const totalColleges = colleges.length;
+  const totalPrograms = programs.length;
+  const totalExamsCount = exams.length;
+  const activeExamsCount = exams.filter((e) => e.status === 'active').length;
+  const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length;
+  const publishedExamsCount = exams.filter((e) => e.status === 'published').length;
 
   const statCards = [
     { label: 'Total Students', value: totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-primary', bg: 'bg-primary/10', trend: '+12% this term' },
@@ -186,7 +220,7 @@ export function DashboardOverview() {
                 <Activity className="h-4 w-4 text-success" /> Infrastructure & AI Engine Health
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Real-time server metrics, database load, and AI grading cluster status.
+                Overview of system health, active background services, and evaluation activity.
               </p>
             </div>
             <Badge variant="outline" className="border-success/30 text-success bg-success/10 gap-1.5">
@@ -199,7 +233,7 @@ export function DashboardOverview() {
             <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Cpu className="h-3.5 w-3.5 text-primary" /> CPU Cluster Load
+                  <Cpu className="h-3.5 w-3.5 text-primary" /> System CPU Usage
                 </span>
                 <span className="font-semibold text-foreground">28.4%</span>
               </div>
@@ -223,19 +257,19 @@ export function DashboardOverview() {
             <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Database className="h-3.5 w-3.5 text-success" /> DB Connection Pool
+                  <Database className="h-3.5 w-3.5 text-success" /> Database Health
                 </span>
-                <span className="font-semibold text-foreground">48 / 200</span>
+                <span className="font-semibold text-foreground">Active</span>
               </div>
               <Progress value={24} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">PostgreSQL cluster latency: 14ms</span>
+              <span className="text-[10px] text-muted-foreground">Database response latency: 14ms</span>
             </div>
 
             {/* AI Model Worker Pool */}
             <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
               <div className="flex items-center justify-between text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Brain className="h-3.5 w-3.5 text-ai-primary" /> AI Evaluation Cluster
+                  <Brain className="h-3.5 w-3.5 text-ai-primary" /> Automated Grading Engine
                 </span>
                 <span className="font-semibold text-success">ONLINE</span>
               </div>

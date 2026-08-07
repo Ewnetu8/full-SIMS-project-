@@ -33,8 +33,11 @@ import type { AdminExamOverview } from '../types';
 export function ExaminationManagement() {
   const {
     exams,
+    isLoadingExams,
     examSearchQuery,
     examStatusFilter,
+    fetchExams,
+    addExam,
     archiveExam,
     deleteExam,
     setExamSearchQuery,
@@ -44,16 +47,24 @@ export function ExaminationManagement() {
   const [selectedExam, setSelectedExam] = React.useState<AdminExamOverview | null>(null);
   const [deletingExam, setDeletingExam] = React.useState<AdminExamOverview | null>(null);
 
+  React.useEffect(() => {
+    fetchExams();
+  }, [fetchExams]);
+
   const handleArchive = (exam: AdminExamOverview) => {
     archiveExam(exam.id);
     toast.success('Exam archived', { description: `${exam.title} archived.` });
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingExam) {
-      deleteExam(deletingExam.id);
-      toast.success('Exam removed', { description: `${deletingExam.title} deleted.` });
-      setDeletingExam(null);
+      try {
+        await deleteExam(deletingExam.id);
+        toast.success('Exam removed', { description: `${deletingExam.title} deleted.` });
+        setDeletingExam(null);
+      } catch (err: any) {
+        toast.error('Delete failed', { description: err?.message || 'Could not delete exam.' });
+      }
     }
   };
 

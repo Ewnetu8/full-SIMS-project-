@@ -11,7 +11,6 @@ export const API_ENDPOINTS = {
     REFRESH: '/api/v1/auth/refresh',
     FORGOT_PASSWORD: '/api/v1/auth/forgot-password',
     RESET_PASSWORD: '/api/v1/auth/reset-password',
-    ME: '/api/v1/auth/me',
   },
 
   // ── Users ─────────────────────────────────────────────────────────────────
@@ -21,13 +20,47 @@ export const API_ENDPOINTS = {
     PROFILE: '/users/profile',
   },
 
+  // ── Academics ─────────────────────────────────────────────────────────────
+  ACADEMICS: {
+    UNIVERSITIES: '/api/v1/universities',
+    UNIVERSITY_BY_ID: (id: string) => `/api/v1/universities/${id}`,
+    COLLEGES: '/api/v1/colleges',
+    COLLEGE_BY_ID: (id: string) => `/api/v1/colleges/${id}`,
+    DEPARTMENTS: '/api/v1/departments',
+    DEPARTMENT_BY_ID: (id: string) => `/api/v1/departments/${id}`,
+    PROGRAMS: '/api/v1/programs',
+    PROGRAM_BY_ID: (id: string) => `/api/v1/programs/${id}`,
+    ACADEMIC_YEARS: '/api/v1/academic-years',
+    ACADEMIC_YEAR_BY_ID: (id: string) => `/api/v1/academic-years/${id}`,
+    SEMESTERS: '/api/v1/semesters',
+    SEMESTER_BY_ID: (id: string) => `/api/v1/semesters/${id}`,
+    COURSES: '/api/v1/courses',
+    COURSE_BY_ID: (id: string) => `/api/v1/courses/${id}`,
+    COURSE_OFFERINGS: '/api/v1/course-offerings',
+    COURSE_OFFERING_BY_ID: (id: string) => `/api/v1/course-offerings/${id}`,
+    ENROLLMENTS: '/api/v1/enrollments',
+    ENROLLMENT_BY_ID: (id: string) => `/api/v1/enrollments/${id}`,
+    BATCH_ENROLLMENT_IMPORT: '/api/v1/enrollments/batch-import',
+  },
+
+  // ── Questions ─────────────────────────────────────────────────────────────
+  QUESTIONS: {
+    ROOT: '/api/v1/questions',
+    BY_ID: (id: string) => `/api/v1/questions/${id}`,
+    OPTIONS: '/api/v1/questions/options',
+    OPTION_BY_ID: (id: string) => `/api/v1/questions/options/${id}`,
+    TAGS: '/api/v1/tags',
+    TAG_BY_ID: (id: string) => `/api/v1/tags/${id}`,
+  },
+
   // ── Exams ─────────────────────────────────────────────────────────────────
   EXAMS: {
-    ROOT: '/exams',
-    BY_ID: (id: string) => `/exams/${id}`,
-    SUBMIT: (id: string) => `/exams/${id}/submit`,
-    RESULTS: (id: string) => `/exams/${id}/results`,
-    QUESTIONS: (id: string) => `/exams/${id}/questions`,
+    ROOT: '/api/v1/exams',
+    BY_ID: (id: string) => `/api/v1/exams/${id}`,
+    SCHEDULE: (id: string) => `/api/v1/exams/${id}/schedule`,
+    START: (id: string) => `/api/v1/exams/${id}/start`,
+    SUBMIT: (id: string) => `/api/v1/exams/${id}/submit`,
+    ACTIVE: '/api/v1/exams/active',
   },
 
   // ── Grades ────────────────────────────────────────────────────────────────
@@ -47,7 +80,7 @@ export const API_ENDPOINTS = {
 
   // ── Departments ───────────────────────────────────────────────────────────
   DEPARTMENTS: {
-    ROOT: '/departments',
-    BY_ID: (id: string) => `/departments/${id}`,
+    ROOT: '/api/v1/departments',
+    BY_ID: (id: string) => `/api/v1/departments/${id}`,
   },
 } as const;

@@ -3,6 +3,8 @@ import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 
 import { authApi } from '../services';
 
+import { toast } from '@/components/feedback';
+
 import type { AuthState, AuthActions } from '../types';
 import type { AuthSession, AuthTokens, BaseUser } from '@/types';
 import type { StateStorage } from 'zustand/middleware';
@@ -213,6 +215,90 @@ export const useAuthStore = create<AuthStore>()(
             false,
             'auth/refreshSession',
           ),
+
+        /**
+         * Restore session from HttpOnly refresh cookie during application startup.
+         */
+        initializeAuth: async () => {
+          set({ isLoading: true }, false, 'auth/initialize/start');
+
+          const hasRehydratedToken = !!get().tokens?.accessToken;
+          const hasRehydratedUser = !!get().user;
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[DEV LOG] App auth initialization started. Rehydrated session present:', {
+              hasToken: hasRehydratedToken,
+              hasUser: hasRehydratedUser,
+            });
+          }
+
+          try {
+            const res = await authApi.refreshToken();
+            const newAccessToken = (res as any).access || (res as any).access_token || (res as any).accessToken || res.tokens?.accessToken || '';
+
+            if (newAccessToken) {
+              set(
+                {
+                  tokens: { accessToken: newAccessToken },
+                  isAuthenticated: true,
+                  isLoading: false,
+                },
+                false,
+                'auth/initialize/success'
+              );
+
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[DEV LOG] User session successfully restored via refresh endpoint.');
+              }
+              return;
+            } else {
+              throw new Error('No access token returned from refresh endpoint');
+            }
+          } catch (error: any) {
+            const statusCode = error?.response?.status || error?.statusCode || 0;
+            const message = error?.message || error;
+
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[DEV LOG] Refresh token request failed:', { statusCode, reason: message });
+            }
+
+            // 401 Unauthorized means the refresh token is genuinely invalid or expired.
+            if (statusCode === 401) {
+              const hadPreviousSession = get().isAuthenticated || hasRehydratedUser;
+              get().clearSession();
+
+              if (hadPreviousSession) {
+                try {
+                  toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+                } catch {
+                  // Ignore toast errors if component not mounted
+                }
+              }
+              return;
+            }
+
+            // Non-401 errors (e.g. 403 CSRF verification failure or network/CORS error):
+            // If the user already has a rehydrated session (user + accessToken), preserve it so page reloads do not log out the user!
+            if (hasRehydratedToken && hasRehydratedUser) {
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[DEV LOG] Preserving rehydrated session for authenticated user:', get().user?.email);
+              }
+              set(
+                {
+                  isAuthenticated: true,
+                  isLoading: false,
+                },
+                false,
+                'auth/initialize/preserved'
+              );
+              return;
+            }
+
+            get().clearSession();
+          } finally {
+            set({ isLoading: false }, false, 'auth/initialize/complete');
+          }
+        },
 
         /**
          * Update the current user's profile data without resetting the session.

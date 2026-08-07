@@ -5,7 +5,7 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface AdminUser {
   id: string;
-  userId: string; // e.g. "USR-1092"
+  userId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -15,6 +15,8 @@ export interface AdminUser {
   lastLogin: string;
   avatarUrl?: string;
   phone?: string;
+  studentIdentifier?: string;
+  facultyIdentifier?: string;
   createdAt: string;
 }
 
@@ -50,6 +52,7 @@ export interface Department {
   id: string;
   code: string; // e.g. "CS"
   name: string; // e.g. "Computer Science & Software Engineering"
+  college?: string | null;
   description: string;
   headOfDepartment: {
     id: string;
@@ -60,6 +63,44 @@ export interface Department {
   studentCount: number;
   courseCount: number;
   createdAt: string;
+}
+
+export interface College {
+  id: string;
+  name: string;
+  code: string;
+  university?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Program {
+  id: string;
+  department: string;
+  name: string;
+  code: string;
+  degreeLevel: 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA' | 'CERTIFICATE';
+  totalCreditHoursRequired: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AcademicYear {
+  id: string;
+  displayLabel: string;
+  startBoundary: string;
+  endBoundary: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Semester {
+  id: string;
+  academicYear: string;
+  academicYearDetail?: AcademicYear;
+  semesterIndex: 'FIRST' | 'SECOND';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Course {

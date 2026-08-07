@@ -34,7 +34,7 @@ const SelectTrigger = React.forwardRef<
         'flex w-full items-center justify-between rounded-lg border bg-background',
         'text-foreground transition-all duration-200',
         'placeholder:text-muted-foreground',
-        'focus:outline-none focus:ring-2 focus:ring-ring',
+        'focus:outline-none focus:border-[#102A7A] focus:ring-2 focus:ring-[#B08A00] dark:focus:border-primary dark:focus:ring-ring',
         'disabled:cursor-not-allowed disabled:opacity-50',
         '[&>span]:line-clamp-1',
         error ? 'border-destructive' : 'border-input',
@@ -143,7 +143,7 @@ const SelectItem = React.forwardRef<
     className={cn(
       'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm',
       'outline-none transition-colors',
-      'focus:bg-accent focus:text-accent-foreground',
+      'focus:bg-[#B08A00] focus:text-[#102A7A] data-[state=checked]:bg-[#102A7A] data-[state=checked]:text-white dark:focus:bg-accent dark:focus:text-accent-foreground dark:data-[state=checked]:bg-primary dark:data-[state=checked]:text-white',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className,
     )}

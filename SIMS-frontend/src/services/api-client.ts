@@ -13,13 +13,26 @@ import { toast } from '@/components/feedback';
 
 import type { ApiErrorResponse } from '@/types';
 
+// ─── CSRF Helper ──────────────────────────────────────────────────────────────
+
+/**
+ * Read the Django CSRF token from the browser cookie.
+ * Django sets a readable (non-HttpOnly) `csrftoken` cookie which is required
+ * in the `X-CSRFToken` header for state-mutating requests.
+ */
+function getCsrfToken(): string {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : '';
+}
+
 // ─── Axios Client Factory ─────────────────────────────────────────────────────
 
 /**
  * Creates a pre-configured Axios instance with:
  * - Base URL from environment
  * - JSON content-type headers
- * - Request interceptor (for auth token injection — ready for Phase 2)
+ * - Request interceptor (for auth token & CSRF token injection)
  * - Response interceptor (normalises API errors into typed ApiError instances)
  */
 function createApiClient(): AxiosInstance {
@@ -39,6 +52,10 @@ function createApiClient(): AxiosInstance {
       const token = useAuthStore.getState().tokens?.accessToken;
       if (token) {
         config.headers.set('Authorization', `Bearer ${token}`);
+      }
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        config.headers.set('X-CSRFToken', csrfToken);
       }
       return config;
     },

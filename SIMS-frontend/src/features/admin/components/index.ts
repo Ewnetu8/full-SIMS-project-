@@ -12,3 +12,4 @@ export * from './reports-analytics';
 export * from './system-settings';
 export * from './audit-logs';
 export * from './admin-notifications';
+export * from './profile';
