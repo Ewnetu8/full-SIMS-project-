@@ -26,11 +26,28 @@ from audit.utils import log_action
 User = get_user_model()
 
 
+from rest_framework.throttling import SimpleRateThrottle
+
+
 def enforce_csrf(request):
     django_request = getattr(request, '_request', request)
     reason = CsrfViewMiddleware(get_response=lambda req: None).process_view(django_request, None, (), {})
     if reason is not None:
         raise DRFPermissionDenied('CSRF verification failed.')
+
+
+class AuthRateThrottle(SimpleRateThrottle):
+    """Throttle specifically for auth endpoints (login, register, refresh)."""
+    scope = 'auth'
+
+    def get_cache_key(self, request, view):
+        if request.user and request.user.is_authenticated:
+            return None  # No throttle for authenticated users
+        ident = self.get_ident(request)
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': ident
+        }
 
 
 _UserOut = inline_serializer(
@@ -77,6 +94,7 @@ _ErrorOut = inline_serializer(
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         tags=['Authentication'],
@@ -192,6 +210,7 @@ class LoginView(APIView):
     """Authenticate and obtain JWT tokens."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         tags=['Authentication'],
@@ -303,6 +322,7 @@ class CookieTokenRefreshView(APIView):
     """Silently refresh the access token using the HttpOnly refresh-token cookie."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         tags=['Authentication'],

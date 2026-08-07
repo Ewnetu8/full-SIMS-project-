@@ -9,7 +9,7 @@ from academics.models import Department
 class UserResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'national_id_fan', 'role', 'created_at')
+        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'created_at')
         read_only_fields = fields
 
 
