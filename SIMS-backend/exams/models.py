@@ -56,6 +56,11 @@ class Examination(BaseModel):
 
 
 class ExamAttempt(BaseModel):
+    class GradingStatusChoices(models.TextChoices):
+        GRADING_PENDING = 'GRADING_PENDING', 'Grading Pending'
+        GRADING_COMPLETE = 'GRADING_COMPLETE', 'Grading Complete'
+        GRADING_FAILED = 'GRADING_FAILED', 'Grading Failed'
+
     examination = models.ForeignKey(
         Examination,
         on_delete=models.PROTECT,
@@ -69,6 +74,11 @@ class ExamAttempt(BaseModel):
     start_time = models.DateTimeField()
     submission_time = models.DateTimeField(null=True, blank=True)
     is_disrupted = models.BooleanField(default=False)
+    grading_status = models.CharField(
+        max_length=20,
+        choices=GradingStatusChoices.choices,
+        default=GradingStatusChoices.GRADING_PENDING,
+    )
 
     def __str__(self):
         return f"Attempt: {self.student.student_identifier} - {self.examination.title}"

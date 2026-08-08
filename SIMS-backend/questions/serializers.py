@@ -81,7 +81,18 @@ class QuestionOptionSerializer(serializers.ModelSerializer):
         is_correct = attrs.get(
             "is_correct", self.instance.is_correct if self.instance else False
         )
-        if not is_correct:
+        if is_correct:
+            other_correct = QuestionOption.objects.filter(
+                question=question, is_correct=True
+            )
+            if self.instance:
+                other_correct = other_correct.exclude(pk=self.instance.pk)
+            if other_correct.exists():
+                raise serializers.ValidationError(
+                    "Exactly one option must be marked as correct for MCQ questions; "
+                    "this question already has a correct option."
+                )
+        else:
             other_correct = QuestionOption.objects.filter(
                 question=question, is_correct=True
             )

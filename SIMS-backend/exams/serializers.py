@@ -115,6 +115,7 @@ class ExamAttemptSerializer(serializers.ModelSerializer):
             "start_time",
             "submission_time",
             "is_disrupted",
+            "grading_status",
             "created_at",
             "updated_at",
         )
