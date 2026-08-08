@@ -20,3 +20,7 @@ export type { DatePickerProps }  from './date-picker';
 
 export { MultiSelect }           from './multi-select';
 export type { MultiSelectProps } from './multi-select';
+
+export { CollegeDepartmentSelect } from './college-department-select';
+export type { CollegeDepartmentSelectProps } from './college-department-select';
+

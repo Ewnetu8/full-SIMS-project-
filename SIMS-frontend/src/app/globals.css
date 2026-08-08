@@ -69,13 +69,13 @@
   --chart-4: #64748B;
   --chart-5: #94A3B8;
 
-  /* ── Sidebar (Dark Navy) ────────────────────────────────────────────────── */
-  --sidebar: #F8FAFC;
+  /* ── Sidebar ────────────────────────────────────────────────────────────── */
+  --sidebar: #FFFFFF;
   --sidebar-foreground: #1E293B;
   --sidebar-border: #E5E7EB;
   --sidebar-accent: var(--aastu-blue);
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-muted: #94A3B8;
+  --sidebar-muted: #64748B;
   --sidebar-primary: var(--aastu-blue);
   --sidebar-ring: var(--aastu-blue);
 

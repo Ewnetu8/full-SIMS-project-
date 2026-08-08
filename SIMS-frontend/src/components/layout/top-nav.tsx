@@ -11,9 +11,10 @@ import { IconButton, Tooltip } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/store';
 import { cn } from '@/lib';
 import { getUserDisplayName } from '@/utils/string';
-import { toast } from '@/components/feedback';
+import { ConfirmationDialog, toast } from '@/components/feedback';
+import { ROUTES } from '@/constants';
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TopNavProps {
   /** Called when the mobile menu button is pressed. */
@@ -29,7 +30,7 @@ export interface TopNavProps {
   className?: string;
 }
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Component ────────────────────────────────────────────────────────────────
 
 /**
  * Fixed top navigation bar.
@@ -48,11 +49,33 @@ export function TopNav({
 }: TopNavProps) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = React.useState(false);
 
-  const handleLogout = async () => {
+  const handleConfirmLogout = async () => {
+    setIsLogoutDialogOpen(false);
     await logout();
-    toast.success('You have been logged out successfully.', { id: 'auth-logout' });
+    toast.success('You have been signed out successfully.', { id: 'auth-logout' });
     router.replace('/login');
+  };
+
+  const handleProfileNavigation = () => {
+    if (!user) return;
+    if (user.role === 'admin') {
+      router.push(ROUTES.ADMIN.PROFILE);
+    } else if (user.role === 'lecturer') {
+      router.push(ROUTES.LECTURER.PROFILE);
+    } else {
+      router.push(ROUTES.STUDENT.PROFILE);
+    }
+  };
+
+  const handleSettingsNavigation = () => {
+    if (!user) return;
+    if (user.role === 'admin') {
+      router.push(ROUTES.ADMIN.SETTINGS);
+    } else {
+      router.push('/settings');
+    }
   };
 
   const defaultUserMenu = user ? (
@@ -63,7 +86,9 @@ export function TopNav({
         role: user.role,
         avatarUrl: user.avatarUrl,
       }}
-      onLogout={handleLogout}
+      onProfile={handleProfileNavigation}
+      onSettings={handleSettingsNavigation}
+      onLogout={() => setIsLogoutDialogOpen(true)}
     />
   ) : null;
 
@@ -120,6 +145,18 @@ export function TopNav({
 
         {userMenu ?? defaultUserMenu}
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmationDialog
+        open={isLogoutDialogOpen}
+        onOpenChange={setIsLogoutDialogOpen}
+        title="Sign Out"
+        description="Are you sure you want to sign out?"
+        confirmLabel="Sign Out"
+        destructive
+        onConfirm={handleConfirmLogout}
+        onCancel={() => setIsLogoutDialogOpen(false)}
+      />
     </header>
   );
 }

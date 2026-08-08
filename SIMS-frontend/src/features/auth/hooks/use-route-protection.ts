@@ -18,9 +18,13 @@ export function useRouteProtection(allowedRoles?: UserRole[]) {
       return;
     }
 
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-      router.replace(getHomeByRole(user.role));
-      return;
+    if (allowedRoles) {
+      const userRoleLower = (user.role || '').toLowerCase() as UserRole;
+      const isAllowed = allowedRoles.some((r) => r.toLowerCase() === userRoleLower);
+      if (!isAllowed) {
+        router.replace(getHomeByRole(userRoleLower));
+        return;
+      }
     }
   }, [isAuthenticated, user, isLoading, allowedRoles, router]);
 

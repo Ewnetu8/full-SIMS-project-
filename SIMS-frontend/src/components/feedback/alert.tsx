@@ -15,9 +15,9 @@ const alertVariants = cva(
     variants: {
       variant: {
         default:     'border-border bg-card text-card-foreground',
-        info:        'border-info/30 bg-info/10 text-foreground',
-        success:     'border-success/30 bg-success/10 text-foreground',
-        warning:     'border-warning/30 bg-warning/10 text-foreground',
+        info:        'border-[#102A7A]/30 bg-[#102A7A]/10 dark:border-info/30 dark:bg-info/10 text-foreground',
+        success:     'border-success/30 bg-white dark:bg-success/10 text-foreground shadow-xs',
+        warning:     'border-[#B08A00]/40 bg-[#B08A00]/10 dark:border-warning/30 dark:bg-warning/10 text-foreground',
         destructive: 'border-destructive/30 bg-destructive/10 text-foreground',
       },
     },
@@ -35,9 +35,9 @@ const alertIcons = {
 
 const alertIconColors = {
   default:     'text-muted-foreground',
-  info:        'text-info',
+  info:        'text-[#102A7A] dark:text-info',
   success:     'text-success',
-  warning:     'text-warning',
+  warning:     'text-[#B08A00] dark:text-warning',
   destructive: 'text-destructive',
 };
 
@@ -92,7 +92,7 @@ export function Alert({
 
       <div className="flex-1 min-w-0">
         {title && (
-          <p className="mb-1 text-sm font-semibold">{title}</p>
+          <p className="mb-1 text-sm font-semibold text-[#102A7A] dark:text-foreground">{title}</p>
         )}
         {children && (
           <div className="text-sm text-muted-foreground">{children}</div>

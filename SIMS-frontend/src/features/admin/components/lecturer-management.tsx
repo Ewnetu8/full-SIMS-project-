@@ -33,9 +33,14 @@ export function LecturerManagement() {
     departments,
     lecturerSearchQuery,
     lecturerDeptFilter,
+    fetchLecturers,
     setLecturerSearchQuery,
     setLecturerDeptFilter,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    fetchLecturers();
+  }, [fetchLecturers]);
 
   const [selectedLecturer, setSelectedLecturer] = React.useState<LecturerProfile | null>(null);
 

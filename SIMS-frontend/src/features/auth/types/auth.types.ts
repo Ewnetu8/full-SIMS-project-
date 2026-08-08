@@ -81,6 +81,8 @@ export interface AuthActions {
   clearSession:   () => void;
   /** Update tokens after a refresh without changing the user. */
   refreshSession: (tokens: AuthTokens) => void;
+  /** Restore session from HttpOnly refresh cookie during app startup. */
+  initializeAuth: () => Promise<void>;
   /** Apply profile updates from the backend or profile form. */
   updateProfile:  (user: BaseUser) => void;
 }

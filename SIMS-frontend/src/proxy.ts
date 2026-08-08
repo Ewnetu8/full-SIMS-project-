@@ -22,7 +22,7 @@ function getSessionFromRequest(request: NextRequest) {
     }
 
     return {
-      role: decoded.role as 'admin' | 'lecturer' | 'student',
+      role: decoded.role.toLowerCase() as 'admin' | 'lecturer' | 'student',
       expiresAt: decoded.exp,
     };
   } catch {
