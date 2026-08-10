@@ -1,5 +1,6 @@
 from academics.models import Enrollment, EnrollmentStatusChoices
 from accounts.permissions import HasRole
+from django.db import transaction
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
@@ -259,6 +260,78 @@ class ScheduleExaminationView(APIView):
         obj.duration_minutes = serializer.validated_data["duration_minutes"]
         obj.status = ExamStatusChoices.SCHEDULED
         obj.save()
+        return Response(ExaminationSerializer(obj).data)
+
+
+class PublishExaminationView(APIView):
+    def get_permissions(self):
+        return [IsAuthenticated(), HasRole("LECTURER")()]
+
+    @extend_schema(
+        tags=["Examination"],
+        summary="Publish examination results",
+        description=(
+            "**Role: LECTURER / ADMIN**\n\n"
+            "Flips the examination from CLOSED to PUBLISHED and notifies all "
+            "enrolled students once every attempt has been graded.\n\n"
+            "Publish gate (400 otherwise):\n"
+            "- `status` must be `CLOSED`\n"
+            "- every attempt has `grading_status = GRADING_COMPLETE`\n"
+            "- no attempt is missing a `Result` row (§9.8 blocks publish if "
+            "anything is ungraded)"
+        ),
+        responses={
+            200: ExaminationSerializer,
+            400: OpenApiResponse(description="Examination cannot be published yet."),
+            404: OpenApiResponse(description="Examination not found."),
+        },
+        request=None,
+    )
+    def post(self, request, pk):
+        obj = get_examination(pk)
+        if not obj:
+            return Response(
+                {"detail": "Examination not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        problems = []
+        if obj.status != ExamStatusChoices.CLOSED:
+            problems.append(
+                f"Only CLOSED examinations can be published "
+                f"(current status: {obj.status})."
+            )
+        ungraded_count = obj.attempts.exclude(
+            grading_status=ExamAttempt.GradingStatusChoices.GRADING_COMPLETE
+        ).count()
+        if ungraded_count:
+            problems.append(
+                f"{ungraded_count} attempt(s) are not fully graded "
+                "(grading_status != GRADING_COMPLETE)."
+            )
+        missing_results_count = obj.attempts.filter(result__isnull=True).count()
+        if missing_results_count:
+            problems.append(
+                f"{missing_results_count} attempt(s) have no Result row."
+            )
+        if problems:
+            return Response(
+                {
+                    "detail": "This examination cannot be published yet.",
+                    "errors": problems,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from notifications.views import notify_course_students
+
+        with transaction.atomic():
+            obj.status = ExamStatusChoices.PUBLISHED
+            obj.save(update_fields=["status", "updated_at"])
+            notify_course_students(
+                obj.course_offering,
+                f"Results for the examination '{obj.title}' "
+                f"({obj.course_offering.course.course_code}) have been published.",
+            )
         return Response(ExaminationSerializer(obj).data)
 
 

@@ -4,6 +4,7 @@ from exams.views import (
     AutoSaveAnswerView,
     ExaminationDetailView,
     ExaminationListView,
+    PublishExaminationView,
     ScheduleExaminationView,
     StartExamView,
     StudentActiveExamsView,
@@ -27,6 +28,11 @@ urlpatterns = [
         "exams/<uuid:pk>/submit",
         SubmitExamView.as_view(),
         name="exam_submit",
+    ),
+    path(
+        "exams/<uuid:pk>/publish",
+        PublishExaminationView.as_view(),
+        name="examination_publish",
     ),
     path(
         "exams/active",
