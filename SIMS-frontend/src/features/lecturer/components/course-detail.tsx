@@ -60,7 +60,7 @@ export function CourseDetail({ courseId }: CourseDetailProps) {
     );
   }
 
-  const published = exams.filter((e) => e.status === 'PUBLISHED').length;
+  const published = exams.filter((e) => e.status === 'PUBLISHED' || e.status === 'ACTIVE' || e.status === 'SCHEDULED').length;
   const draft = exams.filter((e) => e.status === 'DRAFT').length;
   const closed = exams.filter((e) => e.status === 'CLOSED').length;
 

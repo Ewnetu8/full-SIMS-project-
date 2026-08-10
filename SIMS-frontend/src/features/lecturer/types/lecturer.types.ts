@@ -1,4 +1,4 @@
-export type ExamStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+export type ExamStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
 
 export type QuestionType =
   | 'multiple_choice'

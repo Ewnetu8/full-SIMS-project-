@@ -158,8 +158,10 @@ export function ExamList() {
             <SelectContent>
               <SelectItem value="ALL">All Statuses</SelectItem>
               <SelectItem value="DRAFT">Draft</SelectItem>
-              <SelectItem value="PUBLISHED">Published</SelectItem>
+              <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
               <SelectItem value="CLOSED">Closed</SelectItem>
+              <SelectItem value="PUBLISHED">Published</SelectItem>
             </SelectContent>
           </Select>
 

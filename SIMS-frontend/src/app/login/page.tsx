@@ -80,6 +80,22 @@ function LoginFormContent() {
       
       storeLogin({ user: response.user, tokens: response.tokens }, values.rememberMe);
       
+      // Ensure the session cookie is set in browser before navigation
+      try {
+        await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: response.user.id,
+            role: response.user.role,
+            exp: response.tokens.expiresAt || (Date.now() + 8 * 60 * 60 * 1000),
+            rememberMe: values.rememberMe,
+          }),
+        });
+      } catch (cookieErr) {
+        console.error('Failed to set session cookie:', cookieErr);
+      }
+
       console.log('📦 Auth store after login:', {
         isAuthenticated: useAuthStore.getState().isAuthenticated,
         user: useAuthStore.getState().user,
