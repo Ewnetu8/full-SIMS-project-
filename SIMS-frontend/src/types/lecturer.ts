@@ -306,7 +306,7 @@ export interface ApiErrorDetail {
 /**
  * Helper to make all properties of T nullable.
  */
-export type Nullable<T> = {
+export type NullableProperties<T> = {
   [P in keyof T]: T[P] | null;
 };
 

@@ -4,6 +4,7 @@ import {
   listQuestions,
   createQuestion,
   updateQuestion,
+  patchQuestion,
   deleteQuestion,
   createQuestionOption,
   createRubricCriterion,
@@ -134,11 +135,13 @@ export function useCreateExamQuestion() {
           const rubricLines = question.explanationNote.split('\n').filter(line => line.trim());
           for (const line of rubricLines) {
             const match = line.match(/^(.+?)\s*\((\d+(?:\.\d+)?)\s*pts?\)$/);
-            if (match) {
+            const textMatch = match?.[1];
+            const ptsMatch = match?.[2];
+            if (textMatch && ptsMatch) {
               await createRubricCriterion({
                 question: createdQuestion.id,
-                criterion_text: match[1].trim(),
-                point_weight: parseFloat(match[2]),
+                criterion_text: textMatch.trim(),
+                point_weight: parseFloat(ptsMatch),
               });
             } else {
               // No point weight specified, use equal distribution
@@ -179,7 +182,7 @@ export function useUpdateExamQuestion(questionId: string) {
       if (question.type) updateData.question_type = FRONTEND_TO_BACKEND_TYPE[question.type];
       if (question.marks) updateData.total_points = question.marks;
 
-      return updateQuestion(questionId, updateData);
+      return patchQuestion(questionId, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });

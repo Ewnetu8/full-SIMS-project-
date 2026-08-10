@@ -83,6 +83,13 @@ export interface LecturerAnalytics {
   questionDifficulty: { questionId: string; prompt: string; averageScorePct: number; difficulty: 'Easy' | 'Medium' | 'Hard' }[];
 }
 
+export interface LecturerStats {
+  totalStudents: number;
+  totalCourses: number;
+  activeExams: number;
+  pendingGrading: number;
+}
+
 export interface LecturerNotification {
   id: string;
   title: string;
