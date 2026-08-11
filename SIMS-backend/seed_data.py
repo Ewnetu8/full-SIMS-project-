@@ -85,6 +85,9 @@ def seed():
             last_name="Worku",
             national_id_fan="FAN-LECTURER-001"
         )
+    else:
+        lecturer_user.set_password("password123")
+        lecturer_user.save()
     
     lecturer_profile = Lecturer.objects.filter(user=lecturer_user).first()
     if not lecturer_profile:
@@ -105,6 +108,9 @@ def seed():
             last_name="Bikila",
             national_id_fan="FAN-STUDENT-001"
         )
+    else:
+        student_user.set_password("password123")
+        student_user.save()
 
     student_profile = Student.objects.filter(user=student_user).first()
     if not student_profile:

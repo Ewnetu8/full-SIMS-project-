@@ -6,7 +6,7 @@ import { env } from '@/lib/env';
 
 export default function TestAuthPage() {
   const [email, setEmail] = useState('lecturer@sims.com');
-  const [password, setPassword] = useState('Lecturer@123');
+  const [password, setPassword] = useState('password123');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 

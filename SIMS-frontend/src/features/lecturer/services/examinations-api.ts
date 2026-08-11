@@ -34,7 +34,8 @@ import type {
 export async function listExaminations(
   params?: ListExaminationsParams,
 ): Promise<Examination[]> {
-  return api.get<Examination[]>(API_ENDPOINTS.EXAMS.ROOT, { params });
+  const res = await api.get<any>(API_ENDPOINTS.EXAMS.ROOT, { params });
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 /**

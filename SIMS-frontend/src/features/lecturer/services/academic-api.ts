@@ -205,7 +205,8 @@ export async function getCoursePrerequisite(id: string): Promise<CoursePrerequis
  * );
  */
 export async function listCourseOfferings(): Promise<CourseOffering[]> {
-  return api.get<CourseOffering[]>(API_ENDPOINTS.COURSE_OFFERINGS.ROOT);
+  const res = await api.get<any>(API_ENDPOINTS.COURSE_OFFERINGS.ROOT);
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 /**
@@ -234,7 +235,8 @@ export async function getCourseOffering(id: string): Promise<CourseOffering> {
  * );
  */
 export async function listEnrollments(): Promise<Enrollment[]> {
-  return api.get<Enrollment[]>(API_ENDPOINTS.ENROLLMENTS.ROOT);
+  const res = await api.get<any>(API_ENDPOINTS.ENROLLMENTS.ROOT);
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 /**

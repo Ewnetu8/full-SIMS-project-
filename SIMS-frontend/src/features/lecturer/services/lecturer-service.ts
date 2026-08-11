@@ -110,11 +110,15 @@ export const lecturerService = {
    */
   async getStats(): Promise<LecturerStats> {
     try {
-      const [offerings, enrollments, exams] = await Promise.all([
+      const [offeringsRes, enrollmentsRes, examsRes] = await Promise.allSettled([
         listCourseOfferings(),
         listEnrollments(),
         listExaminations(),
       ]);
+
+      const offerings = offeringsRes.status === 'fulfilled' ? offeringsRes.value : [];
+      const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
+      const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
 
       const activeExams = exams.filter((e) => e.status === 'ACTIVE' || e.status === 'PUBLISHED').length;
       const enrolledStudentsCount = enrollments.filter((e) => e.status === 'ENROLLED').length;
@@ -125,7 +129,8 @@ export const lecturerService = {
         activeExams,
         pendingGrading: 0,
       };
-    } catch {
+    } catch (err) {
+      console.error('Error fetching stats:', err);
       return {
         totalStudents: 0,
         totalCourses: 0,
@@ -140,14 +145,19 @@ export const lecturerService = {
    */
   async getCourses(): Promise<Course[]> {
     try {
-      const [offerings, enrollments, exams] = await Promise.all([
+      const [offeringsRes, enrollmentsRes, examsRes] = await Promise.allSettled([
         listCourseOfferings(),
         listEnrollments(),
         listExaminations(),
       ]);
 
+      const offerings = offeringsRes.status === 'fulfilled' ? offeringsRes.value : [];
+      const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
+      const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
+
       return offerings.map((o) => transformOfferingToUiCourse(o, enrollments, exams));
-    } catch {
+    } catch (err) {
+      console.error('Error fetching courses:', err);
       return [];
     }
   },
@@ -157,15 +167,20 @@ export const lecturerService = {
    */
   async getCourseById(id: string): Promise<Course | null> {
     try {
-      const [offering, enrollments, exams] = await Promise.all([
+      const [offeringRes, enrollmentsRes, examsRes] = await Promise.allSettled([
         getCourseOffering(id),
         listEnrollments(),
         listExaminations(),
       ]);
 
+      const offering = offeringRes.status === 'fulfilled' ? offeringRes.value : null;
+      const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
+      const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
+
       if (!offering) return null;
       return transformOfferingToUiCourse(offering, enrollments, exams);
-    } catch {
+    } catch (err) {
+      console.error(`Error fetching course ${id}:`, err);
       return null;
     }
   },
