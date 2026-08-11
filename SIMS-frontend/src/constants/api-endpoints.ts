@@ -15,6 +15,29 @@ export const API_ENDPOINTS = {
     LECTURER_PROTECTED: '/api/v1/auth/protected/lecturer-only',
   },
 
+  // ── Academics ─────────────────────────────────────────────────────────────
+  ACADEMICS: {
+    UNIVERSITIES: '/api/v1/universities',
+    UNIVERSITY_BY_ID: (id: string) => `/api/v1/universities/${id}`,
+    COLLEGES: '/api/v1/colleges',
+    COLLEGE_BY_ID: (id: string) => `/api/v1/colleges/${id}`,
+    DEPARTMENTS: '/api/v1/departments',
+    DEPARTMENT_BY_ID: (id: string) => `/api/v1/departments/${id}`,
+    PROGRAMS: '/api/v1/programs',
+    PROGRAM_BY_ID: (id: string) => `/api/v1/programs/${id}`,
+    ACADEMIC_YEARS: '/api/v1/academic-years',
+    ACADEMIC_YEAR_BY_ID: (id: string) => `/api/v1/academic-years/${id}`,
+    SEMESTERS: '/api/v1/semesters',
+    SEMESTER_BY_ID: (id: string) => `/api/v1/semesters/${id}`,
+    COURSES: '/api/v1/courses',
+    COURSE_BY_ID: (id: string) => `/api/v1/courses/${id}`,
+    COURSE_OFFERINGS: '/api/v1/course-offerings',
+    COURSE_OFFERING_BY_ID: (id: string) => `/api/v1/course-offerings/${id}`,
+    ENROLLMENTS: '/api/v1/enrollments',
+    ENROLLMENT_BY_ID: (id: string) => `/api/v1/enrollments/${id}`,
+    BATCH_ENROLLMENT_IMPORT: '/api/v1/enrollments/batch-import',
+  },
+
   // ── Questions ─────────────────────────────────────────────────────────────
   QUESTIONS: {
     ROOT: '/api/v1/questions',
@@ -23,6 +46,8 @@ export const API_ENDPOINTS = {
     OPTION_BY_ID: (id: string) => `/api/v1/questions/options/${id}`,
     RUBRIC_CRITERIA: '/api/v1/questions/rubric-criteria',
     RUBRIC_CRITERION_BY_ID: (id: string) => `/api/v1/questions/rubric-criteria/${id}`,
+    TAGS: '/api/v1/tags',
+    TAG_BY_ID: (id: string) => `/api/v1/tags/${id}`,
   },
 
   // ── Tags ──────────────────────────────────────────────────────────────────

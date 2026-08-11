@@ -55,7 +55,7 @@ export function Breadcrumb({
             <li>
               <Link
                 href="/"
-                className="flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center text-muted-foreground hover:text-[#B08A00] dark:hover:text-accent transition-colors"
                 aria-label="Home"
               >
                 <Home className="h-3.5 w-3.5" />
@@ -94,7 +94,7 @@ export function Breadcrumb({
                 {item.href && !isLast ? (
                   <Link
                     href={item.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-muted-foreground hover:text-[#B08A00] dark:hover:text-accent transition-colors"
                   >
                     {item.label}
                   </Link>
@@ -102,7 +102,7 @@ export function Breadcrumb({
                   <span
                     className={cn(
                       isLast
-                        ? 'text-foreground font-medium'
+                        ? 'text-[#102A7A] dark:text-foreground font-semibold'
                         : 'text-muted-foreground',
                     )}
                     aria-current={isLast ? 'page' : undefined}

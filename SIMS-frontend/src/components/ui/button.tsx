@@ -20,20 +20,21 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow',
+          'bg-[#102A7A] text-white shadow-sm hover:bg-[#B08A00] hover:text-[#102A7A] hover:shadow transition-all duration-200 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:hover:text-primary-foreground',
         secondary:
-          'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+          'bg-white border border-[#102A7A] text-[#102A7A] shadow-sm hover:bg-[#B08A00] hover:text-[#102A7A] hover:border-[#102A7A] transition-all duration-200 dark:bg-secondary dark:border-transparent dark:text-secondary-foreground dark:hover:bg-secondary/80',
         outline:
-          'border border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground',
+          'border border-[#102A7A] bg-white text-[#102A7A] hover:bg-[#B08A00] hover:text-[#102A7A] hover:border-[#102A7A] transition-all duration-200 dark:border-border dark:bg-transparent dark:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground',
         ghost:
-          'bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground',
+          'bg-transparent text-[#102A7A] hover:bg-amber-500/10 hover:text-[#B08A00] transition-all duration-200 dark:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground',
         destructive:
-          'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
-        link: 'text-primary underline-offset-4 hover:underline p-0 h-auto',
+          'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 transition-all duration-200',
+        link: 'text-[#102A7A] hover:text-[#B08A00] underline-offset-4 hover:underline p-0 h-auto transition-colors duration-200 dark:text-primary dark:hover:text-accent',
         ai: [
-          'text-accent-foreground shadow-sm',
-          'bg-accent',
-          'hover:bg-accent/90 hover:shadow-md',
+          'text-white shadow-sm',
+          'bg-[#102A7A]',
+          'hover:bg-[#B08A00] hover:text-[#102A7A] hover:shadow-md transition-all duration-200',
+          'dark:bg-accent dark:text-accent-foreground dark:hover:bg-accent/90',
         ],
       },
       size: {

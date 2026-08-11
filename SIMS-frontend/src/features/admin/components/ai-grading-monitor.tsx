@@ -255,8 +255,8 @@ export function AIGradingMonitor() {
               <div>
                 <span className="text-xs font-semibold text-muted-foreground">Raw Process Stream Output:</span>
                 <pre className="mt-1.5 p-3 rounded-lg bg-black text-success font-mono text-[11px] h-48 overflow-y-auto leading-relaxed border border-border">
-{`[${inspectingJob.startedAt}] [INFO] Initialized worker process for ${inspectingJob.id}
-[${inspectingJob.startedAt}] [INFO] Fetching submission payloads for exam ${inspectingJob.examId}...
+{`[${inspectingJob.startedAt}] [INFO] Initializing automated grading engine...
+[${inspectingJob.startedAt}] [INFO] Retrieving student answer sheets for exam ${inspectingJob.examId}...
 [${inspectingJob.startedAt}] [INFO] Loaded ${inspectingJob.totalSubmissions} student answer sheets.
 [${inspectingJob.startedAt}] [INFO] Model: GPT-4o-Academic-FineTuned v2.4
 [${inspectingJob.startedAt}] [SUCCESS] Batch #1 (Submissions 1-50) graded with 96.2% confidence.

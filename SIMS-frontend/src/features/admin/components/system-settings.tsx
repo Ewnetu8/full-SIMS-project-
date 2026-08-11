@@ -13,6 +13,7 @@ import {
 import * as React from 'react';
 
 import { toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Button,
@@ -33,10 +34,12 @@ export function SystemSettings() {
   const [formData, setFormData] = React.useState({ ...settings });
 
   const handleSave = () => {
-    updateSettings(formData);
-    toast.success('Settings Saved', {
-      description: 'System settings updated successfully across institutional portal.',
-    });
+    try {
+      updateSettings(formData);
+      toast.success('System settings saved successfully.');
+    } catch (err) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
   const selectClass =
@@ -304,12 +307,12 @@ export function SystemSettings() {
                 >
                   <option value="OpenAI GPT-4o (Fine-Tuned Academic Model)">OpenAI GPT-4o (Fine-Tuned Academic Model)</option>
                   <option value="Claude 3.5 Sonnet (Academic Fine-Tune)">Claude 3.5 Sonnet (Academic Fine-Tune)</option>
-                  <option value="Local On-Premises Llama 3 Cluster">Local On-Premises Llama 3 Cluster</option>
+                  <option value="Local On-Premises Llama 3 Cluster">On-Premises Grading Server (Llama 3)</option>
                 </select>
               </div>
 
               <div>
-                <Label htmlFor="apiKey">API Key (Masked Placeholder)</Label>
+                <Label htmlFor="apiKey">Integration Service Key</Label>
                 <Input id="apiKey" value={formData.aiConfig.apiKeyMasked} disabled />
               </div>
 
@@ -379,7 +382,7 @@ export function SystemSettings() {
               <div className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-muted/20">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Email Alerts on System Errors</p>
-                  <p className="text-xs text-muted-foreground">Send high-priority alerts to support email when AI jobs fail or server errors occur.</p>
+                  <p className="text-xs text-muted-foreground">Send notification alerts to system administrator when evaluation jobs fail or system warnings occur.</p>
                 </div>
                 <Switch
                   checked={formData.notificationSettings.emailAlertsOnSystemErrors}

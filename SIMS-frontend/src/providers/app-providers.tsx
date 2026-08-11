@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthProvider } from './auth-provider';
 import { QueryProvider } from './query-provider';
 import { ThemeProvider } from './theme-provider';
 
@@ -14,6 +15,7 @@ interface AppProvidersProps {
  * 1. ThemeProvider — needs to be the outermost wrapper to prevent flash of
  *    wrong theme during hydration.
  * 2. QueryProvider — wraps data-fetching infrastructure.
+ * 3. AuthProvider — handles authentication state.
  *
  * To add a new provider:
  * 1. Create it in this directory.
@@ -23,7 +25,9 @@ interface AppProvidersProps {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <ThemeProvider>
-      <QueryProvider>{children}</QueryProvider>
+      <QueryProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </QueryProvider>
     </ThemeProvider>
   );
 }

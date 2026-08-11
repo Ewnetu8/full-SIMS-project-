@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Badge,
@@ -46,7 +47,16 @@ export function DepartmentManagement() {
   const {
     departments,
     lecturers,
+    colleges,
+    programs,
+    courses,
+    isLoadingDepartments,
+    departmentsError,
     departmentSearchQuery,
+    fetchDepartments,
+    fetchColleges,
+    fetchPrograms,
+    fetchCourses,
     addDepartment,
     updateDepartment,
     deleteDepartment,
@@ -57,68 +67,100 @@ export function DepartmentManagement() {
   const [editingDept, setEditingDept] = React.useState<Department | null>(null);
   const [assigningHODDept, setAssigningHODDept] = React.useState<Department | null>(null);
   const [deletingDept, setDeletingDept] = React.useState<Department | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const [formData, setFormData] = React.useState({
     code: '',
     name: '',
-    description: '',
+    collegeId: '',
     hodId: lecturers[0]?.id || '',
   });
 
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    fetchDepartments();
+    fetchColleges();
+    fetchPrograms();
+    fetchCourses();
+  }, [fetchDepartments, fetchColleges, fetchPrograms, fetchCourses]);
+
+  const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
   const handleOpenAddModal = () => {
+    setFieldErrors({});
+    const defaultCollege = colleges.find((c) => UUID_REGEX.test(c.id));
     setFormData({
       code: '',
       name: '',
-      description: '',
+      collegeId: defaultCollege ? defaultCollege.id : '',
       hodId: lecturers[0]?.id || '',
     });
     setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (dept: Department) => {
+    setFieldErrors({});
     setEditingDept(dept);
     setFormData({
       code: dept.code,
       name: dept.name,
-      description: dept.description,
+      collegeId: dept.college && UUID_REGEX.test(dept.college) ? dept.college : '',
       hodId: dept.headOfDepartment.id,
     });
   };
 
-  const handleSaveDepartment = () => {
-    if (!formData.name || !formData.code) {
-      toast.error('Missing required fields', { description: 'Department code and name are required.' });
-      return;
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    const trimmedCode = formData.code.trim();
+    const trimmedName = formData.name.trim();
+
+    if (!trimmedCode) {
+      errors.code = 'Department code is required.';
+    } else if (trimmedCode.length > 10) {
+      errors.code = 'Department code must not exceed 10 characters.';
     }
 
-    const selectedLecturer = lecturers.find((l) => l.id === formData.hodId) || lecturers[0];
+    if (!trimmedName) {
+      errors.name = 'Department name is required.';
+    } else if (trimmedName.length > 255) {
+      errors.name = 'Department name must not exceed 255 characters.';
+    }
 
-    if (editingDept) {
-      updateDepartment(editingDept.id, {
-        code: formData.code.toUpperCase(),
-        name: formData.name,
-        description: formData.description,
-        headOfDepartment: {
-          id: selectedLecturer ? selectedLecturer.id : 'lec-1',
-          name: selectedLecturer ? `Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName}` : 'Dr. Robert Vance',
-          email: selectedLecturer ? selectedLecturer.email : 'robert.vance@university.edu',
-        },
-      });
-      toast.success('Department updated', { description: `${formData.name} updated.` });
-      setEditingDept(null);
-    } else {
-      addDepartment({
-        code: formData.code.toUpperCase(),
-        name: formData.name,
-        description: formData.description,
-        headOfDepartment: {
-          id: selectedLecturer?.id || 'lec-1',
-          name: selectedLecturer ? `Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName}` : 'Dr. Robert Vance',
-          email: selectedLecturer?.email || 'robert.vance@university.edu',
-        },
-      });
-      toast.success('Department created', { description: `New department ${formData.name} created.` });
-      setIsAddModalOpen(false);
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSaveDepartment = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    setFieldErrors({});
+
+    try {
+      if (editingDept) {
+        await updateDepartment(editingDept.id, {
+          code: formData.code.trim().toUpperCase(),
+          name: formData.name.trim(),
+          college: formData.collegeId || undefined,
+        });
+        toast.success('Department updated successfully.');
+        setEditingDept(null);
+      } else {
+        await addDepartment({
+          code: formData.code.trim().toUpperCase(),
+          name: formData.name.trim(),
+          college: formData.collegeId || undefined,
+        });
+        toast.success('Department created successfully.');
+        setIsAddModalOpen(false);
+      }
+      await fetchDepartments();
+    } catch (err: any) {
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -127,25 +169,25 @@ export function DepartmentManagement() {
       const selectedLecturer = lecturers.find((l) => l.id === formData.hodId);
       if (selectedLecturer) {
         updateDepartment(assigningHODDept.id, {
-          headOfDepartment: {
-            id: selectedLecturer.id,
-            name: `Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName}`,
-            email: selectedLecturer.email,
-          },
+          name: assigningHODDept.name,
+          code: assigningHODDept.code,
         });
-        toast.success('Head of Department assigned', {
-          description: `Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName} assigned as HOD for ${assigningHODDept.name}.`,
-        });
+        toast.success(`Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName} assigned as HOD for ${assigningHODDept.name}.`);
       }
       setAssigningHODDept(null);
     }
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingDept) {
-      deleteDepartment(deletingDept.id);
-      toast.success('Department deleted', { description: `${deletingDept.name} deleted.` });
-      setDeletingDept(null);
+      try {
+        await deleteDepartment(deletingDept.id);
+        toast.success('Department deleted successfully.');
+        setDeletingDept(null);
+        await fetchDepartments();
+      } catch (err: any) {
+        toast.error(getUserFriendlyErrorMessage(err));
+      }
     }
   };
 
@@ -187,96 +229,120 @@ export function DepartmentManagement() {
         </div>
       </Card>
 
-      {/* Department Cards Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {filteredDepts.map((dept) => (
-          <Card key={dept.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold font-mono text-base">
-                    {dept.code}
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-foreground">{dept.name}</h3>
-                    <p className="text-xs text-muted-foreground">Created {dept.createdAt}</p>
+      {/* Loading State */}
+      {isLoadingDepartments ? (
+        <Card className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm font-medium">Loading departments from backend...</p>
+        </Card>
+      ) : departmentsError ? (
+        /* Error & Retry State */
+        <Card className="p-8 border-destructive/30 bg-destructive/5 text-center flex flex-col items-center justify-center gap-3">
+          <div className="p-3 rounded-full bg-destructive/10 text-destructive">
+            <Building2 className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-foreground">Failed to Load Departments</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">{departmentsError}</p>
+          </div>
+          <Button
+            variant="outline"
+            className="mt-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={() => fetchDepartments()}
+          >
+            Attempt Retry
+          </Button>
+        </Card>
+      ) : filteredDepts.length === 0 ? (
+        /* Empty State */
+        <Card className="p-12 text-center flex flex-col items-center justify-center">
+          <Building2 className="mx-auto h-12 w-12 text-muted-foreground/40 mb-3" />
+          <h3 className="text-lg font-semibold text-[#102A7A] dark:text-foreground mb-1">
+            {departmentSearchQuery ? 'No Matching Departments Found' : 'No departments have been created yet.'}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+            {departmentSearchQuery
+              ? 'Try refining your search filter.'
+              : 'Add your first academic department to configure the university structure.'}
+          </p>
+          <Button onClick={handleOpenAddModal} leftIcon={<Plus className="h-4 w-4" />}>
+            Add Department
+          </Button>
+        </Card>
+      ) : (
+        /* Department Cards Grid */
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {filteredDepts.map((dept) => {
+            const parentCollege = colleges.find((c) => c.id === dept.college || c.code === dept.college);
+            const deptProgramsCount = programs.filter((p) => p.department === dept.id || p.department === dept.name).length;
+            const deptCoursesCount = courses.filter((c) => c.department === dept.name || c.department === dept.code).length;
+
+            return (
+              <Card key={dept.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-shadow border-border">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#102A7A]/10 text-[#102A7A] dark:bg-primary/20 dark:text-blue-300 font-bold font-mono text-base">
+                        {dept.code}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground">{dept.name}</h3>
+                        {parentCollege && (
+                          <span className="text-xs text-[#102A7A] dark:text-blue-400 font-medium">
+                            {parentCollege.name} ({parentCollege.code})
+                          </span>
+                        )}
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Created {new Date(dept.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => router.push(ROUTES.ADMIN.DEPARTMENT_DETAIL(dept.id))}>
+                          <ArrowRight className="h-4 w-4 mr-2" /> View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenEditModal(dept)}>
+                          <Edit2 className="h-4 w-4 mr-2" /> Edit Department
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeletingDept(dept)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete Department
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => router.push(ROUTES.ADMIN.DEPARTMENT_DETAIL(dept.id))}>
-                      <ArrowRight className="h-4 w-4 mr-2" /> View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleOpenEditModal(dept)}>
-                      <Edit2 className="h-4 w-4 mr-2" /> Edit Department
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setAssigningHODDept(dept);
-                        setFormData({ ...formData, hodId: dept.headOfDepartment.id });
-                      }}
-                    >
-                      <UserCheck className="h-4 w-4 mr-2 text-primary" /> Assign HOD
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setDeletingDept(dept)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" /> Delete Department
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                {/* Department Quick Stats */}
+                <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-2 text-center text-xs">
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border/50">
+                    <p className="font-bold text-foreground text-sm">{deptProgramsCount}</p>
+                    <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1 mt-0.5">
+                      <GraduationCap className="h-3 w-3 text-primary" /> Academic Programs
+                    </p>
+                  </div>
 
-              <p className="text-xs text-muted-foreground line-clamp-2">{dept.description}</p>
-
-              {/* Head of Department Badge */}
-              <div className="p-2.5 rounded-lg border border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-[10px] uppercase font-semibold text-muted-foreground">Head of Department</p>
-                    <p className="text-xs font-semibold text-foreground">{dept.headOfDepartment.name}</p>
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border/50">
+                    <p className="font-bold text-foreground text-sm">{deptCoursesCount}</p>
+                    <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1 mt-0.5">
+                      <BookOpen className="h-3 w-3 text-primary" /> Active Courses
+                    </p>
                   </div>
                 </div>
-                <Badge variant="outline" className="text-[10px]">
-                  HOD
-                </Badge>
-              </div>
-            </div>
-
-            {/* Department Quick Stats */}
-            <div className="mt-4 pt-3 border-t border-border grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="p-2 rounded bg-muted/40">
-                <p className="font-bold text-foreground text-sm">{dept.studentCount}</p>
-                <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1">
-                  <GraduationCap className="h-3 w-3" /> Students
-                </p>
-              </div>
-
-              <div className="p-2 rounded bg-muted/40">
-                <p className="font-bold text-foreground text-sm">{dept.lecturerCount}</p>
-                <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1">
-                  <UserCheck className="h-3 w-3" /> Lecturers
-                </p>
-              </div>
-
-              <div className="p-2 rounded bg-muted/40">
-                <p className="font-bold text-foreground text-sm">{dept.courseCount}</p>
-                <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1">
-                  <BookOpen className="h-3 w-3" /> Courses
-                </p>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add / Edit Department Modal */}
       <Dialog
@@ -288,76 +354,100 @@ export function DepartmentManagement() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editingDept ? 'Edit Department' : 'Add New Department'}</DialogTitle>
+            <DialogTitle className="text-xl text-[#102A7A] dark:text-foreground font-bold">
+              {editingDept ? 'Edit Department' : 'Add New Department'}
+            </DialogTitle>
             <DialogDescription>
-              {editingDept ? 'Update department code, title, or description.' : 'Define a new academic unit.'}
+              {editingDept
+                ? 'Update department details in the institutional hierarchy.'
+                : 'Add a new academic department to the university.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-5 py-2">
+            {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
+              <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="code">Code</Label>
+                <Label htmlFor="code" required>
+                  Department Code
+                </Label>
                 <Input
                   id="code"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g. CS"
+                  placeholder="e.g. SE"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  maxLength={10}
                 />
+                {fieldErrors.code && <p className="text-xs text-destructive mt-1">{fieldErrors.code}</p>}
               </div>
-              <div className="col-span-2">
-                <Label htmlFor="name">Department Name</Label>
+
+              <div>
+                <Label htmlFor="name" required>
+                  Department Name
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Computer Science & Software Engineering"
+                  placeholder="e.g. Software Engineering"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  maxLength={255}
                 />
+                {fieldErrors.name && <p className="text-xs text-destructive mt-1">{fieldErrors.name}</p>}
               </div>
             </div>
 
             <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief summary of department academic focus..."
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="hod">Head of Department (HOD)</Label>
+              <Label>Assigned College (Optional)</Label>
               <select
-                id="hod"
-                className={selectClass}
-                value={formData.hodId}
-                onChange={(e) => setFormData({ ...formData, hodId: e.target.value })}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] mt-1.5 transition-all shadow-sm"
+                value={formData.collegeId}
+                onChange={(e) => setFormData({ ...formData, collegeId: e.target.value })}
               >
-                {lecturers.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    Dr. {l.firstName} {l.lastName} ({l.department})
+                <option value="">-- Unassigned College --</option>
+                {colleges.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
                   </option>
                 ))}
               </select>
+              {fieldErrors.college && <p className="text-xs text-destructive mt-1">{fieldErrors.college}</p>}
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               variant="outline"
               onClick={() => {
                 setIsAddModalOpen(false);
                 setEditingDept(null);
               }}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveDepartment}>
-              {editingDept ? 'Save Changes' : 'Create Department'}
+            <Button
+              onClick={handleSaveDepartment}
+              disabled={isSubmitting}
+              className="bg-[#102A7A] text-white hover:bg-[#D4AF37] hover:text-[#102A7A] transition-colors font-medium px-5"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Saving...
+                </span>
+              ) : editingDept ? (
+                'Save Changes'
+              ) : (
+                'Create Department'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

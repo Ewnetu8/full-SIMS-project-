@@ -20,6 +20,7 @@ import {
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
   Badge,
@@ -47,11 +48,15 @@ import type { AdminUser, UserRole, UserStatus } from '../types';
 export function UserManagement() {
   const {
     users,
+    isLoadingUsers,
+    usersError,
     departments,
     userSearchQuery,
     userRoleFilter,
     userDeptFilter,
     userStatusFilter,
+    fetchUsers,
+    fetchDepartments,
     addUser,
     updateUser,
     deleteUser,
@@ -61,6 +66,11 @@ export function UserManagement() {
     setUserStatusFilter,
   } = useAdminStore();
 
+  React.useEffect(() => {
+    fetchUsers();
+    fetchDepartments();
+  }, [fetchUsers, fetchDepartments]);
+
   // Modals & Drawers state
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<AdminUser | null>(null);
@@ -68,108 +78,142 @@ export function UserManagement() {
   const [deletingUser, setDeletingUser] = React.useState<AdminUser | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Form State
+  // Form State matching UserRegisterRequest
   const [formData, setFormData] = React.useState({
     firstName: '',
     lastName: '',
     email: '',
+    password: '',
     role: 'student' as UserRole,
-    department: departments[0]?.name || 'Computer Science & Software Engineering',
-    phone: '',
-    userId: '',
+    studentIdentifier: '',
+    facultyIdentifier: '',
+    departmentId: '',
   });
 
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+
   const handleOpenAddModal = () => {
+    setFieldErrors({});
     setFormData({
       firstName: '',
       lastName: '',
       email: '',
+      password: '',
       role: 'student',
-      department: departments[0]?.name || 'Computer Science & Software Engineering',
-      phone: '',
-      userId: `USR-${Math.floor(1000 + Math.random() * 9000)}`,
+      studentIdentifier: '',
+      facultyIdentifier: '',
+      departmentId: departments[0]?.id || '',
     });
     setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (user: AdminUser) => {
+    setFieldErrors({});
     setEditingUser(user);
+    const userDept = departments.find((d) => d.name === user.department);
     setFormData({
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      password: '',
       role: user.role,
-      department: user.department,
-      phone: user.phone || '',
-      userId: user.userId,
+      studentIdentifier: '',
+      facultyIdentifier: '',
+      departmentId: userDept?.id || '',
     });
   };
 
-  const handleSaveUser = async () => {
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      toast.error('Missing fields', { description: 'First name, last name, and email are required.' });
-      return;
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.email.trim()) {
+      errors.email = 'Email address is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address.';
     }
+
+    if (!editingUser) {
+      if (!formData.password) {
+        errors.password = 'Password is required.';
+      } else if (formData.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters long.';
+      }
+    }
+
+    if (formData.role === 'student' && !formData.studentIdentifier.trim()) {
+      errors.studentIdentifier = "Please enter the student's ID before creating the account.";
+      errors.student_identifier = "Please enter the student's ID before creating the account.";
+    }
+
+    if (formData.role === 'lecturer' && !formData.facultyIdentifier.trim()) {
+      errors.facultyIdentifier = "Please enter the lecturer's faculty ID before creating the account.";
+      errors.faculty_identifier = "Please enter the lecturer's faculty ID before creating the account.";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSaveUser = async () => {
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
     try {
       if (editingUser) {
-        updateUser(editingUser.id, {
+        const selectedDept = departments.find((d) => d.id === formData.departmentId);
+        await updateUser(editingUser.id, {
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
           role: formData.role,
-          department: formData.department,
-          phone: formData.phone,
+          department: selectedDept?.name || editingUser.department,
         });
-        toast.success('User updated', { description: `${formData.firstName} ${formData.lastName} account updated successfully.` });
+        toast.success('User account updated successfully.');
         setEditingUser(null);
       } else {
-        // Use default passwords for university-managed accounts since admin sets them up
-        const generatedPassword = `${formData.firstName}123!`;
-        
-        await authApi.register({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
+        await addUser({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           email: formData.email,
-          role: formData.role,
-          password: generatedPassword,
-          confirmPassword: generatedPassword,
+          password: formData.password,
+          role: formData.role.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN',
+          student_identifier: formData.role === 'student' ? formData.studentIdentifier : undefined,
+          faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
+          department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : null,
         });
-        
-        addUser({
-          userId: formData.userId || `USR-${Date.now()}`,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          role: formData.role,
-          department: formData.department,
-          status: 'active',
-          phone: formData.phone,
-        });
-        toast.success('User created', { description: `Account for ${formData.firstName} ${formData.lastName} created.` });
+        toast.success('User account created successfully.');
         setIsAddModalOpen(false);
+        fetchUsers();
       }
-    } catch (error) {
-      toast.error('Failed to save user', { 
-        description: error instanceof Error ? error.message : 'An unexpected error occurred.' 
-      });
+    } catch (error: any) {
+      const parsedFields = parseFieldErrors(error);
+      setFieldErrors(parsedFields);
+      const friendlyMessage = getUserFriendlyErrorMessage(error);
+      toast.error(friendlyMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = (user: AdminUser) => {
+  const handleToggleStatus = async (user: AdminUser) => {
     const nextStatus: UserStatus = user.status === 'active' ? 'inactive' : 'active';
-    updateUser(user.id, { status: nextStatus });
-    toast.success(`User ${nextStatus}`, { description: `${user.firstName} ${user.lastName} is now ${nextStatus}.` });
+    try {
+      await updateUser(user.id, { status: nextStatus });
+      toast.success(`User status updated to ${nextStatus}.`);
+    } catch (error) {
+      toast.error(getUserFriendlyErrorMessage(error));
+    }
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingUser) {
-      deleteUser(deletingUser.id);
-      toast.success('User deleted', { description: `${deletingUser.firstName} ${deletingUser.lastName} deleted.` });
-      setDeletingUser(null);
+      try {
+        await deleteUser(deletingUser.id);
+        toast.success('User account deleted successfully.');
+        setDeletingUser(null);
+      } catch (error) {
+        toast.error(getUserFriendlyErrorMessage(error));
+      }
     }
   };
 
@@ -263,6 +307,19 @@ export function UserManagement() {
         </div>
       </Card>
 
+      {/* Error State Banner */}
+      {usersError && (
+        <Card className="p-4 border-destructive/40 bg-destructive/10 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-destructive">
+            <XCircle className="h-5 w-5" />
+            <p className="text-sm font-medium">Unable to load users. Please try again.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => fetchUsers()}>
+            Retry
+          </Button>
+        </Card>
+      )}
+
       {/* Users Table */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -279,9 +336,24 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredUsers.length === 0 ? (
+              {isLoadingUsers ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      Loading user accounts...
+                    </div>
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    No users have been created yet.
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No users found matching current filters.
                   </td>
                 </tr>
@@ -290,20 +362,22 @@ export function UserManagement() {
                   <tr key={user.id} className="hover:bg-accent/40 transition-colors">
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
-                          {user.firstName[0]}
-                          {user.lastName[0]}
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0 uppercase">
+                          {(user.firstName && user.firstName[0]) || 'U'}
+                          {(user.lastName && user.lastName[0]) || ''}
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-foreground truncate">
-                            {user.firstName} {user.lastName}
+                            {user.firstName || ''} {user.lastName || ''}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">{user.userId}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
+                      {user.studentIdentifier || user.facultyIdentifier || user.userId || user.id}
+                    </td>
 
                     <td className="px-4 py-3.5">
                       <Badge
@@ -324,7 +398,7 @@ export function UserManagement() {
                     </td>
 
                     <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[200px] truncate">
-                      {user.department}
+                      {user.department || 'Not assigned'}
                     </td>
 
                     <td className="px-4 py-3.5">
@@ -338,11 +412,11 @@ export function UserManagement() {
                         }
                         className="capitalize"
                       >
-                        {user.status}
+                        {user.status || 'active'}
                       </Badge>
                     </td>
 
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{user.lastLogin}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{user.lastLogin || 'Never'}</td>
 
                     <td className="px-4 py-3.5 text-right">
                       <DropdownMenu>
@@ -396,106 +470,198 @@ export function UserManagement() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editingUser ? 'Edit User Account' : 'Add New User Account'}</DialogTitle>
+            <DialogTitle className="text-xl text-[#102A7A] dark:text-foreground font-bold">
+              {editingUser ? 'Edit User Account' : 'Add New User Account'}
+            </DialogTitle>
             <DialogDescription>
-              {editingUser ? 'Modify user information and access controls.' : 'Create a new institutional user with specified role.'}
+              {editingUser
+                ? 'Modify user account details and assigned role.'
+                : 'Create a new user account for the university. Assign a role and enter the required information.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-5 py-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
                   id="firstName"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  placeholder="e.g. John"
+                  placeholder="e.g. Abebe"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
                 />
+                {fieldErrors.first_name && <p className="text-xs text-destructive mt-1">{fieldErrors.first_name}</p>}
               </div>
+
               <div>
                 <Label htmlFor="lastName">Last Name</Label>
                 <Input
                   id="lastName"
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  placeholder="e.g. Doe"
+                  placeholder="e.g. Kebede"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
                 />
+                {fieldErrors.last_name && <p className="text-xs text-destructive mt-1">{fieldErrors.last_name}</p>}
               </div>
-            </div>
 
-            <div>
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="john.doe@university.edu"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="email" required>
+                  Email Address
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="user@aastu.edu.et"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                />
+                {fieldErrors.email && <p className="text-xs text-destructive mt-1">{fieldErrors.email}</p>}
+              </div>
+
+              {!editingUser && (
+                <div>
+                  <Label htmlFor="password" required>
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Enter password"
+                    className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  />
+                  {fieldErrors.password && <p className="text-xs text-destructive mt-1">{fieldErrors.password}</p>}
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="role" required>
+                  Institutional Role
+                </Label>
                 <select
                   id="role"
-                  className={selectClass}
+                  className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                 >
-                  <option value="student">Student</option>
-                  <option value="lecturer">Lecturer</option>
-                  <option value="admin">Administrator</option>
+                  <option value="student">STUDENT</option>
+                  <option value="lecturer">LECTURER</option>
+                  <option value="admin">ADMIN</option>
                 </select>
-              </div>
-              <div>
-                <Label htmlFor="userId">User ID</Label>
-                <Input id="userId" value={formData.userId} disabled />
+                {fieldErrors.role && <p className="text-xs text-destructive mt-1">{fieldErrors.role}</p>}
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="department">Department</Label>
-              <select
-                id="department"
-                className={selectClass}
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-              >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.name}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Dynamic Role-Specific Fields */}
+            {formData.role === 'student' && (
+              <div className="space-y-4 p-4 rounded-xl border border-[#102A7A]/15 bg-accent/15">
+                <div>
+                  <Label htmlFor="studentIdentifier" required>
+                    Student Identifier (ID)
+                  </Label>
+                  <Input
+                    id="studentIdentifier"
+                    value={formData.studentIdentifier}
+                    onChange={(e) => setFormData({ ...formData, studentIdentifier: e.target.value })}
+                    placeholder="e.g. ETS0123/14"
+                    className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  />
+                  {fieldErrors.studentIdentifier && <p className="text-xs text-destructive mt-1">{fieldErrors.studentIdentifier}</p>}
+                  {fieldErrors.student_identifier && <p className="text-xs text-destructive mt-1">{fieldErrors.student_identifier}</p>}
+                </div>
 
-            <div>
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+1 (555) 019-0000"
-              />
-            </div>
+                <div>
+                  <Label htmlFor="studentDepartment">Department</Label>
+                  <select
+                    id="studentDepartment"
+                    className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                    value={formData.departmentId}
+                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.departmentId && <p className="text-xs text-destructive mt-1">{fieldErrors.departmentId}</p>}
+                  {fieldErrors.department_id && <p className="text-xs text-destructive mt-1">{fieldErrors.department_id}</p>}
+                </div>
+              </div>
+            )}
+
+            {formData.role === 'lecturer' && (
+              <div className="space-y-4 p-4 rounded-xl border border-[#102A7A]/15 bg-accent/15">
+                <div>
+                  <Label htmlFor="facultyIdentifier" required>
+                    Faculty Identifier (ID)
+                  </Label>
+                  <Input
+                    id="facultyIdentifier"
+                    value={formData.facultyIdentifier}
+                    onChange={(e) => setFormData({ ...formData, facultyIdentifier: e.target.value })}
+                    placeholder="e.g. FAC-2026-01"
+                    className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  />
+                  {fieldErrors.facultyIdentifier && <p className="text-xs text-destructive mt-1">{fieldErrors.facultyIdentifier}</p>}
+                  {fieldErrors.faculty_identifier && <p className="text-xs text-destructive mt-1">{fieldErrors.faculty_identifier}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="lecturerDepartment">Department</Label>
+                  <select
+                    id="lecturerDepartment"
+                    className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                    value={formData.departmentId}
+                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.departmentId && <p className="text-xs text-destructive mt-1">{fieldErrors.departmentId}</p>}
+                  {fieldErrors.department_id && <p className="text-xs text-destructive mt-1">{fieldErrors.department_id}</p>}
+                </div>
+              </div>
+            )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               variant="outline"
               onClick={() => {
                 setIsAddModalOpen(false);
                 setEditingUser(null);
               }}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveUser} disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : editingUser ? 'Update User' : 'Create User'}
+            <Button
+              onClick={handleSaveUser}
+              disabled={isSubmitting}
+              className="bg-[#102A7A] text-white hover:bg-[#D4AF37] hover:text-[#102A7A] transition-colors font-medium px-5"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Saving...
+                </span>
+              ) : editingUser ? (
+                'Update User'
+              ) : (
+                'Create User'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

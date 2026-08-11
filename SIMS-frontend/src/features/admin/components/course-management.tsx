@@ -10,7 +10,8 @@ import {
 import * as React from 'react';
 
 import { toast } from '@/components/feedback';
-import { Label } from '@/components/forms';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
+import { CollegeDepartmentSelect, Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -34,8 +35,15 @@ export function CourseManagement() {
     courses,
     departments,
     lecturers,
+    programs,
+    colleges,
+    isLoadingCourses,
     courseSearchQuery,
     courseDeptFilter,
+    fetchCourses,
+    fetchPrograms,
+    fetchColleges,
+    fetchDepartments,
     addCourse,
     updateCourse,
     toggleCourseArchive,
@@ -45,86 +53,117 @@ export function CourseManagement() {
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingCourse, setEditingCourse] = React.useState<Course | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const [formData, setFormData] = React.useState({
     code: '',
-    name: '',
+    title: '',
     creditHours: 3,
-    department: departments[0]?.name || 'Computer Science & Software Engineering',
-    lecturerId: lecturers[0]?.id || '',
-    semester: 'Spring 2026',
+    collegeId: 'col-coe-001',
+    departmentId: 'dept-se-006',
+    programId: '',
+    intendedClassStanding: '' as string,
   });
 
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    fetchCourses();
+    fetchPrograms();
+    fetchColleges();
+    fetchDepartments();
+  }, [fetchCourses, fetchPrograms, fetchColleges, fetchDepartments]);
+
   const handleOpenAddModal = () => {
+    setFieldErrors({});
     setFormData({
       code: '',
-      name: '',
+      title: '',
       creditHours: 3,
-      department: departments[0]?.name || 'Computer Science & Software Engineering',
-      lecturerId: lecturers[0]?.id || '',
-      semester: 'Spring 2026',
+      collegeId: colleges[0]?.id || 'col-coe-001',
+      departmentId: departments[0]?.id || 'dept-se-006',
+      programId: programs[0]?.id || '',
+      intendedClassStanding: '',
     });
     setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (course: Course) => {
+    setFieldErrors({});
     setEditingCourse(course);
     setFormData({
       code: course.code,
-      name: course.name,
+      title: course.name,
       creditHours: course.creditHours,
-      department: course.department,
-      lecturerId: course.assignedLecturer.id,
-      semester: course.semester,
+      collegeId: colleges[0]?.id || 'col-coe-001',
+      departmentId: departments[0]?.id || 'dept-se-006',
+      programId: programs[0]?.id || '',
+      intendedClassStanding: '',
     });
   };
 
-  const handleSaveCourse = () => {
-    if (!formData.code || !formData.name) {
-      toast.error('Missing fields', { description: 'Course code and title are required.' });
-      return;
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!formData.code.trim()) {
+      errors.code = 'Course code is required.';
+    } else if (formData.code.length > 20) {
+      errors.code = 'Course code must not exceed 20 characters.';
     }
 
-    const assignedLec = lecturers.find((l) => l.id === formData.lecturerId) || lecturers[0];
+    if (!formData.title.trim()) {
+      errors.title = 'Course title is required.';
+    } else if (formData.title.length > 255) {
+      errors.title = 'Course title must not exceed 255 characters.';
+    }
 
-    if (editingCourse) {
-      updateCourse(editingCourse.id, {
-        code: formData.code.toUpperCase(),
-        name: formData.name,
-        creditHours: formData.creditHours,
-        department: formData.department,
-        assignedLecturer: {
-          id: assignedLec ? assignedLec.id : 'lec-1',
-          name: assignedLec ? `Dr. ${assignedLec.firstName} ${assignedLec.lastName}` : 'Dr. Robert Vance',
-        },
-        semester: formData.semester,
-      });
-      toast.success('Course updated', { description: `${formData.code} - ${formData.name} updated.` });
-      setEditingCourse(null);
-    } else {
-      addCourse({
-        code: formData.code.toUpperCase(),
-        name: formData.name,
-        creditHours: formData.creditHours,
-        department: formData.department,
-        assignedLecturer: {
-          id: assignedLec?.id || 'lec-1',
-          name: assignedLec ? `Dr. ${assignedLec.firstName} ${assignedLec.lastName}` : 'Dr. Robert Vance',
-        },
-        status: 'active',
-        semester: formData.semester,
-      });
-      toast.success('Course created', { description: `${formData.code} created.` });
-      setIsAddModalOpen(false);
+    if (formData.creditHours < 0) {
+      errors.credit_hours = 'Credit hours must be non-negative.';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSaveCourse = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      if (editingCourse) {
+        await updateCourse(editingCourse.id, {
+          course_code: formData.code.toUpperCase(),
+          title: formData.title,
+          credit_hours: formData.creditHours,
+        });
+        toast.success('Course updated successfully.');
+        setEditingCourse(null);
+      } else {
+        await addCourse({
+          course_code: formData.code.toUpperCase(),
+          title: formData.title,
+          credit_hours: formData.creditHours,
+          program: formData.programId || undefined,
+          intended_class_standing: formData.intendedClassStanding || undefined,
+        });
+        toast.success('Course created successfully.');
+        setIsAddModalOpen(false);
+      }
+    } catch (err: any) {
+      setFieldErrors(parseFieldErrors(err));
+      toast.error(getUserFriendlyErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleToggleArchive = (course: Course) => {
-    toggleCourseArchive(course.id);
-    const isArchived = course.status === 'active';
-    toast.success(`Course ${isArchived ? 'archived' : 'restored'}`, {
-      description: `${course.code} is now ${isArchived ? 'archived' : 'active'}.`,
-    });
+    try {
+      toggleCourseArchive(course.id);
+      const isArchived = course.status === 'active';
+      toast.success(`Course ${isArchived ? 'archived' : 'restored'} successfully.`);
+    } catch (err: any) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
   const filteredCourses = courses.filter((c) => {
@@ -255,103 +294,138 @@ export function CourseManagement() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editingCourse ? 'Edit Course Details' : 'Create New Course'}</DialogTitle>
+            <DialogTitle className="text-xl text-[#102A7A] dark:text-foreground font-bold">
+              {editingCourse ? 'Edit Course Details' : 'Create New Course'}
+            </DialogTitle>
             <DialogDescription>
-              {editingCourse ? 'Update course metadata and instructor assignments.' : 'Define a new course offer for student registration.'}
+              {editingCourse
+                ? 'Update course details, title, code, and credits.'
+                : 'Create a new course offering for the academic catalog.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-5 py-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="crsCode">Code</Label>
+                <Label htmlFor="crsCode" required>
+                  Course Code
+                </Label>
                 <Input
                   id="crsCode"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   placeholder="e.g. CS301"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  maxLength={20}
                 />
+                {fieldErrors.course_code && <p className="text-xs text-destructive mt-1">{fieldErrors.course_code}</p>}
+                {fieldErrors.code && <p className="text-xs text-destructive mt-1">{fieldErrors.code}</p>}
               </div>
-              <div className="col-span-2">
-                <Label htmlFor="crsTitle">Course Title</Label>
+
+              <div>
+                <Label htmlFor="crsTitle" required>
+                  Course Title
+                </Label>
                 <Input
                   id="crsTitle"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Advanced Data Structures"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="e.g. Data Structures & Algorithms"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  maxLength={255}
                 />
+                {fieldErrors.title && <p className="text-xs text-destructive mt-1">{fieldErrors.title}</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <CollegeDepartmentSelect
+              collegeValue={formData.collegeId}
+              onCollegeChange={(colId) => setFormData((prev) => ({ ...prev, collegeId: colId }))}
+              departmentValue={formData.departmentId}
+              onDepartmentChange={(deptId) => setFormData((prev) => ({ ...prev, departmentId: deptId }))}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="credits">Credit Hours</Label>
+                <Label htmlFor="programId">Program (Optional)</Label>
+                <select
+                  id="programId"
+                  className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                  value={formData.programId}
+                  onChange={(e) => setFormData({ ...formData, programId: e.target.value })}
+                >
+                  <option value="">-- Unassigned Program --</option>
+                  {programs.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.code})
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.program && <p className="text-xs text-destructive mt-1">{fieldErrors.program}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="classStanding">Intended Class Standing</Label>
+                <select
+                  id="classStanding"
+                  className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                  value={formData.intendedClassStanding}
+                  onChange={(e) => setFormData({ ...formData, intendedClassStanding: e.target.value })}
+                >
+                  <option value="">-- Not Specified --</option>
+                  <option value="FRESHMAN">Freshman</option>
+                  <option value="SOPHOMORE">Sophomore</option>
+                  <option value="JUNIOR">Junior</option>
+                  <option value="SENIOR">Senior</option>
+                  <option value="GRADUATE">Graduate</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="credits" required>
+                  Credit Hours
+                </Label>
                 <Input
                   id="credits"
                   type="number"
-                  min={1}
-                  max={6}
+                  min={0}
                   value={formData.creditHours}
-                  onChange={(e) => setFormData({ ...formData, creditHours: parseInt(e.target.value) || 3 })}
+                  onChange={(e) => setFormData({ ...formData, creditHours: parseInt(e.target.value) || 0 })}
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
                 />
+                {fieldErrors.credit_hours && <p className="text-xs text-destructive mt-1">{fieldErrors.credit_hours}</p>}
               </div>
-              <div>
-                <Label htmlFor="semester">Semester</Label>
-                <Input
-                  id="semester"
-                  value={formData.semester}
-                  onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="crsDept">Department</Label>
-              <select
-                id="crsDept"
-                className={selectClass}
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-              >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.name}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Label htmlFor="crsLec">Assigned Lecturer</Label>
-              <select
-                id="crsLec"
-                className={selectClass}
-                value={formData.lecturerId}
-                onChange={(e) => setFormData({ ...formData, lecturerId: e.target.value })}
-              >
-                {lecturers.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    Dr. {l.firstName} {l.lastName} ({l.department})
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               variant="outline"
               onClick={() => {
                 setIsAddModalOpen(false);
                 setEditingCourse(null);
               }}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveCourse}>
-              {editingCourse ? 'Save Changes' : 'Create Course'}
+            <Button
+              onClick={handleSaveCourse}
+              disabled={isSubmitting}
+              className="bg-[#102A7A] text-white hover:bg-[#D4AF37] hover:text-[#102A7A] transition-colors font-medium px-5"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Saving...
+                </span>
+              ) : editingCourse ? (
+                'Save Changes'
+              ) : (
+                'Create Course'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
