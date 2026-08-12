@@ -413,4 +413,29 @@ export const lecturerService = {
   async getRecentActivity(): Promise<any[]> {
     return [];
   },
+
+  /**
+   * Schedule exam window
+   */
+  async scheduleExam(
+    examId: string,
+    data: {
+      start_window?: string;
+      end_window?: string;
+      duration_minutes?: number;
+      startDate?: string;
+      endDate?: string;
+      durationMinutes?: number;
+    }
+  ): Promise<void> {
+    const startWindow = data.start_window || data.startDate || new Date().toISOString();
+    const endWindow = data.end_window || data.endDate || new Date(Date.now() + 86400000).toISOString();
+    const durationMinutes = data.duration_minutes ?? data.durationMinutes ?? 60;
+
+    await patchExamination(examId, {
+      start_window: startWindow,
+      end_window: endWindow,
+      duration_minutes: durationMinutes,
+    });
+  },
 };

@@ -31,7 +31,9 @@ export function ExaminationQuestionCard({
   const wordCount = textAnswer.trim() ? textAnswer.trim().split(/\s+/).filter(Boolean).length : 0;
   const charCount = textAnswer.length;
 
-  const isChoice = question.type === 'multiple_choice' || question.type === 'true_false';
+  const isChoice = question.type === 'MCQ' || question.type === 'multiple_choice' || question.type === 'true_false';
+  const isShortAnswer = question.type === 'SHORT_ANSWER' || question.type === 'short_answer';
+  const isEssay = question.type === 'ESSAY' || question.type === 'essay';
   const options =
     question.type === 'true_false'
       ? [
@@ -56,7 +58,7 @@ export function ExaminationQuestionCard({
               ({question.marks} {question.marks === 1 ? 'mark' : 'marks'})
             </span>
             <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
-              {question.type.replace('_', ' ')}
+              {String(question.type).replace('_', ' ')}
             </span>
           </div>
 
@@ -99,7 +101,7 @@ export function ExaminationQuestionCard({
 
       {/* Question Body Controls */}
       <div className="mt-6">
-        {/* Single Choice / True-False */}
+        {/* Single Choice / True-False / MCQ */}
         {isChoice && (
           <fieldset>
             <legend className="sr-only">Options for Question {index + 1}</legend>
@@ -141,55 +143,8 @@ export function ExaminationQuestionCard({
           </fieldset>
         )}
 
-        {/* Multiple Select */}
-        {question.type === 'multiple_select' && (
-          <fieldset>
-            <legend className="sr-only">Multiple select options for Question {index + 1}</legend>
-            <div role="group" aria-label={`Answer options for question ${index + 1}`} className="space-y-3">
-              {options.map((option, optionIndex) => {
-                const checked = selectedOptions.includes(option.id);
-                const letter = String.fromCharCode(65 + optionIndex);
-                return (
-                  <label
-                    key={option.id}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-3.5 rounded-xl border p-4 transition-all hover:border-primary/50 hover:bg-accent/40',
-                      checked
-                        ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
-                        : 'border-border/80 bg-background'
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      name={`q-${question.id}`}
-                      value={option.id}
-                      checked={checked}
-                      onChange={() => {
-                        const updated = checked
-                          ? selectedOptions.filter((id) => id !== option.id)
-                          : [...selectedOptions, option.id];
-                        onChange(updated);
-                      }}
-                      className="h-4 w-4 rounded accent-primary"
-                    />
-                    <span
-                      className={cn(
-                        'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold transition',
-                        checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                      )}
-                    >
-                      {letter}
-                    </span>
-                    <span className="text-sm font-medium text-foreground">{option.text}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        )}
-
         {/* Short Answer */}
-        {question.type === 'short_answer' && (
+        {isShortAnswer && (
           <div className="space-y-2">
             <input
               type="text"
@@ -210,7 +165,7 @@ export function ExaminationQuestionCard({
         )}
 
         {/* Essay Question */}
-        {question.type === 'essay' && (
+        {isEssay && (
           <div className="space-y-2">
             <textarea
               value={textAnswer}

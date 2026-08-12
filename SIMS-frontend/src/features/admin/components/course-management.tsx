@@ -17,16 +17,19 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  FormSelect,
   Input,
   SearchInput,
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { Course } from '../types';
 
@@ -49,11 +52,18 @@ export function CourseManagement() {
     toggleCourseArchive,
     setCourseSearchQuery,
     setCourseDeptFilter,
+    fetchAdminData,
+    isLoadingData,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingCourse, setEditingCourse] = React.useState<Course | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [courseCollegeFilter, setCourseCollegeFilter] = React.useState<string>('ALL');
 
   const [formData, setFormData] = React.useState({
     code: '',
@@ -62,7 +72,9 @@ export function CourseManagement() {
     collegeId: 'col-coe-001',
     departmentId: 'dept-se-006',
     programId: '',
-    intendedClassStanding: '' as string,
+    intendedClassStanding: '',
+    lecturerId: '',
+    semester: 'Semester 1',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -84,6 +96,8 @@ export function CourseManagement() {
       departmentId: departments[0]?.id || 'dept-se-006',
       programId: programs[0]?.id || '',
       intendedClassStanding: '',
+      lecturerId: lecturers[0]?.id || '',
+      semester: 'Semester 1',
     });
     setIsAddModalOpen(true);
   };
@@ -99,6 +113,8 @@ export function CourseManagement() {
       departmentId: departments[0]?.id || 'dept-se-006',
       programId: programs[0]?.id || '',
       intendedClassStanding: '',
+      lecturerId: course.assignedLecturer?.id || '',
+      semester: course.semester || 'Semester 1',
     });
   };
 
@@ -209,11 +225,29 @@ export function CourseManagement() {
           <div>
             <select
               className={selectClass}
+              value={courseCollegeFilter}
+              onChange={(e) => {
+                setCourseCollegeFilter(e.target.value);
+                setCourseDeptFilter('ALL');
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={courseDeptFilter}
               onChange={(e) => setCourseDeptFilter(e.target.value)}
             >
               <option value="ALL">All Academic Departments</option>
-              {departments.map((d) => (
+              {getDepartmentsByCollege(courseCollegeFilter).map((d) => (
                 <option key={d.id} value={d.name}>
                   {d.name}
                 </option>
@@ -253,7 +287,7 @@ export function CourseManagement() {
                     <td className="px-4 py-3.5 font-semibold text-foreground">{crs.name}</td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground">{crs.creditHours} Hrs</td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{crs.department}</td>
-                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{crs.assignedLecturer.name}</td>
+                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{crs.assignedLecturer?.name || 'Unassigned'}</td>
                     <td className="px-4 py-3.5 text-xs font-semibold text-foreground">{crs.studentCount} Students</td>
                     <td className="px-4 py-3.5">
                       <Badge variant={crs.status === 'active' ? 'success' : 'secondary'} className="capitalize">
@@ -301,12 +335,12 @@ export function CourseManagement() {
             </DialogTitle>
             <DialogDescription>
               {editingCourse
-                ? 'Update course details, title, code, and credits.'
+                ? 'Update course details, title, code, and credit allocation.'
                 : 'Create a new course offering for the academic catalog.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <Label htmlFor="crsCode" required>
@@ -398,7 +432,7 @@ export function CourseManagement() {
                 {fieldErrors.credit_hours && <p className="text-xs text-destructive mt-1">{fieldErrors.credit_hours}</p>}
               </div>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button

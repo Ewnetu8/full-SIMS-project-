@@ -18,21 +18,16 @@ export default function ExamSubmittedPage() {
 
   useEffect(() => {
     if (!receipt && examId) {
-      // Fallback mock receipt if store was reset or accessed directly
-      const session = examinationService.getSession(examId);
-      const examTitle = session ? session.examTitle : 'Course Examination';
-      const courseCode = session ? session.courseCode : 'COURSE';
-
       setReceipt({
-        receiptId: `RCP-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        receiptId: `REC-${examId.slice(0, 8).toUpperCase()}`,
         examId,
-        examTitle,
-        course: session ? session.course : 'General Course',
-        courseCode,
-        lecturer: session ? session.lecturer : 'Course Lecturer',
+        examTitle: 'Course Examination',
+        course: 'Enrolled Course',
+        courseCode: 'COURSE',
+        lecturer: 'Course Instructor',
         submittedAt: new Date().toISOString(),
-        totalQuestions: session ? session.questions.length : 0,
-        answeredCount: session ? session.questions.length : 0,
+        totalQuestions: 0,
+        answeredCount: 0,
       });
     }
   }, [receipt, examId]);

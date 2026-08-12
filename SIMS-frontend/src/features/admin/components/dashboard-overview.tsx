@@ -44,52 +44,37 @@ export function DashboardOverview() {
     exams,
     aiJobs,
     auditLogs,
-    fetchUsers,
-    fetchStudents,
-    fetchLecturers,
-    fetchColleges,
-    fetchDepartments,
-    fetchPrograms,
-    fetchAcademicYears,
-    fetchCourses,
-    fetchExams,
+    fetchAdminData,
+    isLoadingData,
   } = useAdminStore();
 
   React.useEffect(() => {
-    fetchUsers();
-    fetchStudents();
-    fetchLecturers();
-    fetchColleges();
-    fetchDepartments();
-    fetchPrograms();
-    fetchAcademicYears();
-    fetchCourses();
-    fetchExams();
-  }, [fetchUsers, fetchStudents, fetchLecturers, fetchColleges, fetchDepartments, fetchPrograms, fetchAcademicYears, fetchCourses, fetchExams]);
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   const totalStudents = students.length;
   const totalLecturers = lecturers.length;
   const totalAdmins = users.filter((u) => u.role === 'admin').length;
   const totalCourses = courses.length;
   const totalDepts = departments.length;
-  const totalColleges = colleges.length;
-  const totalPrograms = programs.length;
+  const totalColleges = colleges ? colleges.length : 0;
+  const totalPrograms = programs ? programs.length : 0;
   const totalExamsCount = exams.length;
-  const activeExamsCount = exams.filter((e) => e.status === 'active').length;
+  const activeExamsCount = exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length;
   const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length;
   const publishedExamsCount = exams.filter((e) => e.status === 'published').length;
 
   const statCards = [
-    { label: 'Total Students', value: totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-primary', bg: 'bg-primary/10', trend: '+12% this term' },
-    { label: 'Total Lecturers', value: totalLecturers.toString(), icon: UserCheck, color: 'text-primary', bg: 'bg-primary/10', trend: '4 departments' },
-    { label: 'Administrators', value: totalAdmins.toString(), icon: Shield, color: 'text-primary', bg: 'bg-primary/10', trend: 'Full access' },
-    { label: 'Active Courses', value: totalCourses.toString(), icon: BookOpen, color: 'text-accent', bg: 'bg-accent/10', trend: 'Spring 2026' },
-    { label: 'Departments', value: totalDepts.toString(), icon: Building2, color: 'text-primary', bg: 'bg-primary/10', trend: 'Academic units' },
-    { label: 'Total Exams', value: totalExamsCount.toString(), icon: ClipboardCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'This academic year' },
-    { label: 'Active Exams Now', value: activeExamsCount.toString(), icon: Zap, color: 'text-accent', bg: 'bg-accent/10', trend: 'Live sessions' },
-    { label: 'Pending AI Grading', value: pendingAIGradingCount.toString(), icon: Brain, color: 'text-primary', bg: 'bg-primary/10', trend: 'Queue processing' },
-    { label: 'Published Results', value: publishedExamsCount.toString(), icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10', trend: 'Verified scores' },
-    { label: 'System Health', value: '99.9%', icon: Activity, color: 'text-success', bg: 'bg-success/10', trend: 'All services online' },
+    { label: 'Total Students', value: isLoadingData ? '...' : totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-primary', bg: 'bg-primary/10', trend: 'Enrolled students' },
+    { label: 'Total Lecturers', value: isLoadingData ? '...' : totalLecturers.toString(), icon: UserCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'Faculty members' },
+    { label: 'Administrators', value: isLoadingData ? '...' : totalAdmins.toString(), icon: Shield, color: 'text-primary', bg: 'bg-primary/10', trend: 'Full access' },
+    { label: 'Active Courses', value: isLoadingData ? '...' : totalCourses.toString(), icon: BookOpen, color: 'text-accent', bg: 'bg-accent/10', trend: 'Academic offerings' },
+    { label: 'Departments', value: isLoadingData ? '...' : totalDepts.toString(), icon: Building2, color: 'text-primary', bg: 'bg-primary/10', trend: 'Academic units' },
+    { label: 'Total Exams', value: isLoadingData ? '...' : totalExamsCount.toString(), icon: ClipboardCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'Scheduled assessments' },
+    { label: 'Active Exams Now', value: isLoadingData ? '...' : activeExamsCount.toString(), icon: Zap, color: 'text-accent', bg: 'bg-accent/10', trend: 'Live sessions' },
+    { label: 'Pending AI Grading', value: isLoadingData ? '...' : pendingAIGradingCount.toString(), icon: Brain, color: 'text-primary', bg: 'bg-primary/10', trend: 'Queue processing' },
+    { label: 'Published Results', value: isLoadingData ? '...' : publishedExamsCount.toString(), icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10', trend: 'Verified scores' },
+    { label: 'System Status', value: 'Active', icon: Activity, color: 'text-success', bg: 'bg-success/10', trend: 'All services online' },
   ];
 
   return (

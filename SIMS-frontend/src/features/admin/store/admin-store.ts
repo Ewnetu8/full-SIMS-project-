@@ -35,6 +35,7 @@ interface AdminStoreState {
   auditLogs: AuditLog[];
   settings: SystemSettings;
   notifications: AdminNotification[];
+  isLoadingData: boolean;
 
   // Loading states
   isLoadingUsers: boolean;
@@ -76,6 +77,7 @@ interface AdminStoreState {
   auditCategoryFilter: string;
 
   // Fetch Actions
+  fetchAdminData: () => Promise<void>;
   fetchUsers: () => Promise<void>;
   fetchStudents: () => Promise<void>;
   fetchLecturers: () => Promise<void>;
@@ -203,6 +205,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     },
   },
   notifications: [],
+  isLoadingData: false,
 
   isLoadingUsers: false,
   usersError: null,
@@ -241,7 +244,40 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   auditSearchQuery: '',
   auditCategoryFilter: 'ALL',
 
-  // Fetch Actions
+  fetchAdminData: async () => {
+    set({ isLoadingData: true });
+    try {
+      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters] = await Promise.all([
+        adminService.getDepartments().catch(() => []),
+        adminService.getCourses().catch(() => []),
+        adminService.getAllExams().catch(() => []),
+        adminService.getStudents().catch(() => []),
+        adminService.getUsers().catch(() => []),
+        adminService.getLecturers().catch(() => []),
+        adminService.getColleges().catch(() => []),
+        adminService.getPrograms().catch(() => []),
+        adminService.getAcademicYears().catch(() => []),
+        adminService.getSemesters().catch(() => []),
+      ]);
+
+      set({
+        departments,
+        courses,
+        exams,
+        students,
+        users,
+        lecturers,
+        colleges,
+        programs,
+        academicYears,
+        semesters,
+        isLoadingData: false,
+      });
+    } catch {
+      set({ isLoadingData: false });
+    }
+  },
+
   fetchUsers: async () => {
     set({ isLoadingUsers: true, usersError: null });
     try {
@@ -505,12 +541,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     set((state) => ({
       aiJobs: state.aiJobs.map((j) =>
         j.id === id
-          ? {
-              ...j,
-              status: 'processing',
-              errorReason: undefined,
-              startedAt: new Date().toLocaleString(),
-            }
+          ? { ...j, status: 'processing', errorReason: undefined, startedAt: new Date().toLocaleString() }
           : j
       ),
     })),
@@ -522,12 +553,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   setAuditSearchQuery: (auditSearchQuery) => set({ auditSearchQuery }),
   setAuditCategoryFilter: (auditCategoryFilter) => set({ auditCategoryFilter }),
-
   markNotificationRead: (id) =>
     set((state) => ({
       notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
     })),
-
   markAllNotificationsRead: () =>
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),

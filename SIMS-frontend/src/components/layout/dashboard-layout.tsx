@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import * as React from 'react';
 
 import { cn } from '@/lib';
@@ -42,8 +43,14 @@ export function DashboardLayout({
   showFooter = false,
   className,
 }: DashboardLayoutProps) {
+  const pathname = usePathname();
   const [collapsed,   setCollapsed]   = React.useState(false);
   const [mobileOpen, setMobileOpen]   = React.useState(false);
+
+  // Automatically close mobile sidebar on route change
+  React.useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   return (
     <div className={cn('flex h-screen overflow-hidden bg-background', className)}>

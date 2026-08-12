@@ -59,20 +59,22 @@ export const API_ENDPOINTS = {
   // ── Examinations ──────────────────────────────────────────────────────────
   EXAMS: {
     ROOT: '/api/v1/exams',
+    ACTIVE: '/api/v1/exams/active',
     BY_ID: (id: string) => `/api/v1/exams/${id}`,
     SCHEDULE: (id: string) => `/api/v1/exams/${id}/schedule`,
     START: (id: string) => `/api/v1/exams/${id}/start`,
     SUBMIT: (id: string) => `/api/v1/exams/${id}/submit`,
-    ACTIVE: '/api/v1/exams/active',
   },
 
-  // ── Exam Attempts (Student) ───────────────────────────────────────────────
+  // ── Exam Attempts (Student & Lecturer) ────────────────────────────────────
   ATTEMPTS: {
+    ANSWER: (attemptId: string, questionId: string) =>
+      `/api/v1/attempts/${attemptId}/answers/${questionId}`,
     AUTO_SAVE_ANSWER: (attemptId: string, questionId: string) =>
       `/api/v1/attempts/${attemptId}/answers/${questionId}`,
   },
 
-  // ── Academic Hierarchy (Read-Only for Lecturers) ──────────────────────────
+  // ── Academic Hierarchy ───────────────────────────────────────────────────
   UNIVERSITIES: {
     ROOT: '/api/v1/universities',
     BY_ID: (id: string) => `/api/v1/universities/${id}`,
@@ -134,7 +136,13 @@ export const API_ENDPOINTS = {
     BY_ID: (id: string) => `/api/v1/enrollment-overrides/${id}`,
   },
 
-  // ── Legacy/Placeholder (for future implementation) ────────────────────────
+  // ── Notifications ─────────────────────────────────────────────────────────
+  NOTIFICATIONS: {
+    ROOT: '/api/v1/notifications/',
+    BY_ID: (id: string) => `/api/v1/notifications/${id}/`,
+  },
+
+  // ── Legacy/Users/Grades/Analytics ─────────────────────────────────────────
   USERS: {
     ROOT: '/users',
     BY_ID: (id: string) => `/users/${id}`,

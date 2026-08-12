@@ -28,6 +28,9 @@ export {
   SelectScrollUpButton, SelectScrollDownButton,
 }                                            from './select';
 
+export { FormSelect, formSelectClass }        from './form-select';
+export type { FormSelectProps }              from './form-select';
+
 export { Checkbox }                          from './checkbox';
 export type { CheckboxProps }                from './checkbox';
 

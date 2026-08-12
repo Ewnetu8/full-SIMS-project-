@@ -53,7 +53,7 @@ export function LecturerDashboardOverview() {
   const activeExams = exams.filter((e) => e.status === 'PUBLISHED' || e.status === 'ACTIVE' || e.status === 'SCHEDULED');
   const draftExams = exams.filter((e) => e.status === 'DRAFT');
   const pendingAiGrading = submissions.filter((s) => s.aiGradingStatus === 'PENDING' || s.aiGradingStatus === 'PROCESSING');
-  const totalStudents = courses.reduce((acc, c) => acc + c.studentCount, 0);
+  const totalStudents = courses.reduce((acc, c) => acc + (c.studentCount || 0), 0);
 
   if (loading) {
     return (

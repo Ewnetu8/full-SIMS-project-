@@ -1,11 +1,16 @@
+import type { Question, Examination, ExamAttempt } from '@/features/student/types';
+
 export type ExaminationQuestionType =
+  | 'MCQ'
+  | 'SHORT_ANSWER'
+  | 'ESSAY'
   | 'multiple_choice'
   | 'multiple_select'
   | 'true_false'
   | 'short_answer'
   | 'essay';
 
-export type ExaminationAnswer = string | string[];
+export type ExaminationAnswer = string;
 
 export interface ExaminationOption {
   id: string;
@@ -17,7 +22,7 @@ export interface ExaminationQuestion {
   type: ExaminationQuestionType;
   prompt: string;
   marks: number;
-  required: boolean;
+  required?: boolean;
   options?: ExaminationOption[];
   maxCharacters?: number;
   codeSnippet?: string;
@@ -26,18 +31,21 @@ export interface ExaminationQuestion {
 
 export interface ExaminationSession {
   examId: string;
+  attemptId?: string;
   examTitle: string;
   course: string;
   courseCode: string;
   lecturer: string;
   durationSeconds: number;
   totalMarks: number;
-  passingScore: number;
-  allowedAttempts: number;
-  attemptNumber: number;
-  instructions: string[];
-  academicIntegrityNotice: string;
+  passingScore?: number;
+  allowedAttempts?: number;
+  attemptNumber?: number;
+  instructions?: string[];
+  academicIntegrityNotice?: string;
   questions: ExaminationQuestion[];
+  rawExam?: Examination;
+  rawAttempt?: ExamAttempt;
 }
 
 export interface SubmissionReceipt {
