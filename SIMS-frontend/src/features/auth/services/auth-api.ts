@@ -101,16 +101,19 @@ export const authApi = {
    * POST /api/v1/auth/logout
    * Sends X-CSRFToken header and HttpOnly refresh_token cookie.
    */
-  logout: (): Promise<void> =>
-    apiClient
-      .post<void>(API_ENDPOINTS.AUTH.LOGOUT, {})
-      .then(async () => {
-        try {
-          await fetch('/api/auth/session', { method: 'DELETE' });
-        } catch (e) {
-          console.error('Failed to clear session cookie:', e);
-        }
-      }),
+  logout: async (): Promise<void> => {
+    try {
+      await apiClient.post<void>(API_ENDPOINTS.AUTH.LOGOUT, {});
+    } catch (e) {
+      console.error('Logout request error:', e);
+    } finally {
+      try {
+        await fetch('/api/auth/session', { method: 'DELETE' });
+      } catch (e) {
+        console.error('Failed to clear session cookie:', e);
+      }
+    }
+  },
 
   /**
    * POST /api/v1/auth/forgot-password
@@ -134,10 +137,6 @@ export const authApi = {
   refreshToken: async (): Promise<RefreshTokenResponse> => {
     const csrfToken = getCsrfToken();
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Refresh request - CSRF token present:', !!csrfToken);
-    }
-
     const response = await axios.post<any>(
       `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
       {},
@@ -145,6 +144,7 @@ export const authApi = {
         withCredentials: true,
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
           ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
         },
       }

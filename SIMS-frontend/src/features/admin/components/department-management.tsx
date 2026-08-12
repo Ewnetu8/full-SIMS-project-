@@ -22,6 +22,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -31,6 +32,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  FormSelect,
   Input,
   SearchInput,
   Textarea,
@@ -38,6 +40,7 @@ import {
 import { ROUTES } from '@/constants';
 
 import { useAdminStore } from '../store';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { Department } from '../types';
 
@@ -51,7 +54,13 @@ export function DepartmentManagement() {
     updateDepartment,
     deleteDepartment,
     setDepartmentSearchQuery,
+    fetchAdminData,
+    isLoadingData,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingDept, setEditingDept] = React.useState<Department | null>(null);
@@ -149,11 +158,18 @@ export function DepartmentManagement() {
     }
   };
 
-  const filteredDepts = departments.filter(
-    (d) =>
-      d.name.toLowerCase().includes(departmentSearchQuery.toLowerCase()) ||
-      d.code.toLowerCase().includes(departmentSearchQuery.toLowerCase())
-  );
+  const [collegeFilter, setCollegeFilter] = React.useState<string>('ALL');
+
+  const filteredDepartments = departments.filter((dept) => {
+    const matchesSearch =
+      dept.name.toLowerCase().includes(departmentSearchQuery.toLowerCase()) ||
+      dept.code.toLowerCase().includes(departmentSearchQuery.toLowerCase());
+
+    const foundInfo = getDepartmentsByCollege().find((d) => d.name === dept.name);
+    const matchesCollege = collegeFilter === 'ALL' || (foundInfo && foundInfo.college === collegeFilter);
+
+    return matchesSearch && matchesCollege;
+  });
 
   const selectClass =
     'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground';
@@ -175,21 +191,37 @@ export function DepartmentManagement() {
         </Button>
       </div>
 
-      {/* Search Bar */}
+      {/* Search & Filter Bar */}
       <Card className="p-4">
-        <div className="max-w-md">
-          <SearchInput
-            placeholder="Search department by name or code..."
-            value={departmentSearchQuery}
-            onChange={(e) => setDepartmentSearchQuery(e.target.value)}
-            onClear={() => setDepartmentSearchQuery('')}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+          <div>
+            <SearchInput
+              placeholder="Search department by name or code..."
+              value={departmentSearchQuery}
+              onChange={(e) => setDepartmentSearchQuery(e.target.value)}
+              onClear={() => setDepartmentSearchQuery('')}
+            />
+          </div>
+          <div>
+            <select
+              className={selectClass}
+              value={collegeFilter}
+              onChange={(e) => setCollegeFilter(e.target.value)}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </Card>
 
       {/* Department Cards Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {filteredDepts.map((dept) => (
+        {filteredDepartments.map((dept) => (
           <Card key={dept.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div className="space-y-3">
               <div className="flex items-start justify-between">
@@ -288,52 +320,61 @@ export function DepartmentManagement() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingDept ? 'Edit Department' : 'Add New Department'}</DialogTitle>
             <DialogDescription>
-              {editingDept ? 'Update department code, title, or description.' : 'Define a new academic unit.'}
+              {editingDept
+                ? 'Update department details, academic code, or designated Head of Department.'
+                : 'Enter the department information below to create a new academic department.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-3 gap-3">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <Label htmlFor="code">Code</Label>
+                <Label htmlFor="code" className="text-xs font-medium mb-1.5 block">
+                  Department Code
+                </Label>
                 <Input
                   id="code"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g. CS"
+                  placeholder="e.g. SE"
                 />
               </div>
-              <div className="col-span-2">
-                <Label htmlFor="name">Department Name</Label>
+              <div className="sm:col-span-2">
+                <Label htmlFor="name" className="text-xs font-medium mb-1.5 block">
+                  Department Name
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Computer Science & Software Engineering"
+                  placeholder="e.g. Software Engineering & AI"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="text-xs font-medium mb-1.5 block">
+                Description
+              </Label>
               <Textarea
                 id="description"
                 rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief summary of department academic focus..."
+                placeholder="Overview of academic focus, research areas, and program offerings..."
               />
             </div>
 
             <div>
-              <Label htmlFor="hod">Head of Department (HOD)</Label>
-              <select
+              <Label htmlFor="hod" className="text-xs font-medium mb-1.5 block">
+                Head of Department (HOD)
+              </Label>
+              <FormSelect
                 id="hod"
-                className={selectClass}
                 value={formData.hodId}
                 onChange={(e) => setFormData({ ...formData, hodId: e.target.value })}
               >
@@ -342,9 +383,9 @@ export function DepartmentManagement() {
                     Dr. {l.firstName} {l.lastName} ({l.department})
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button
@@ -366,7 +407,7 @@ export function DepartmentManagement() {
       {/* Assign HOD Modal */}
       {assigningHODDept && (
         <Dialog open={!!assigningHODDept} onOpenChange={() => setAssigningHODDept(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-primary" /> Assign Head of Department
@@ -376,12 +417,13 @@ export function DepartmentManagement() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-2">
+            <DialogBody className="space-y-4 py-3">
               <div>
-                <Label htmlFor="hodSelect">Select HOD</Label>
-                <select
+                <Label htmlFor="hodSelect" className="text-xs font-medium mb-1.5 block">
+                  Designated HOD
+                </Label>
+                <FormSelect
                   id="hodSelect"
-                  className={selectClass}
                   value={formData.hodId}
                   onChange={(e) => setFormData({ ...formData, hodId: e.target.value })}
                 >
@@ -390,9 +432,9 @@ export function DepartmentManagement() {
                       Dr. {l.firstName} {l.lastName} — {l.department}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setAssigningHODDept(null)}>

@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   Bell,
   UserPlus,
+  Layers,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -35,13 +36,14 @@ const adminNavigation: NavItem[] = [
   { label: 'Student Directory', href: ROUTES.ADMIN.STUDENTS, icon: <GraduationCap className="h-4 w-4" /> },
   { label: 'Lecturer Directory', href: ROUTES.ADMIN.LECTURERS, icon: <UserCheck className="h-4 w-4" /> },
   { label: 'Departments', href: ROUTES.ADMIN.DEPARTMENTS, icon: <Building2 className="h-4 w-4" /> },
+  { label: 'Academic Structure', href: ROUTES.ADMIN.ACADEMIC_STRUCTURE, icon: <Layers className="h-4 w-4" /> },
   { label: 'Courses', href: ROUTES.ADMIN.COURSES, icon: <BookOpen className="h-4 w-4" /> },
   { label: 'Exams Overview', href: ROUTES.ADMIN.EXAMS, icon: <ClipboardCheck className="h-4 w-4" /> },
   { label: 'AI Grading Monitor', href: ROUTES.ADMIN.AI_MONITOR, icon: <Brain className="h-4 w-4" />, badge: 'Live' },
   { label: 'Reports & Analytics', href: ROUTES.ADMIN.REPORTS, icon: <BarChart3 className="h-4 w-4" /> },
   { label: 'System Settings', href: ROUTES.ADMIN.SETTINGS, icon: <Settings className="h-4 w-4" /> },
   { label: 'Audit Logs', href: ROUTES.ADMIN.AUDIT_LOGS, icon: <ShieldAlert className="h-4 w-4" /> },
-  { label: 'Notifications', href: ROUTES.ADMIN.NOTIFICATIONS, icon: <Bell className="h-4 w-4" />, badge: 2 },
+  { label: 'Notifications', href: ROUTES.ADMIN.NOTIFICATIONS, icon: <Bell className="h-4 w-4" /> },
 ];
 
 export interface AdminShellProps {

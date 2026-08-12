@@ -88,8 +88,8 @@ export function NotificationsPage() {
       ) : notifications.length === 0 ? (
         <EmptyState
           icon={<Bell className="h-10 w-10 text-muted-foreground" />}
-          title="You're all caught up"
-          description="New academic updates, exam announcements, and reminders will appear here."
+          title="No notifications available"
+          description="No notifications are available at the moment."
         />
       ) : (
         <Card className="shadow-sm border-border/80">

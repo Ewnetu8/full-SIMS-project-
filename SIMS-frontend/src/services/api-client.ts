@@ -14,6 +14,28 @@ import { getCsrfToken } from '@/utils/csrf';
 
 import type { ApiErrorResponse } from '@/types';
 
+// ─── Concurrent Refresh Control State ─────────────────────────────────────────
+
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
+
+/**
+ * Resolves or rejects all queued requests waiting for a token refresh to complete.
+ */
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach((promise) => {
+    if (error) {
+      promise.reject(error);
+    } else if (token) {
+      promise.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 // ─── Axios Client Factory ─────────────────────────────────────────────────────
 
 /**
@@ -21,7 +43,7 @@ import type { ApiErrorResponse } from '@/types';
  * - Base URL from environment
  * - JSON content-type headers
  * - Request interceptor (auth Bearer token & CSRF header injection)
- * - Response interceptor (error normalization & silent 401 token refresh flow)
+ * - Response interceptor (error normalization & silent 401 token refresh flow with concurrency queueing)
  */
 function createApiClient(): AxiosInstance {
   const client = axios.create({
@@ -72,8 +94,6 @@ function createApiClient(): AxiosInstance {
       }
 
       // Normalise the backend response into the ApiErrorResponse shape.
-      // Django REST Framework uses `detail` (string) for error messages,
-      // but our frontend ApiErrorResponse expects `message` + `statusCode`.
       const raw = response.data as Record<string, unknown> | undefined;
       const normalised: ApiErrorResponse = {
         message:
@@ -89,40 +109,52 @@ function createApiClient(): AxiosInstance {
       };
 
       const apiError = createApiError(normalised);
+      const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
 
       const isAuthEndpoint =
-        error.config?.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
-        error.config?.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
-        error.config?.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
 
       // Handle 401 Unauthorized for non-auth endpoints by attempting silent refresh
-      if (response.status === 401 && !isAuthEndpoint) {
+      if (response.status === 401 && !isAuthEndpoint && originalRequest && !originalRequest._retry) {
+        // If a refresh is ALREADY in progress, queue this request to await new token
+        if (isRefreshing) {
+          return new Promise<string>((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          })
+            .then((token: string) => {
+              originalRequest.headers.set('Authorization', `Bearer ${token}`);
+              return client(originalRequest);
+            })
+            .catch((err) => Promise.reject(err));
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
         try {
-          const csrfToken = getCsrfToken();
-          const refreshRes = await axios.post<{ access?: string; access_token?: string; accessToken?: string }>(
-            `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
-            {},
-            {
-              withCredentials: true,
-              headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
-            }
-          );
-          
-          // The exact field name depends on the backend framework (access, access_token, etc)
-          const newAccessToken =
-            refreshRes.data.access || refreshRes.data.access_token || refreshRes.data.accessToken || '';
+          // Dynamically import authApi to avoid circular dependency
+          const { authApi } = await import('@/features/auth/services/auth-api');
+          const refreshRes = await authApi.refreshToken();
+          const newAccessToken = refreshRes.tokens?.accessToken || '';
 
           if (newAccessToken) {
             useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
+            originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
+
+            // Resolve all queued requests with the new access token
+            processQueue(null, newAccessToken);
+
             // Retry the original request
-            if (error.config) {
-              error.config.headers.set('Authorization', `Bearer ${newAccessToken}`);
-              return client(error.config);
-            }
+            return client(originalRequest);
+          } else {
+            throw new Error('No access token returned from refresh endpoint');
           }
         } catch (refreshError: any) {
+          processQueue(refreshError, null);
+
           const refreshStatus = refreshError?.response?.status;
-          console.error('Token refresh failed:', refreshStatus, refreshError);
 
           // ONLY clear session if refresh explicitly fails with 401 (refresh token missing/expired)
           if (refreshStatus === 401) {
@@ -131,6 +163,8 @@ function createApiClient(): AxiosInstance {
           }
           // Do NOT clear session on 403 (CSRF failure or permission error)
           return Promise.reject(apiError);
+        } finally {
+          isRefreshing = false;
         }
       }
 

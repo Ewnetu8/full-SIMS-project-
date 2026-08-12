@@ -16,16 +16,19 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  FormSelect,
   Input,
   SearchInput,
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { Course } from '../types';
 
@@ -41,26 +44,37 @@ export function CourseManagement() {
     toggleCourseArchive,
     setCourseSearchQuery,
     setCourseDeptFilter,
+    fetchAdminData,
+    isLoadingData,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingCourse, setEditingCourse] = React.useState<Course | null>(null);
+  const [courseCollegeFilter, setCourseCollegeFilter] = React.useState<string>('ALL');
 
   const [formData, setFormData] = React.useState({
     code: '',
     name: '',
     creditHours: 3,
-    department: departments[0]?.name || 'Computer Science & Software Engineering',
+    college: 'College of Engineering',
+    department: 'Software Engineering',
     lecturerId: lecturers[0]?.id || '',
     semester: 'Spring 2026',
   });
 
   const handleOpenAddModal = () => {
+    const defaultCol = 'College of Engineering';
+    const depts = getDepartmentsByCollege(defaultCol);
     setFormData({
       code: '',
       name: '',
       creditHours: 3,
-      department: departments[0]?.name || 'Computer Science & Software Engineering',
+      college: defaultCol,
+      department: depts[0]?.name || 'Software Engineering',
       lecturerId: lecturers[0]?.id || '',
       semester: 'Spring 2026',
     });
@@ -68,11 +82,14 @@ export function CourseManagement() {
   };
 
   const handleOpenEditModal = (course: Course) => {
+    const foundDept = getDepartmentsByCollege().find((d) => d.name === course.department);
+    const crsCol = foundDept ? foundDept.college : 'College of Engineering';
     setEditingCourse(course);
     setFormData({
       code: course.code,
       name: course.name,
       creditHours: course.creditHours,
+      college: crsCol,
       department: course.department,
       lecturerId: course.assignedLecturer.id,
       semester: course.semester,
@@ -170,11 +187,29 @@ export function CourseManagement() {
           <div>
             <select
               className={selectClass}
+              value={courseCollegeFilter}
+              onChange={(e) => {
+                setCourseCollegeFilter(e.target.value);
+                setCourseDeptFilter('ALL');
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={courseDeptFilter}
               onChange={(e) => setCourseDeptFilter(e.target.value)}
             >
               <option value="ALL">All Academic Departments</option>
-              {departments.map((d) => (
+              {getDepartmentsByCollege(courseCollegeFilter).map((d) => (
                 <option key={d.id} value={d.name}>
                   {d.name}
                 </option>
@@ -255,39 +290,47 @@ export function CourseManagement() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingCourse ? 'Edit Course Details' : 'Create New Course'}</DialogTitle>
             <DialogDescription>
-              {editingCourse ? 'Update course metadata and instructor assignments.' : 'Define a new course offer for student registration.'}
+              {editingCourse
+                ? 'Update course details, credit allocation, or assigned lecturer.'
+                : 'Enter the course details below to create a new course offering.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-3 gap-3">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <Label htmlFor="crsCode">Code</Label>
+                <Label htmlFor="crsCode" className="text-xs font-medium mb-1.5 block">
+                  Course Code
+                </Label>
                 <Input
                   id="crsCode"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g. CS301"
+                  placeholder="e.g. ECE301"
                 />
               </div>
-              <div className="col-span-2">
-                <Label htmlFor="crsTitle">Course Title</Label>
+              <div className="sm:col-span-2">
+                <Label htmlFor="crsTitle" className="text-xs font-medium mb-1.5 block">
+                  Course Title
+                </Label>
                 <Input
                   id="crsTitle"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Advanced Data Structures"
+                  placeholder="e.g. Data Structures & Algorithms"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="credits">Credit Hours</Label>
+                <Label htmlFor="credits" className="text-xs font-medium mb-1.5 block">
+                  Credit Hours
+                </Label>
                 <Input
                   id="credits"
                   type="number"
@@ -298,36 +341,66 @@ export function CourseManagement() {
                 />
               </div>
               <div>
-                <Label htmlFor="semester">Semester</Label>
+                <Label htmlFor="semester" className="text-xs font-medium mb-1.5 block">
+                  Semester
+                </Label>
                 <Input
                   id="semester"
                   value={formData.semester}
                   onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                  placeholder="e.g. Semester 1"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="crsDept">Department</Label>
-              <select
+              <Label htmlFor="crsCollege" className="text-xs font-medium mb-1.5 block">
+                College *
+              </Label>
+              <FormSelect
+                id="crsCollege"
+                value={formData.college}
+                onChange={(e) => {
+                  const newCol = e.target.value;
+                  const depts = getDepartmentsByCollege(newCol);
+                  setFormData({
+                    ...formData,
+                    college: newCol,
+                    department: depts[0]?.name || '',
+                  });
+                }}
+              >
+                {COLLEGES.map((col) => (
+                  <option key={col} value={col}>
+                    {col}
+                  </option>
+                ))}
+              </FormSelect>
+            </div>
+
+            <div>
+              <Label htmlFor="crsDept" className="text-xs font-medium mb-1.5 block">
+                Department *
+              </Label>
+              <FormSelect
                 id="crsDept"
-                className={selectClass}
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               >
-                {departments.map((d) => (
+                {getDepartmentsByCollege(formData.college).map((d) => (
                   <option key={d.id} value={d.name}>
                     {d.name}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
 
             <div>
-              <Label htmlFor="crsLec">Assigned Lecturer</Label>
-              <select
+              <Label htmlFor="crsLec" className="text-xs font-medium mb-1.5 block">
+                Assigned Lecturer
+              </Label>
+              <FormSelect
                 id="crsLec"
-                className={selectClass}
                 value={formData.lecturerId}
                 onChange={(e) => setFormData({ ...formData, lecturerId: e.target.value })}
               >
@@ -336,9 +409,9 @@ export function CourseManagement() {
                     Dr. {l.firstName} {l.lastName} ({l.department})
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button

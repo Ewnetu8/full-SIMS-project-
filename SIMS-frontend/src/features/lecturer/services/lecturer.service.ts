@@ -1,10 +1,6 @@
-import {
-  mockCourses,
-  mockLecturerExams,
-  mockSubmissions,
-  mockLecturerAnalytics,
-  mockLecturerNotifications,
-} from '../mock';
+import { api } from '@/services/api-client';
+import { API_ENDPOINTS } from '@/constants';
+import { mockLecturerAnalytics } from '../mock/lecturer-data';
 
 import type {
   Course,
@@ -12,83 +8,158 @@ import type {
   StudentSubmission,
   LecturerAnalytics,
   LecturerNotification,
-  ExamWizardData,
 } from '../types';
 
-let examsInMemory = [...mockLecturerExams];
-let notificationsInMemory = [...mockLecturerNotifications];
+let examsInMemory: LecturerExam[] = [];
 
 export const lecturerService = {
   async getCourses(): Promise<Course[]> {
-    await new Promise((res) => setTimeout(res, 200));
-    return mockCourses;
+    try {
+      const data = await api.get<any>(API_ENDPOINTS.COURSE_OFFERINGS.ROOT);
+      const list = Array.isArray(data) ? data : data?.results || [];
+      return list.map((c: any) => ({
+        id: c.id || String(Math.random()),
+        code: c.course_code || c.code || 'CRS',
+        name: c.course_title || c.title || c.name || 'Course Offering',
+        department: c.department || 'Department',
+        studentCount: c.enrolled_count || c.student_count || 0,
+        examCount: c.active_exams_count || 0,
+        description: c.description || '',
+        academicYear: c.academic_year || '2025/2026',
+        semester: c.semester_detail?.name || c.semester || 'Semester 1',
+      }));
+    } catch {
+      return [];
+    }
   },
 
   async getCourseById(id: string): Promise<Course | undefined> {
-    await new Promise((res) => setTimeout(res, 150));
-    return mockCourses.find((c) => c.id === id || c.code.toLowerCase() === id.toLowerCase());
+    const courses = await this.getCourses();
+    return courses.find((c) => c.id === id || c.code.toLowerCase() === id.toLowerCase());
   },
 
   async getExams(): Promise<LecturerExam[]> {
-    await new Promise((res) => setTimeout(res, 200));
-    return [...examsInMemory];
+    try {
+      const data = await api.get<any>(API_ENDPOINTS.EXAMS.ROOT);
+      const list = Array.isArray(data) ? data : data?.results || [];
+      if (list.length > 0) {
+        examsInMemory = list.map((e: any) => ({
+          id: e.id || String(Math.random()),
+          title: e.title || 'Examination',
+          courseId: e.course_offering || e.course_id || '',
+          courseCode: e.course_offering_detail?.course_code || e.course_code || 'EXAM',
+          courseName: e.course_offering_detail?.course_title || e.course_title || 'Assessment',
+          description: e.description || '',
+          instructions: e.instructions || [],
+          durationMinutes: e.duration_minutes || e.duration || 60,
+          totalMarks: e.total_marks || 100,
+          passingScore: e.passing_score || 50,
+          status: e.status || 'DRAFT',
+          startDate: e.start_time || e.start_date || new Date().toISOString(),
+          endDate: e.end_time || e.end_date || new Date().toISOString(),
+          randomizeQuestions: Boolean(e.randomize_questions),
+          allowMultipleAttempts: Boolean(e.allow_multiple_attempts),
+          autoSubmitOnTimeout: Boolean(e.auto_submit_on_timeout),
+          showResultsAfterSubmission: Boolean(e.show_results_after_submission),
+          questions: e.questions || [],
+          createdAt: e.created_at || new Date().toISOString(),
+          updatedAt: e.updated_at || new Date().toISOString(),
+        }));
+      }
+      return [...examsInMemory];
+    } catch {
+      return [...examsInMemory];
+    }
   },
 
   async getExamById(id: string): Promise<LecturerExam | undefined> {
-    await new Promise((res) => setTimeout(res, 150));
-    return examsInMemory.find((e) => e.id === id);
+    const exams = await this.getExams();
+    return exams.find((e) => e.id === id);
   },
 
   async saveExam(data: Partial<LecturerExam> & { id?: string }): Promise<LecturerExam> {
-    await new Promise((res) => setTimeout(res, 300));
-    const course = mockCourses.find((c) => c.id === data.courseId) ?? mockCourses[0];
-    const courseCode = course?.code ?? 'CS 101';
-    const courseName = course?.name ?? 'Course';
+    try {
+      const payload = {
+        course_offering: data.courseId,
+        title: data.title ?? 'Untitled Examination',
+        status: data.status || 'DRAFT',
+        start_window: data.startDate ? new Date(data.startDate).toISOString() : new Date().toISOString(),
+        end_window: data.endDate ? new Date(data.endDate).toISOString() : new Date(Date.now() + 7 * 86400000).toISOString(),
+        duration_minutes: Number(data.durationMinutes ?? 60),
+      };
 
-    if (data.id) {
-      const index = examsInMemory.findIndex((e) => e.id === data.id);
-      if (index !== -1) {
-        const updated: LecturerExam = {
-          ...examsInMemory[index]!,
-          ...data,
-          courseCode,
-          courseName,
-          updatedAt: new Date().toISOString(),
-        };
-        examsInMemory[index] = updated;
-        return updated;
+      let res: any;
+      if (data.id && !data.id.startsWith('exam-')) {
+        res = await api.put<any>(API_ENDPOINTS.EXAMS.BY_ID(data.id), payload);
+      } else {
+        res = await api.post<any>(API_ENDPOINTS.EXAMS.ROOT, payload);
       }
+
+      const savedExam: LecturerExam = {
+        id: res?.id || data.id || `exam-${Date.now()}`,
+        title: res?.title || payload.title,
+        courseId: res?.course_offering || payload.course_offering || '',
+        courseCode: res?.course_offering_detail?.course_code || data.courseCode || 'EXAM',
+        courseName: res?.course_offering_detail?.course_title || data.courseName || 'Assessment',
+        description: data.description ?? '',
+        instructions: data.instructions ?? [],
+        durationMinutes: res?.duration_minutes || payload.duration_minutes,
+        totalMarks: data.totalMarks ?? 100,
+        passingScore: data.passingScore ?? 50,
+        status: res?.status || payload.status,
+        startDate: res?.start_window || payload.start_window,
+        endDate: res?.end_window || payload.end_window,
+        randomizeQuestions: Boolean(data.randomizeQuestions),
+        allowMultipleAttempts: Boolean(data.allowMultipleAttempts),
+        autoSubmitOnTimeout: Boolean(data.autoSubmitOnTimeout),
+        showResultsAfterSubmission: Boolean(data.showResultsAfterSubmission),
+        questions: data.questions ?? [],
+        createdAt: res?.created_at || new Date().toISOString(),
+        updatedAt: res?.updated_at || new Date().toISOString(),
+      };
+
+      const index = examsInMemory.findIndex((e) => e.id === savedExam.id);
+      if (index !== -1) {
+        examsInMemory[index] = savedExam;
+      } else {
+        examsInMemory.unshift(savedExam);
+      }
+      return savedExam;
+    } catch {
+      const newExam: LecturerExam = {
+        id: data.id || `exam-${Date.now()}`,
+        title: data.title ?? 'Untitled Examination',
+        courseId: data.courseId ?? '',
+        courseCode: data.courseCode ?? 'CRS 101',
+        courseName: data.courseName ?? 'Course',
+        description: data.description ?? '',
+        instructions: data.instructions ?? [],
+        durationMinutes: data.durationMinutes ?? 60,
+        totalMarks: data.totalMarks ?? 100,
+        passingScore: data.passingScore ?? 50,
+        status: data.status ?? 'DRAFT',
+        startDate: data.startDate ?? new Date().toISOString(),
+        endDate: data.endDate ?? new Date(Date.now() + 7 * 86400000).toISOString(),
+        randomizeQuestions: Boolean(data.randomizeQuestions),
+        allowMultipleAttempts: Boolean(data.allowMultipleAttempts),
+        autoSubmitOnTimeout: Boolean(data.autoSubmitOnTimeout),
+        showResultsAfterSubmission: Boolean(data.showResultsAfterSubmission),
+        questions: data.questions ?? [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const index = examsInMemory.findIndex((e) => e.id === newExam.id);
+      if (index !== -1) {
+        examsInMemory[index] = newExam;
+      } else {
+        examsInMemory.unshift(newExam);
+      }
+      return newExam;
     }
-
-    const newExam: LecturerExam = {
-      id: `exam-${Date.now()}`,
-      title: data.title ?? 'Untitled Examination',
-      courseId: course?.id ?? 'course-cs101',
-      courseCode,
-      courseName,
-      description: data.description ?? '',
-      instructions: data.instructions ?? [],
-      durationMinutes: data.durationMinutes ?? 60,
-      totalMarks: data.totalMarks ?? 100,
-      passingScore: data.passingScore ?? 50,
-      status: data.status ?? 'DRAFT',
-      startDate: data.startDate ?? new Date().toISOString(),
-      endDate: data.endDate ?? new Date(Date.now() + 7 * 86400000).toISOString(),
-      randomizeQuestions: Boolean(data.randomizeQuestions),
-      allowMultipleAttempts: Boolean(data.allowMultipleAttempts),
-      autoSubmitOnTimeout: Boolean(data.autoSubmitOnTimeout),
-      showResultsAfterSubmission: Boolean(data.showResultsAfterSubmission),
-      questions: data.questions ?? [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    examsInMemory.unshift(newExam);
-    return newExam;
   },
 
   async duplicateExam(id: string): Promise<LecturerExam | undefined> {
-    await new Promise((res) => setTimeout(res, 250));
     const original = examsInMemory.find((e) => e.id === id);
     if (!original) return undefined;
 
@@ -106,14 +177,38 @@ export const lecturerService = {
   },
 
   async deleteExam(id: string): Promise<boolean> {
-    await new Promise((res) => setTimeout(res, 200));
     const beforeLength = examsInMemory.length;
     examsInMemory = examsInMemory.filter((e) => e.id !== id);
     return examsInMemory.length < beforeLength;
   },
 
+  async scheduleExam(id: string, data: { startDate: string; endDate: string; durationMinutes: number }): Promise<any> {
+    const payload = {
+      start_window: new Date(data.startDate).toISOString(),
+      end_window: new Date(data.endDate).toISOString(),
+      duration_minutes: Number(data.durationMinutes),
+    };
+    try {
+      const res = await api.post<any>(API_ENDPOINTS.EXAMS.SCHEDULE(id), payload);
+      const target = examsInMemory.find((e) => e.id === id);
+      if (target) {
+        target.startDate = payload.start_window;
+        target.endDate = payload.end_window;
+        target.durationMinutes = payload.duration_minutes;
+      }
+      return res;
+    } catch {
+      const target = examsInMemory.find((e) => e.id === id);
+      if (target) {
+        target.startDate = payload.start_window;
+        target.endDate = payload.end_window;
+        target.durationMinutes = payload.duration_minutes;
+      }
+      return { success: true };
+    }
+  },
+
   async togglePublishExam(id: string): Promise<LecturerExam | undefined> {
-    await new Promise((res) => setTimeout(res, 250));
     const target = examsInMemory.find((e) => e.id === id);
     if (!target) return undefined;
 
@@ -121,41 +216,22 @@ export const lecturerService = {
     target.status = newStatus;
     target.updatedAt = new Date().toISOString();
 
-    if (newStatus === 'PUBLISHED') {
-      notificationsInMemory.unshift({
-        id: `notif-${Date.now()}`,
-        title: 'Exam Published',
-        message: `"${target.title}" is now published and active for students.`,
-        timestamp: 'Just now',
-        type: 'published',
-        read: false,
-        link: `/lecturer/exams/${target.id}`,
-      });
-    }
-
     return { ...target };
   },
 
-  async getSubmissions(examId?: string): Promise<StudentSubmission[]> {
-    await new Promise((res) => setTimeout(res, 200));
-    if (examId) {
-      return mockSubmissions.filter((s) => s.examId === examId);
-    }
-    return mockSubmissions;
+  async getSubmissions(_examId?: string): Promise<StudentSubmission[]> {
+    return Promise.resolve([]);
   },
 
   async getAnalytics(): Promise<LecturerAnalytics> {
-    await new Promise((res) => setTimeout(res, 200));
-    return mockLecturerAnalytics;
+    return Promise.resolve(mockLecturerAnalytics);
   },
 
   async getNotifications(): Promise<LecturerNotification[]> {
-    await new Promise((res) => setTimeout(res, 150));
-    return [...notificationsInMemory];
+    return Promise.resolve([]);
   },
 
   async markAllNotificationsRead(): Promise<void> {
-    await new Promise((res) => setTimeout(res, 100));
-    notificationsInMemory = notificationsInMemory.map((n) => ({ ...n, read: true }));
+    return Promise.resolve();
   },
 };

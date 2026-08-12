@@ -16,6 +16,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { LecturerProfile } from '../types';
 
@@ -38,6 +40,7 @@ export function LecturerManagement() {
   } = useAdminStore();
 
   const [selectedLecturer, setSelectedLecturer] = React.useState<LecturerProfile | null>(null);
+  const [lecturerCollegeFilter, setLecturerCollegeFilter] = React.useState<string>('ALL');
 
   const filteredLecturers = lecturers.filter((l) => {
     const fullName = `${l.firstName} ${l.lastName}`.toLowerCase();
@@ -68,7 +71,7 @@ export function LecturerManagement() {
 
       {/* Filter Bar */}
       <Card className="p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <SearchInput
               placeholder="Search by lecturer name, ID, or email..."
@@ -81,11 +84,29 @@ export function LecturerManagement() {
           <div>
             <select
               className={selectClass}
+              value={lecturerCollegeFilter}
+              onChange={(e) => {
+                setLecturerCollegeFilter(e.target.value);
+                setLecturerDeptFilter('ALL');
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={lecturerDeptFilter}
               onChange={(e) => setLecturerDeptFilter(e.target.value)}
             >
               <option value="ALL">All Departments</option>
-              {departments.map((d) => (
+              {getDepartmentsByCollege(lecturerCollegeFilter).map((d) => (
                 <option key={d.id} value={d.name}>
                   {d.name}
                 </option>
@@ -167,16 +188,16 @@ export function LecturerManagement() {
       {/* Lecturer Profile Modal */}
       {selectedLecturer && (
         <Dialog open={!!selectedLecturer} onOpenChange={() => setSelectedLecturer(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-primary" /> Faculty Member Profile
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-3">
+            <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
               <div className="flex items-center gap-4 border-b border-border pb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl shrink-0">
                   {selectedLecturer.firstName[0]}
                   {selectedLecturer.lastName[0]}
                 </div>
@@ -196,9 +217,9 @@ export function LecturerManagement() {
               <div className="space-y-2.5 text-xs text-foreground">
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Building className="h-3.5 w-3.5" /> Affiliated Department:
+                    <Building className="h-3.5 w-3.5" /> Department:
                   </span>
-                  <span className="font-medium text-right max-w-[200px]">{selectedLecturer.department}</span>
+                  <span className="font-medium text-right max-w-[240px]">{selectedLecturer.department}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
@@ -208,20 +229,20 @@ export function LecturerManagement() {
                   <span className="font-medium">{selectedLecturer.office}</span>
                 </div>
 
-                <div className="space-y-1 py-1">
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    <ClipboardList className="h-3.5 w-3.5" /> Teaching Assignments:
+                <div className="space-y-1.5 py-1">
+                  <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <ClipboardList className="h-3.5 w-3.5" /> Assigned Course Offerings:
                   </span>
-                  <div className="pl-5 space-y-1">
+                  <div className="grid grid-cols-1 gap-1.5">
                     {selectedLecturer.coursesAssigned.map((course) => (
-                      <div key={course} className="p-2 rounded bg-muted/40 font-medium">
+                      <div key={course} className="p-2 rounded-md bg-muted/40 font-medium text-xs border border-border/50">
                         {course}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button onClick={() => setSelectedLecturer(null)}>Close</Button>

@@ -61,8 +61,7 @@ export function StudentDashboard() {
   React.useEffect(() => {
     void fetchEnrollments();
     void fetchActiveExams();
-    void fetchNotifications();
-  }, [fetchEnrollments, fetchActiveExams, fetchNotifications]);
+  }, [fetchEnrollments, fetchActiveExams]);
 
   const currentHour = new Date().getHours();
   const greeting =
@@ -76,8 +75,8 @@ export function StudentDashboard() {
     (e) => e.status === 'PASSED' || e.status === 'FAILED' || Boolean(e.grade)
   );
 
-  const isLoading = isLoadingEnrollments || isLoadingExams || isLoadingNotifications;
-  const hasError = enrollmentsError || examsError || notificationsError;
+  const isLoading = isLoadingEnrollments || isLoadingExams;
+  const hasError = enrollmentsError || examsError;
 
   return (
     <motion.div
@@ -108,7 +107,7 @@ export function StudentDashboard() {
         />
         <StatsCard
           title="Unread Notifications"
-          value={isLoading ? '...' : unreadNotificationsCount}
+          value={unreadNotificationsCount}
           icon={<Bell className="h-5 w-5" />}
         />
         <StatsCard
@@ -121,11 +120,10 @@ export function StudentDashboard() {
       {hasError && (
         <ErrorState
           title="Data Synchronization Notice"
-          description={enrollmentsError || examsError || notificationsError || 'Unable to sync dashboard with backend.'}
+          description={enrollmentsError || examsError || 'Unable to sync dashboard with backend.'}
           onRetry={() => {
             void fetchEnrollments();
             void fetchActiveExams();
-            void fetchNotifications();
           }}
           retryLabel="Reload Data"
         />

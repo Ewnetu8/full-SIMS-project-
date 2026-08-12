@@ -61,6 +61,7 @@ export const ROUTES = {
     AI_MONITOR: '/admin/ai-monitor',
     REPORTS: '/admin/reports',
     SETTINGS: '/admin/settings',
+    ACADEMIC_STRUCTURE: '/admin/academic-structure',
     AUDIT_LOGS: '/admin/audit-logs',
     NOTIFICATIONS: '/admin/notifications',
   },

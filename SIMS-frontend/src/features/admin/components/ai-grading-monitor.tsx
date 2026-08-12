@@ -20,6 +20,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -238,40 +239,40 @@ export function AIGradingMonitor() {
       {/* Inspect Logs Modal */}
       {inspectingJob && (
         <Dialog open={!!inspectingJob} onOpenChange={() => setInspectingJob(null)}>
-          <DialogContent className="max-w-xl">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 font-mono">
-                <FileText className="h-5 w-5 text-ai-primary" /> Evaluation Logs — {inspectingJob.id}
+                <FileText className="h-5 w-5 text-ai-primary" /> Evaluation Process Logs — {inspectingJob.id}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-3 py-2">
-              <div className="p-3 rounded bg-muted/40 text-xs space-y-1">
-                <p><strong>Target Exam:</strong> {inspectingJob.examTitle}</p>
-                <p><strong>Department:</strong> {inspectingJob.department}</p>
-                <p><strong>Status:</strong> {inspectingJob.status.toUpperCase()}</p>
+            <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+              <div className="p-3 rounded-lg bg-muted/40 text-xs space-y-1.5 border border-border/60">
+                <p><strong className="text-foreground">Examination Title:</strong> {inspectingJob.examTitle}</p>
+                <p><strong className="text-foreground">Department:</strong> {inspectingJob.department}</p>
+                <p><strong className="text-foreground">Grading Status:</strong> <span className="capitalize font-semibold text-primary">{inspectingJob.status}</span></p>
               </div>
 
               <div>
-                <span className="text-xs font-semibold text-muted-foreground">Raw Process Stream Output:</span>
-                <pre className="mt-1.5 p-3 rounded-lg bg-black text-success font-mono text-[11px] h-48 overflow-y-auto leading-relaxed border border-border">
-{`[${inspectingJob.startedAt}] [INFO] Initialized worker process for ${inspectingJob.id}
-[${inspectingJob.startedAt}] [INFO] Fetching submission payloads for exam ${inspectingJob.examId}...
+                <span className="text-xs font-semibold text-muted-foreground block mb-1.5">Automated Evaluation Stream Logs:</span>
+                <pre className="p-4 rounded-lg bg-black text-emerald-400 font-mono text-[11px] h-52 overflow-y-auto leading-relaxed border border-border">
+{`[${inspectingJob.startedAt}] [INFO] Initialized automated grading runner for ${inspectingJob.id}
+[${inspectingJob.startedAt}] [INFO] Fetching student submissions for ${inspectingJob.examTitle}...
 [${inspectingJob.startedAt}] [INFO] Loaded ${inspectingJob.totalSubmissions} student answer sheets.
-[${inspectingJob.startedAt}] [INFO] Model: GPT-4o-Academic-FineTuned v2.4
-[${inspectingJob.startedAt}] [SUCCESS] Batch #1 (Submissions 1-50) graded with 96.2% confidence.
+[${inspectingJob.startedAt}] [INFO] Academic Evaluation Engine: Fine-Tuned AI Model v2.4
+[${inspectingJob.startedAt}] [SUCCESS] Submissions evaluated with high confidence rate (96.2%).
 ${
   inspectingJob.status === 'failed'
-    ? `[ERROR] OCR Engine Exception: ${inspectingJob.errorReason}
-[ERROR] Worker thread suspended. Job status set to FAILED.`
-    : `[${inspectingJob.startedAt}] [SUCCESS] All evaluation tasks completed cleanly.`
+    ? `[ERROR] Processing Notice: ${inspectingJob.errorReason}
+[ERROR] Task paused. Requiring manual instructor review.`
+    : `[${inspectingJob.startedAt}] [SUCCESS] All student answer sheets evaluated successfully.`
 }`}
                 </pre>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
-              <Button onClick={() => setInspectingJob(null)}>Close Inspector</Button>
+              <Button onClick={() => setInspectingJob(null)}>Close Log Inspector</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

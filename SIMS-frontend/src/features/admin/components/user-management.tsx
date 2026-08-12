@@ -26,6 +26,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -35,12 +36,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  FormSelect,
   Input,
   SearchInput,
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
 import { authApi } from '@/features/auth/services';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { AdminUser, UserRole, UserStatus } from '../types';
 
@@ -59,7 +62,12 @@ export function UserManagement() {
     setUserRoleFilter,
     setUserDeptFilter,
     setUserStatusFilter,
+    fetchAdminData,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   // Modals & Drawers state
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
@@ -68,24 +76,40 @@ export function UserManagement() {
   const [deletingUser, setDeletingUser] = React.useState<AdminUser | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const [userCollegeFilter, setUserCollegeFilter] = React.useState<string>('ALL');
+
   // Form State
   const [formData, setFormData] = React.useState({
     firstName: '',
     lastName: '',
     email: '',
+    password: '',
     role: 'student' as UserRole,
-    department: departments[0]?.name || 'Computer Science & Software Engineering',
+    college: 'College of Engineering' as string,
+    departmentId: 'dept-se',
+    department: 'Software Engineering',
+    studentIdentifier: '',
+    facultyIdentifier: '',
+    nationalId: '',
     phone: '',
     userId: '',
   });
 
   const handleOpenAddModal = () => {
+    const defaultCol = 'College of Engineering';
+    const deptsInCol = getDepartmentsByCollege(defaultCol);
     setFormData({
       firstName: '',
       lastName: '',
       email: '',
+      password: '',
       role: 'student',
-      department: departments[0]?.name || 'Computer Science & Software Engineering',
+      college: defaultCol,
+      departmentId: deptsInCol[0]?.id || '',
+      department: deptsInCol[0]?.name || 'Software Engineering',
+      studentIdentifier: `STD-${Math.floor(1000 + Math.random() * 9000)}`,
+      facultyIdentifier: `FAC-${Math.floor(1000 + Math.random() * 9000)}`,
+      nationalId: '',
       phone: '',
       userId: `USR-${Math.floor(1000 + Math.random() * 9000)}`,
     });
@@ -93,13 +117,21 @@ export function UserManagement() {
   };
 
   const handleOpenEditModal = (user: AdminUser) => {
+    const foundDept = getDepartmentsByCollege().find((d) => d.name === user.department);
+    const userCol = foundDept ? foundDept.college : 'College of Engineering';
     setEditingUser(user);
     setFormData({
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      password: '',
       role: user.role,
+      college: userCol,
+      departmentId: foundDept?.id || '',
       department: user.department,
+      studentIdentifier: '',
+      facultyIdentifier: '',
+      nationalId: '',
       phone: user.phone || '',
       userId: user.userId,
     });
@@ -108,6 +140,21 @@ export function UserManagement() {
   const handleSaveUser = async () => {
     if (!formData.firstName || !formData.lastName || !formData.email) {
       toast.error('Missing fields', { description: 'First name, last name, and email are required.' });
+      return;
+    }
+
+    if (!editingUser && !formData.password) {
+      toast.error('Missing field', { description: 'Password is required for user registration.' });
+      return;
+    }
+
+    if (formData.role === 'student' && !formData.studentIdentifier) {
+      toast.error('Missing field', { description: 'Student identifier is required for Student registration.' });
+      return;
+    }
+
+    if (formData.role === 'lecturer' && !formData.facultyIdentifier) {
+      toast.error('Missing field', { description: 'Faculty identifier is required for Lecturer registration.' });
       return;
     }
 
@@ -125,16 +172,16 @@ export function UserManagement() {
         toast.success('User updated', { description: `${formData.firstName} ${formData.lastName} account updated successfully.` });
         setEditingUser(null);
       } else {
-        // Use default passwords for university-managed accounts since admin sets them up
-        const generatedPassword = `${formData.firstName}123!`;
-        
         await authApi.register({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           email: formData.email,
-          role: formData.role,
-          password: generatedPassword,
-          confirmPassword: generatedPassword,
+          password: formData.password,
+          role: formData.role.toUpperCase(),
+          student_identifier: formData.role === 'student' ? formData.studentIdentifier : undefined,
+          faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
+          department_id: formData.departmentId || undefined,
+          national_id_fan: formData.nationalId || undefined,
         });
         
         addUser({
@@ -236,11 +283,29 @@ export function UserManagement() {
           <div>
             <select
               className={selectClass}
+              value={userCollegeFilter}
+              onChange={(e) => {
+                setUserCollegeFilter(e.target.value);
+                setUserDeptFilter('ALL');
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={userDeptFilter}
               onChange={(e) => setUserDeptFilter(e.target.value)}
             >
               <option value="ALL">All Departments</option>
-              {departments.map((d) => (
+              {getDepartmentsByCollege(userCollegeFilter).map((d) => (
                 <option key={d.id} value={d.name}>
                   {d.name}
                 </option>
@@ -396,93 +461,176 @@ export function UserManagement() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingUser ? 'Edit User Account' : 'Add New User Account'}</DialogTitle>
             <DialogDescription>
-              {editingUser ? 'Modify user information and access controls.' : 'Create a new institutional user with specified role.'}
+              {editingUser
+                ? 'Update user account information and departmental role.'
+                : 'Enter the user details below to create a new account.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName" className="text-xs font-medium mb-1.5 block">
+                  First Name
+                </Label>
                 <Input
                   id="firstName"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  placeholder="e.g. John"
+                  placeholder="e.g. Abebe"
                 />
               </div>
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName" className="text-xs font-medium mb-1.5 block">
+                  Last Name
+                </Label>
                 <Input
                   id="lastName"
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  placeholder="e.g. Doe"
+                  placeholder="e.g. Bikila"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email" className="text-xs font-medium mb-1.5 block">
+                Email Address *
+              </Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="john.doe@university.edu"
+                placeholder="user@aastu.edu.et"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {!editingUser && (
               <div>
-                <Label htmlFor="role">Role</Label>
-                <select
-                  id="role"
-                  className={selectClass}
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                >
-                  <option value="student">Student</option>
-                  <option value="lecturer">Lecturer</option>
-                  <option value="admin">Administrator</option>
-                </select>
+                <Label htmlFor="password" className="text-xs font-medium mb-1.5 block">
+                  Password *
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Enter initial account password"
+                />
               </div>
+            )}
+
+            <div>
+              <Label htmlFor="role" className="text-xs font-medium mb-1.5 block">
+                Role
+              </Label>
+              <FormSelect
+                id="role"
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+              >
+                <option value="student">Student</option>
+                <option value="lecturer">Lecturer</option>
+                <option value="admin">Administrator</option>
+              </FormSelect>
+            </div>
+
+            {!editingUser && formData.role === 'student' && (
               <div>
-                <Label htmlFor="userId">User ID</Label>
-                <Input id="userId" value={formData.userId} disabled />
+                <Label htmlFor="studentIdentifier" className="text-xs font-medium mb-1.5 block">
+                  Student Identifier *
+                </Label>
+                <Input
+                  id="studentIdentifier"
+                  value={formData.studentIdentifier}
+                  onChange={(e) => setFormData({ ...formData, studentIdentifier: e.target.value })}
+                  placeholder="e.g. STD-2026-001"
+                />
               </div>
+            )}
+
+            {!editingUser && formData.role === 'lecturer' && (
+              <div>
+                <Label htmlFor="facultyIdentifier" className="text-xs font-medium mb-1.5 block">
+                  Faculty Identifier *
+                </Label>
+                <Input
+                  id="facultyIdentifier"
+                  value={formData.facultyIdentifier}
+                  onChange={(e) => setFormData({ ...formData, facultyIdentifier: e.target.value })}
+                  placeholder="e.g. FAC-2026-001"
+                />
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="userCollege" className="text-xs font-medium mb-1.5 block">
+                College *
+              </Label>
+              <FormSelect
+                id="userCollege"
+                value={formData.college}
+                onChange={(e) => {
+                  const newCol = e.target.value;
+                  const depts = getDepartmentsByCollege(newCol);
+                  setFormData({
+                    ...formData,
+                    college: newCol,
+                    departmentId: depts[0]?.id || '',
+                    department: depts[0]?.name || '',
+                  });
+                }}
+              >
+                {COLLEGES.map((col) => (
+                  <option key={col} value={col}>
+                    {col}
+                  </option>
+                ))}
+              </FormSelect>
             </div>
 
             <div>
-              <Label htmlFor="department">Department</Label>
-              <select
+              <Label htmlFor="department" className="text-xs font-medium mb-1.5 block">
+                Department *
+              </Label>
+              <FormSelect
                 id="department"
-                className={selectClass}
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                value={formData.departmentId}
+                onChange={(e) => {
+                  const deptId = e.target.value;
+                  const deptObj = getDepartmentsByCollege(formData.college).find((d) => d.id === deptId);
+                  setFormData({
+                    ...formData,
+                    departmentId: deptId,
+                    department: deptObj ? deptObj.name : formData.department,
+                  });
+                }}
               >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.name}>
+                {getDepartmentsByCollege(formData.college).map((d) => (
+                  <option key={d.id} value={d.id}>
                     {d.name}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
 
             <div>
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
+              <Label htmlFor="nationalId" className="text-xs font-medium mb-1.5 block">
+                National ID / FAN (Optional)
+              </Label>
               <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+1 (555) 019-0000"
+                id="nationalId"
+                value={formData.nationalId}
+                onChange={(e) => setFormData({ ...formData, nationalId: e.target.value })}
+                placeholder="e.g. FAN-123456"
               />
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button

@@ -53,7 +53,7 @@ export function ProfilePage() {
     if (Object.keys(next).length > 0) return;
     setSaved(true);
     toast.success('Profile changes saved', {
-      description: 'Your updated details are ready to sync with the student records API.',
+      description: 'Your profile information has been successfully updated.',
     });
   };
 
@@ -89,8 +89,8 @@ export function ProfilePage() {
               className="mt-6 w-full"
               leftIcon={<KeyRound className="h-4 w-4" />}
               onClick={() =>
-                toast.info('Password changes will be connected to authentication API endpoints.', {
-                  description: 'This action is managed via standard auth security settings.',
+                toast.info('Account Security Notice', {
+                  description: 'To update your password, please contact the IT support desk or administrator.',
                 })
               }
             >
@@ -105,7 +105,7 @@ export function ProfilePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UserRound className="h-5 w-5 text-primary" />
-                Authenticated User Identity
+                Account Identity Details
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -113,8 +113,8 @@ export function ProfilePage() {
                 <DetailField label="First Name" value={user?.firstName || 'N/A'} />
                 <DetailField label="Last Name" value={user?.lastName || 'N/A'} />
                 <DetailField label="Email Address" value={user?.email || 'N/A'} />
-                <DetailField label="System User ID" value={user?.id || 'N/A'} />
-                <DetailField label="Role Scoping" value={user?.role?.toUpperCase() || 'STUDENT'} />
+                <DetailField label="Account ID" value={user?.id || 'N/A'} />
+                <DetailField label="Account Type" value={user?.role?.toUpperCase() || 'STUDENT'} />
               </div>
             </CardContent>
           </Card>

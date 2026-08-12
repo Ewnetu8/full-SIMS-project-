@@ -12,19 +12,26 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 
+import { toast } from '@/components/feedback';
+import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
   SearchInput,
 } from '@/components/ui';
 
+import { adminService } from '../services/admin-service';
 import { useAdminStore } from '../store';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { StudentProfile } from '../types';
 
@@ -60,21 +67,52 @@ export function StudentManagement() {
   const selectClass =
     'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground';
 
+  const [isImportOpen, setIsImportOpen] = React.useState(false);
+  const [importFile, setImportFile] = React.useState<File | null>(null);
+  const [isImporting, setIsImporting] = React.useState(false);
+
+  const handleBatchImport = async () => {
+    if (!importFile) {
+      toast.error('No file selected', { description: 'Please select a CSV file to import.' });
+      return;
+    }
+    setIsImporting(true);
+    try {
+      const res = await adminService.batchImportEnrollments(importFile);
+      toast.success('Batch enrollment imported', {
+        description: res.message || `Successfully processed ${res.imported_count || 'all'} records.`,
+      });
+      setIsImportOpen(false);
+      setImportFile(null);
+    } catch (err: any) {
+      toast.error('Import failed', { description: err?.message || 'An error occurred during batch import.' });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const [studentCollegeFilter, setStudentCollegeFilter] = React.useState<string>('ALL');
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <GraduationCap className="h-6 w-6 text-primary" /> Student Directory
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          View all enrolled student profiles, academic standings, programs, and course enrollments.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <GraduationCap className="h-6 w-6 text-primary" /> Student Directory
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View all enrolled student profiles, academic standings, programs, and course enrollments.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+          Batch Import CSV
+        </Button>
       </div>
 
       {/* Filter Bar */}
       <Card className="p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <SearchInput
               placeholder="Search by student name, ID, or email..."
@@ -90,6 +128,25 @@ export function StudentManagement() {
           <div>
             <select
               className={selectClass}
+              value={studentCollegeFilter}
+              onChange={(e) => {
+                setStudentCollegeFilter(e.target.value);
+                setStudentDeptFilter('ALL');
+                setCurrentPage(1);
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={studentDeptFilter}
               onChange={(e) => {
                 setStudentDeptFilter(e.target.value);
@@ -97,7 +154,7 @@ export function StudentManagement() {
               }}
             >
               <option value="ALL">All Academic Departments</option>
-              {departments.map((d) => (
+              {getDepartmentsByCollege(studentCollegeFilter).map((d) => (
                 <option key={d.id} value={d.name}>
                   {d.name}
                 </option>
@@ -204,16 +261,16 @@ export function StudentManagement() {
       {/* Student Profile Modal */}
       {selectedStudent && (
         <Dialog open={!!selectedStudent} onOpenChange={() => setSelectedStudent(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <GraduationCap className="h-5 w-5 text-primary" /> Student Profile & Academic Record
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-3">
+            <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
               <div className="flex items-center gap-4 border-b border-border pb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl shrink-0">
                   {selectedStudent.firstName[0]}
                   {selectedStudent.lastName[0]}
                 </div>
@@ -235,7 +292,7 @@ export function StudentManagement() {
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Building className="h-3.5 w-3.5" /> Department:
                   </span>
-                  <span className="font-medium text-right max-w-[200px]">{selectedStudent.department}</span>
+                  <span className="font-medium text-right max-w-[240px]">{selectedStudent.department}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
@@ -266,7 +323,7 @@ export function StudentManagement() {
                   <span className="font-semibold text-foreground">{selectedStudent.enrolledCoursesCount} Courses</span>
                 </div>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button onClick={() => setSelectedStudent(null)}>Close</Button>
@@ -274,6 +331,37 @@ export function StudentManagement() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Batch CSV Import Dialog */}
+      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Batch Student Enrollment CSV Import</DialogTitle>
+            <DialogDescription>
+              Select a CSV file containing student identifiers and course offering IDs to perform batch enrollment.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4 py-3">
+            <div>
+              <Label htmlFor="csvFile">CSV File</Label>
+              <Input
+                id="csvFile"
+                type="file"
+                accept=".csv"
+                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+              />
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBatchImport} disabled={isImporting || !importFile}>
+              {isImporting ? 'Importing...' : 'Upload & Import'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

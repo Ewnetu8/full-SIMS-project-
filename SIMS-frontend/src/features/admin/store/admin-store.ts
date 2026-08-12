@@ -1,17 +1,6 @@
 import { create } from 'zustand';
-
-import {
-  INITIAL_USERS,
-  INITIAL_STUDENTS,
-  INITIAL_LECTURERS,
-  INITIAL_DEPARTMENTS,
-  INITIAL_COURSES,
-  INITIAL_EXAMS,
-  INITIAL_AI_JOBS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_SETTINGS,
-  INITIAL_NOTIFICATIONS,
-} from '../mock';
+import { INITIAL_SETTINGS } from '../mock';
+import { adminService } from '../services/admin-service';
 
 import type {
   AdminUser,
@@ -26,6 +15,7 @@ import type {
   AdminNotification,
 } from '../types';
 
+const defaultSettings: SystemSettings = INITIAL_SETTINGS;
 
 interface AdminStoreState {
   // Datasets
@@ -39,6 +29,7 @@ interface AdminStoreState {
   auditLogs: AuditLog[];
   settings: SystemSettings;
   notifications: AdminNotification[];
+  isLoadingData: boolean;
 
   // User filters & state
   userSearchQuery: string;
@@ -68,6 +59,9 @@ interface AdminStoreState {
   // Audit logs search & filter
   auditSearchQuery: string;
   auditCategoryFilter: string;
+
+  // Actions
+  fetchAdminData: () => Promise<void>;
 
   // Actions - Users
   setUsers: (users: AdminUser[]) => void;
@@ -116,16 +110,17 @@ interface AdminStoreState {
 }
 
 export const useAdminStore = create<AdminStoreState>((set) => ({
-  users: INITIAL_USERS,
-  students: INITIAL_STUDENTS,
-  lecturers: INITIAL_LECTURERS,
-  departments: INITIAL_DEPARTMENTS,
-  courses: INITIAL_COURSES,
-  exams: INITIAL_EXAMS,
-  aiJobs: INITIAL_AI_JOBS,
-  auditLogs: INITIAL_AUDIT_LOGS,
-  settings: INITIAL_SETTINGS,
-  notifications: INITIAL_NOTIFICATIONS,
+  users: [],
+  students: [],
+  lecturers: [],
+  departments: [],
+  courses: [],
+  exams: [],
+  aiJobs: [],
+  auditLogs: [],
+  settings: defaultSettings,
+  notifications: [],
+  isLoadingData: false,
 
   userSearchQuery: '',
   userRoleFilter: 'ALL',
@@ -149,6 +144,28 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
   auditSearchQuery: '',
   auditCategoryFilter: 'ALL',
 
+  fetchAdminData: async () => {
+    set({ isLoadingData: true });
+    try {
+      const [departments, courses, exams, students] = await Promise.all([
+        adminService.getDepartments(),
+        adminService.getCourses(),
+        adminService.getAllExams(),
+        adminService.getStudents(),
+      ]);
+
+      set({
+        departments,
+        courses,
+        exams,
+        students,
+        isLoadingData: false,
+      });
+    } catch {
+      set({ isLoadingData: false });
+    }
+  },
+
   // Actions - Users
   setUsers: (users) => set({ users }),
   addUser: (userData) =>
@@ -160,22 +177,8 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
         lastLogin: 'Never',
         createdAt: dateStr,
       };
-      // Log event to audit logs as well
-      const newAudit: AuditLog = {
-        id: `log-${Date.now()}`,
-        timestamp: new Date().toLocaleString(),
-        actorName: 'Marcus Aurelius (Admin)',
-        actorEmail: 'admin.marcus@university.edu',
-        actorRole: 'admin',
-        actionEvent: 'user.created',
-        resourceType: 'User',
-        resourceName: `${newUser.firstName} ${newUser.lastName} (${newUser.userId})`,
-        ipAddress: '192.168.1.100',
-        details: `Created user account with role '${newUser.role}' in department '${newUser.department}'.`,
-      };
       return {
         users: [newUser, ...state.users],
-        auditLogs: [newAudit, ...state.auditLogs],
       };
     }),
 
@@ -185,28 +188,9 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
     })),
 
   deleteUser: (id) =>
-    set((state) => {
-      const user = state.users.find((u) => u.id === id);
-      const updatedUsers = state.users.filter((u) => u.id !== id);
-      if (!user) return { users: updatedUsers };
-
-      const newAudit: AuditLog = {
-        id: `log-${Date.now()}`,
-        timestamp: new Date().toLocaleString(),
-        actorName: 'Marcus Aurelius (Admin)',
-        actorEmail: 'admin.marcus@university.edu',
-        actorRole: 'admin',
-        actionEvent: 'user.deleted',
-        resourceType: 'User',
-        resourceName: `${user.firstName} ${user.lastName} (${user.userId})`,
-        ipAddress: '192.168.1.100',
-        details: `Deleted user record permanently from institution database.`,
-      };
-      return {
-        users: updatedUsers,
-        auditLogs: [newAudit, ...state.auditLogs],
-      };
-    }),
+    set((state) => ({
+      users: state.users.filter((u) => u.id !== id),
+    })),
 
   setUserSearchQuery: (userSearchQuery) => set({ userSearchQuery }),
   setUserRoleFilter: (userRoleFilter) => set({ userRoleFilter }),
@@ -273,7 +257,6 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
   // Actions - Exams
   setExamSearchQuery: (examSearchQuery) => set({ examSearchQuery }),
   setExamStatusFilter: (examStatusFilter) => set({ examStatusFilter }),
-
   archiveExam: (id) =>
     set((state) => ({
       exams: state.exams.map((e) => (e.id === id ? { ...e, status: 'archived' } : e)),
@@ -289,12 +272,7 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
     set((state) => ({
       aiJobs: state.aiJobs.map((j) =>
         j.id === id
-          ? {
-              ...j,
-              status: 'processing',
-              errorReason: undefined,
-              startedAt: new Date().toLocaleString(),
-            }
+          ? { ...j, status: 'processing', errorReason: undefined, startedAt: new Date().toLocaleString() }
           : j
       ),
     })),
@@ -307,12 +285,10 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
 
   setAuditSearchQuery: (auditSearchQuery) => set({ auditSearchQuery }),
   setAuditCategoryFilter: (auditCategoryFilter) => set({ auditCategoryFilter }),
-
   markNotificationRead: (id) =>
     set((state) => ({
       notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
     })),
-
   markAllNotificationsRead: () =>
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),

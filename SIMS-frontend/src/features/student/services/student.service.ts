@@ -131,27 +131,20 @@ export const studentService = {
   },
 
   /**
-   * GET /api/v1/notifications/
-   * Returns notifications for authenticated student, ordered by newest first.
+   * Notifications endpoint is currently unavailable on the backend.
+   * Returns empty array to maintain UI stability without dispatching invalid requests.
    */
-  getNotifications: async (isRead?: boolean): Promise<Notification[]> => {
-    const query = typeof isRead === 'boolean' ? `?is_read=${isRead}` : '';
-    const url = `${API_ENDPOINTS.NOTIFICATIONS.ROOT}${query}`;
-    const data = await api.get<Notification[]>(url);
-    return Array.isArray(data) ? data : [];
+  getNotifications: async (_isRead?: boolean): Promise<Notification[]> => {
+    return Promise.resolve([]);
   },
 
   /**
-   * PATCH /api/v1/notifications/{id}/
-   * Marks a single notification as read.
+   * No-op implementation for notification mark-as-read since endpoint is unavailable.
    */
   markNotificationAsRead: async (
     id: string
   ): Promise<NotificationMarkRead> => {
-    return await api.patch<NotificationMarkRead>(
-      API_ENDPOINTS.NOTIFICATIONS.BY_ID(id),
-      { is_read: true }
-    );
+    return Promise.resolve({ id, is_read: true });
   },
 
   /**
