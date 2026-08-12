@@ -80,6 +80,7 @@ export function MobileNav({ open, onClose, ...sidebarProps }: MobileNavProps) {
             <Sidebar
               {...sidebarProps}
               collapsed={false}
+              onNavItemClick={onClose}
               className="w-full h-full"
             />
           </motion.div>

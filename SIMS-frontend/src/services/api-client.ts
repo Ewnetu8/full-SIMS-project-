@@ -10,6 +10,7 @@ import { env } from '@/lib/env';
 import { API_ENDPOINTS } from '@/constants';
 import { createApiError } from '@/lib/errors';
 import { toast } from '@/components/feedback';
+import { getCsrfToken } from '@/utils/csrf';
 
 import type { ApiErrorResponse } from '@/types';
 
@@ -19,8 +20,8 @@ import type { ApiErrorResponse } from '@/types';
  * Creates a pre-configured Axios instance with:
  * - Base URL from environment
  * - JSON content-type headers
- * - Request interceptor (for auth token injection — ready for Phase 2)
- * - Response interceptor (normalises API errors into typed ApiError instances)
+ * - Request interceptor (auth Bearer token & CSRF header injection)
+ * - Response interceptor (error normalization & silent 401 token refresh flow)
  */
 function createApiClient(): AxiosInstance {
   const client = axios.create({
@@ -30,16 +31,26 @@ function createApiClient(): AxiosInstance {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    withCredentials: true, // send cookies for refresh token flow
+    withCredentials: true, // send HttpOnly cookies (refresh_token, csrftoken)
+    xsrfCookieName: 'csrftoken',
+    xsrfHeaderName: 'X-CSRFToken',
   });
 
   // ── Request Interceptor ──────────────────────────────────────────────────────
   client.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
+      // 1. Inject Bearer Access Token if present
       const token = useAuthStore.getState().tokens?.accessToken;
       if (token) {
         config.headers.set('Authorization', `Bearer ${token}`);
       }
+
+      // 2. Inject Django CSRF token for requests
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        config.headers.set('X-CSRFToken', csrfToken);
+      }
+
       return config;
     },
     (error: unknown) => Promise.reject(error),
@@ -84,18 +95,23 @@ function createApiClient(): AxiosInstance {
         error.config?.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
         error.config?.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
 
+      // Handle 401 Unauthorized for non-auth endpoints by attempting silent refresh
       if (response.status === 401 && !isAuthEndpoint) {
         try {
-          // Attempt to refresh the token using raw axios to avoid interceptor loops
-          const refreshRes = await axios.post<{ access_token?: string; access?: string; accessToken?: string }>(
+          const csrfToken = getCsrfToken();
+          const refreshRes = await axios.post<{ access?: string; access_token?: string; accessToken?: string }>(
             `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
             {},
-            { withCredentials: true }
+            {
+              withCredentials: true,
+              headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
+            }
           );
           
           // The exact field name depends on the backend framework (access, access_token, etc)
-          const newAccessToken = refreshRes.data.access || refreshRes.data.access_token || refreshRes.data.accessToken || '';
-          
+          const newAccessToken =
+            refreshRes.data.access || refreshRes.data.access_token || refreshRes.data.accessToken || '';
+
           if (newAccessToken) {
             useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
             // Retry the original request
@@ -104,15 +120,18 @@ function createApiClient(): AxiosInstance {
               return client(error.config);
             }
           }
-        } catch (refreshError) {
-          // If refresh fails, clear the session
-          useAuthStore.getState().clearSession();
-          toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+        } catch (refreshError: any) {
+          const refreshStatus = refreshError?.response?.status;
+          console.error('Token refresh failed:', refreshStatus, refreshError);
+
+          // ONLY clear session if refresh explicitly fails with 401 (refresh token missing/expired)
+          if (refreshStatus === 401) {
+            useAuthStore.getState().clearSession();
+            toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+          }
+          // Do NOT clear session on 403 (CSRF failure or permission error)
           return Promise.reject(apiError);
         }
-      } else if (response.status === 401 && !isAuthEndpoint) {
-        useAuthStore.getState().clearSession();
-        toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
       }
 
       return Promise.reject(apiError);
