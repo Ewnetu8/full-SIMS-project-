@@ -21,7 +21,7 @@ class University(BaseModel):
 class College(BaseModel):
     university = models.ForeignKey(
         University,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='colleges'
     )
     name = models.CharField(max_length=255, unique=True)
@@ -39,7 +39,7 @@ class College(BaseModel):
 class Department(BaseModel):
     college = models.ForeignKey(
         College,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='departments',
         null=True,
         blank=True
@@ -67,7 +67,7 @@ class DegreeLevelChoices(models.TextChoices):
 class Program(BaseModel):
     department = models.ForeignKey(
         Department,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='programs'
     )
     name = models.CharField(max_length=255)
@@ -150,17 +150,20 @@ class Course(BaseModel):
 class CoursePrerequisite(BaseModel):
     course = models.ForeignKey(
         Course,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='prerequisites'
     )
     prerequisite_course = models.ForeignKey(
         Course,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='prerequisite_for'
     )
 
     class Meta:
         unique_together = ('course', 'prerequisite_course')
+        indexes = [
+            models.Index(fields=['course'], name='idx_courseprereq_course'),
+        ]
 
     def clean(self):
         super().clean()
@@ -178,7 +181,7 @@ class CoursePrerequisite(BaseModel):
 class CourseOffering(BaseModel):
     course = models.ForeignKey(
         Course,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='offerings'
     )
     semester = models.ForeignKey(
@@ -191,6 +194,9 @@ class CourseOffering(BaseModel):
 
     class Meta:
         unique_together = ('course', 'semester', 'section')
+        indexes = [
+            models.Index(fields=['course', 'semester'], name='idx_offering_course_sem'),
+        ]
 
     def __str__(self):
         return f"{self.course.course_code} ({self.semester}) - Sec {self.section}"
@@ -277,6 +283,9 @@ class Enrollment(BaseModel):
 
     class Meta:
         unique_together = ('student', 'course_offering')
+        indexes = [
+            models.Index(fields=['student', 'course_offering'], name='idx_enroll_student_offer'),
+        ]
 
     def __str__(self):
         offering_str = str(self.course_offering) if self.course_offering else "No Offering"
