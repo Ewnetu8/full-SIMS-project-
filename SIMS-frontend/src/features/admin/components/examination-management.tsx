@@ -19,6 +19,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -43,7 +44,12 @@ export function ExaminationManagement() {
     deleteExam,
     setExamSearchQuery,
     setExamStatusFilter,
+    fetchAdminData,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   const [selectedExam, setSelectedExam] = React.useState<AdminExamOverview | null>(null);
   const [deletingExam, setDeletingExam] = React.useState<AdminExamOverview | null>(null);
@@ -218,17 +224,19 @@ export function ExaminationManagement() {
       {/* View Exam Details Modal */}
       {selectedExam && (
         <Dialog open={!!selectedExam} onOpenChange={() => setSelectedExam(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 text-primary" /> Examination Details
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-3 text-xs text-foreground">
+            <DialogBody className="space-y-4 py-3 text-xs text-foreground max-h-[75vh] overflow-y-auto">
               <div>
-                <span className="font-mono font-bold text-success">{selectedExam.courseCode}</span>
-                <h3 className="text-base font-bold text-foreground mt-0.5">{selectedExam.title}</h3>
+                <span className="font-mono font-bold text-success text-xs px-2 py-0.5 rounded bg-success/10 border border-success/20">
+                  {selectedExam.courseCode}
+                </span>
+                <h3 className="text-base font-bold text-foreground mt-2">{selectedExam.title}</h3>
                 <p className="text-muted-foreground">{selectedExam.courseName}</p>
               </div>
 
@@ -260,7 +268,7 @@ export function ExaminationManagement() {
                   </span>
                 </div>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button onClick={() => setSelectedExam(null)}>Close</Button>

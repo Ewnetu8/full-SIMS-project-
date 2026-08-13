@@ -36,3 +36,11 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// Debug log for troubleshooting
+if (typeof window !== 'undefined') {
+  console.log('🔧 Environment Configuration:');
+  console.log('  - API Base URL:', env.NEXT_PUBLIC_API_BASE_URL);
+  console.log('  - App URL:', env.NEXT_PUBLIC_APP_URL);
+  console.log('  - Node Env:', env.NODE_ENV);
+}

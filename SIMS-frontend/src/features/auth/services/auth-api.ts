@@ -15,6 +15,7 @@ import axios from 'axios';
 import { apiClient } from '@/services';
 import { API_ENDPOINTS } from '@/constants';
 import { env } from '@/lib/env';
+import { getCsrfToken } from '@/utils/csrf';
 
 import type {
   LoginCredentials,
@@ -27,38 +28,42 @@ import type {
 } from '../types';
 import type { BaseUser } from '@/types';
 
-// ─── CSRF Helper ──────────────────────────────────────────────────────────────
-
-/**
- * Read the Django CSRF token from the browser cookie.
- * Django sets a readable (non-HttpOnly) `csrftoken` cookie which is required
- * in the `X-CSRFToken` header for state-mutating requests that enforce CSRF.
- */
-function getCsrfToken(): string {
-  if (typeof document === 'undefined') return '';
-  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : '';
-}
-
 export const authApi = {
   /**
    * POST /api/v1/auth/register
    */
   register: (data: any): Promise<{ message: string; user?: BaseUser }> =>
     apiClient
-      .post<{ message: string; user?: BaseUser }>(API_ENDPOINTS.AUTH.REGISTER, data)
+      .post<any>(API_ENDPOINTS.AUTH.REGISTER, data)
       .then((r) => {
-        if (r.data?.user) {
-          const u = r.data.user as any;
-          if (u.first_name) { u.firstName = u.first_name; delete u.first_name; }
-          if (u.last_name) { u.lastName = u.last_name; delete u.last_name; }
-          if (u.role) u.role = u.role.toLowerCase();
+        const backendResponse = r.data;
+        
+        if (backendResponse?.user) {
+          const user: any = { ...backendResponse.user };
+          if (user.first_name) { 
+            user.firstName = user.first_name; 
+            delete user.first_name; 
+          }
+          if (user.last_name) { 
+            user.lastName = user.last_name; 
+            delete user.last_name; 
+          }
+          if (user.role) {
+            user.role = user.role.toLowerCase();
+          }
+          
+          return {
+            message: 'Registration successful',
+            user,
+          };
         }
-        return r.data;
+        
+        return { message: backendResponse.message || 'Registration successful' };
       }),
 
   /**
    * POST /api/v1/auth/login
+   * Backend returns { user: {...}, access: "jwt_string" } and sets HttpOnly refresh_token cookie.
    */
   login: async (credentials: LoginCredentials): Promise<AuthLoginResponse> => {
     const response = await apiClient.post<any>(API_ENDPOINTS.AUTH.LOGIN, credentials);
@@ -70,13 +75,13 @@ export const authApi = {
       email: rawUser.email || credentials.email,
       firstName: rawUser.first_name || rawUser.firstName || 'User',
       lastName: rawUser.last_name || rawUser.lastName || '',
-      role: (rawUser.role ? rawUser.role.toLowerCase() : 'admin') as any,
+      role: (rawUser.role ? rawUser.role.toLowerCase() : 'student') as any,
       avatarUrl: rawUser.avatar_url || rawUser.avatarUrl,
       createdAt: rawUser.created_at || rawUser.createdAt || new Date().toISOString(),
       updatedAt: rawUser.updated_at || rawUser.updatedAt || new Date().toISOString(),
     };
 
-    const accessToken = data.access || data.accessToken || data.tokens?.accessToken || '';
+    const accessToken = data.access || data.access_token || data.accessToken || data.tokens?.accessToken || '';
     const expiresAt = Date.now() + (credentials.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000);
 
     const formattedTokens = {
@@ -110,35 +115,20 @@ export const authApi = {
 
   /**
    * POST /api/v1/auth/logout
+   * Sends X-CSRFToken header and HttpOnly refresh_token cookie.
    */
-  logout: (): Promise<void> => {
-    const csrfToken = getCsrfToken();
-    return apiClient
-      .post<void>(
-        API_ENDPOINTS.AUTH.LOGOUT,
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
-          },
-        }
-      )
-      .catch((err: any) => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(
-            '[DEV LOG] Logout request encountered an error (e.g. CSRF or session expired):',
-            err?.message || err
-          );
-        }
-      })
-      .then(async () => {
-        try {
-          await fetch('/api/auth/session', { method: 'DELETE' });
-        } catch (e) {
-          console.error('Failed to clear session cookie:', e);
-        }
-      });
+  logout: async (): Promise<void> => {
+    try {
+      await apiClient.post<void>(API_ENDPOINTS.AUTH.LOGOUT, {});
+    } catch (e) {
+      console.error('Logout request error:', e);
+    } finally {
+      try {
+        await fetch('/api/auth/session', { method: 'DELETE' });
+      } catch (e) {
+        console.error('Failed to clear session cookie:', e);
+      }
+    }
   },
 
   /**
@@ -167,10 +157,6 @@ export const authApi = {
   refreshToken: async (): Promise<RefreshTokenResponse> => {
     const csrfToken = getCsrfToken();
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Refresh request - CSRF token present:', !!csrfToken);
-    }
-
     const response = await axios.post<any>(
       `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
       {},
@@ -178,13 +164,45 @@ export const authApi = {
         withCredentials: true,
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
           ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
         },
       }
     );
 
-    return response.data;
+    const data = response.data || {};
+    const accessToken = data.access || data.access_token || data.tokens?.accessToken || '';
+
+    return {
+      tokens: {
+        accessToken,
+        refreshToken: data.refresh || data.tokens?.refreshToken || '',
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      },
+    } as any;
   },
+
+  /**
+   * GET /api/v1/auth/me
+   */
+  getMe: (): Promise<{ user: BaseUser }> =>
+    apiClient
+      .get<any>(API_ENDPOINTS.AUTH.ME)
+      .then((r) => {
+        // Transform user fields
+        const user: any = { ...r.data };
+        if (user.first_name) { 
+          user.firstName = user.first_name; 
+          delete user.first_name; 
+        }
+        if (user.last_name) { 
+          user.lastName = user.last_name; 
+          delete user.last_name; 
+        }
+        if (user.role) {
+          user.role = user.role.toLowerCase();
+        }
+        
+        return { user };
+      }),
 };
-
-

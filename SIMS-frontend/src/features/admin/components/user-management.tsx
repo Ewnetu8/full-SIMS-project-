@@ -27,6 +27,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -36,12 +37,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  FormSelect,
   Input,
   SearchInput,
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
-import { authApi } from '@/features/auth/services';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { AdminUser, UserRole, UserStatus } from '../types';
 
@@ -64,12 +66,14 @@ export function UserManagement() {
     setUserRoleFilter,
     setUserDeptFilter,
     setUserStatusFilter,
+    fetchAdminData,
   } = useAdminStore();
 
   React.useEffect(() => {
     fetchUsers();
     fetchDepartments();
-  }, [fetchUsers, fetchDepartments]);
+    void fetchAdminData();
+  }, [fetchUsers, fetchDepartments, fetchAdminData]);
 
   // Modals & Drawers state
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
@@ -77,6 +81,8 @@ export function UserManagement() {
   const [viewingUser, setViewingUser] = React.useState<AdminUser | null>(null);
   const [deletingUser, setDeletingUser] = React.useState<AdminUser | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const [userCollegeFilter, setUserCollegeFilter] = React.useState<string>('ALL');
 
   // Form State matching UserRegisterRequest
   const [formData, setFormData] = React.useState({
@@ -88,6 +94,8 @@ export function UserManagement() {
     studentIdentifier: '',
     facultyIdentifier: '',
     departmentId: '',
+    nationalId: '',
+    phone: '',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -103,6 +111,8 @@ export function UserManagement() {
       studentIdentifier: '',
       facultyIdentifier: '',
       departmentId: departments[0]?.id || '',
+      nationalId: '',
+      phone: '',
     });
     setIsAddModalOpen(true);
   };
@@ -110,16 +120,18 @@ export function UserManagement() {
   const handleOpenEditModal = (user: AdminUser) => {
     setFieldErrors({});
     setEditingUser(user);
-    const userDept = departments.find((d) => d.name === user.department);
+    const userDept = departments.find((d) => d.name === user.department || d.id === user.department);
     setFormData({
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
       password: '',
       role: user.role,
-      studentIdentifier: '',
-      facultyIdentifier: '',
+      studentIdentifier: user.studentIdentifier || '',
+      facultyIdentifier: user.facultyIdentifier || '',
       departmentId: userDept?.id || '',
+      nationalId: '',
+      phone: user.phone || '',
     });
   };
 
@@ -167,6 +179,7 @@ export function UserManagement() {
           email: formData.email,
           role: formData.role,
           department: selectedDept?.name || editingUser.department,
+          phone: formData.phone || editingUser.phone,
         });
         toast.success('User account updated successfully.');
         setEditingUser(null);
@@ -223,7 +236,7 @@ export function UserManagement() {
     const matchesSearch =
       fullName.includes(userSearchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      u.userId.toLowerCase().includes(userSearchQuery.toLowerCase());
+      (u.userId && u.userId.toLowerCase().includes(userSearchQuery.toLowerCase()));
 
     const matchesRole = userRoleFilter === 'ALL' || u.role === userRoleFilter;
     const matchesDept = userDeptFilter === 'ALL' || u.department === userDeptFilter;
@@ -280,11 +293,29 @@ export function UserManagement() {
           <div>
             <select
               className={selectClass}
+              value={userCollegeFilter}
+              onChange={(e) => {
+                setUserCollegeFilter(e.target.value);
+                setUserDeptFilter('ALL');
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={userDeptFilter}
               onChange={(e) => setUserDeptFilter(e.target.value)}
             >
               <option value="ALL">All Departments</option>
-              {departments.map((d) => (
+              {getDepartmentsByCollege(userCollegeFilter).map((d) => (
                 <option key={d.id} value={d.name}>
                   {d.name}
                 </option>
@@ -482,10 +513,12 @@ export function UserManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName" required>
+                  First Name
+                </Label>
                 <Input
                   id="firstName"
                   value={formData.firstName}
@@ -497,7 +530,9 @@ export function UserManagement() {
               </div>
 
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName" required>
+                  Last Name
+                </Label>
                 <Input
                   id="lastName"
                   value={formData.lastName}
@@ -634,7 +669,7 @@ export function UserManagement() {
                 </div>
               </div>
             )}
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
@@ -704,7 +739,7 @@ export function UserManagement() {
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Shield className="h-3.5 w-3.5" /> System User ID:
                   </span>
-                  <span className="font-mono font-medium">{viewingUser.userId}</span>
+                  <span className="font-mono font-medium">{viewingUser.userId || viewingUser.id}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
@@ -718,7 +753,7 @@ export function UserManagement() {
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" /> Last Login:
                   </span>
-                  <span className="font-medium">{viewingUser.lastLogin}</span>
+                  <span className="font-medium">{viewingUser.lastLogin || 'Never'}</span>
                 </div>
 
                 <div className="flex justify-between py-1">
@@ -745,7 +780,7 @@ export function UserManagement() {
             if (!open) setDeletingUser(null);
           }}
           title="Delete User Account"
-          description={`Are you sure you want to permanently delete account for ${deletingUser.firstName} ${deletingUser.lastName} (${deletingUser.userId})? This action cannot be undone.`}
+          description={`Are you sure you want to permanently delete account for ${deletingUser.firstName} ${deletingUser.lastName} (${deletingUser.userId || deletingUser.id})? This action cannot be undone.`}
           confirmLabel="Delete Account"
           destructive
           onConfirm={handleDeleteConfirm}

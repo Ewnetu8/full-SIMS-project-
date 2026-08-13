@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Archive,
+  Calendar,
   ChevronDown,
   Copy,
   Eye,
@@ -20,12 +21,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
+import { toast } from '@/components/feedback';
 import {
   Badge,
   Button,
   Card,
   CardContent,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -58,6 +61,35 @@ export function ExamList() {
   const [confirmDelete, setConfirmDelete] = React.useState<LecturerExam | null>(null);
   const [confirmPublish, setConfirmPublish] = React.useState<LecturerExam | null>(null);
   const [actionMenuId, setActionMenuId] = React.useState<string | null>(null);
+
+  const [schedulingExam, setSchedulingExam] = React.useState<LecturerExam | null>(null);
+  const [scheduleForm, setScheduleForm] = React.useState({ startDate: '', endDate: '', durationMinutes: 60 });
+  const [isScheduling, setIsScheduling] = React.useState(false);
+
+  const handleScheduleSubmit = async () => {
+    if (!schedulingExam) return;
+    if (!scheduleForm.startDate || !scheduleForm.endDate) {
+      toast.error('Missing dates', { description: 'Start and End dates are required.' });
+      return;
+    }
+    setIsScheduling(true);
+    try {
+      await lecturerService.scheduleExam(schedulingExam.id, scheduleForm);
+      toast.success('Exam Scheduled', { description: `Exam windows updated via DRF schedule API.` });
+      setExams((prev) =>
+        prev.map((e) =>
+          e.id === schedulingExam.id
+            ? { ...e, startDate: scheduleForm.startDate, endDate: scheduleForm.endDate, durationMinutes: scheduleForm.durationMinutes }
+            : e
+        )
+      );
+      setSchedulingExam(null);
+    } catch (err: any) {
+      toast.error('Schedule failed', { description: err?.message || 'Could not schedule examination.' });
+    } finally {
+      setIsScheduling(false);
+    }
+  };
 
   React.useEffect(() => {
     async function load() {
@@ -158,8 +190,10 @@ export function ExamList() {
             <SelectContent>
               <SelectItem value="ALL">All Statuses</SelectItem>
               <SelectItem value="DRAFT">Draft</SelectItem>
-              <SelectItem value="PUBLISHED">Published</SelectItem>
+              <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
               <SelectItem value="CLOSED">Closed</SelectItem>
+              <SelectItem value="PUBLISHED">Published</SelectItem>
             </SelectContent>
           </Select>
 
@@ -282,6 +316,20 @@ export function ExamList() {
                                 <Pencil className="h-3.5 w-3.5" /> Edit Exam
                               </button>
                               <button
+                                onClick={() => {
+                                  setActionMenuId(null);
+                                  setSchedulingExam(exam);
+                                  setScheduleForm({
+                                    startDate: exam.startDate ? exam.startDate.slice(0, 16) : '',
+                                    endDate: exam.endDate ? exam.endDate.slice(0, 16) : '',
+                                    durationMinutes: exam.durationMinutes || 60,
+                                  });
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-primary"
+                              >
+                                <Calendar className="h-3.5 w-3.5" /> Schedule Window
+                              </button>
+                              <button
                                 onClick={() => handleDuplicate(exam.id)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
                               >
@@ -334,14 +382,16 @@ export function ExamList() {
 
       {/* Confirm Delete Dialog */}
       <Dialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
-        <DialogContent>
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Delete Examination</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
             <DialogDescription>
               Are you sure you want to permanently delete{' '}
-              <strong>&quot;{confirmDelete?.title}&quot;</strong>? This action cannot be undone.
+              <strong className="text-foreground">&quot;{confirmDelete?.title}&quot;</strong>? This action will remove the examination and cannot be undone.
             </DialogDescription>
-          </DialogHeader>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDelete(null)}>
               Cancel
@@ -359,17 +409,19 @@ export function ExamList() {
 
       {/* Confirm Publish/Unpublish Dialog */}
       <Dialog open={!!confirmPublish} onOpenChange={() => setConfirmPublish(null)}>
-        <DialogContent>
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>
               {confirmPublish?.status === 'PUBLISHED' ? 'Unpublish Examination' : 'Publish Examination'}
             </DialogTitle>
+          </DialogHeader>
+          <DialogBody>
             <DialogDescription>
               {confirmPublish?.status === 'PUBLISHED'
-                ? `Unpublishing "${confirmPublish?.title}" will prevent students from accessing it. Existing submissions will remain intact.`
-                : `Publishing "${confirmPublish?.title}" will make it live and accessible to enrolled students from the specified start date.`}
+                ? `Unpublishing "${confirmPublish?.title}" will prevent students from starting new attempts. Existing student submissions will remain saved.`
+                : `Publishing "${confirmPublish?.title}" will make it live and accessible to enrolled students according to the scheduled start time.`}
             </DialogDescription>
-          </DialogHeader>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmPublish(null)}>
               Cancel
@@ -379,7 +431,62 @@ export function ExamList() {
               loading={publishingId === confirmPublish?.id}
               onClick={() => confirmPublish && handleTogglePublish(confirmPublish)}
             >
-              {confirmPublish?.status === 'PUBLISHED' ? 'Unpublish' : 'Publish Exam'}
+              {confirmPublish?.status === 'PUBLISHED' ? 'Unpublish Exam' : 'Publish Exam'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Exam Window Dialog */}
+      <Dialog open={!!schedulingExam} onOpenChange={() => setSchedulingExam(null)}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Schedule Examination Window</DialogTitle>
+            <DialogDescription>
+              Set the active start/end availability windows and duration for &quot;{schedulingExam?.title}&quot;.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4 py-3">
+            <div>
+              <label htmlFor="schedStart" className="text-xs font-medium mb-1.5 block text-foreground">
+                Start Window (Date &amp; Time)
+              </label>
+              <Input
+                id="schedStart"
+                type="datetime-local"
+                value={scheduleForm.startDate}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, startDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label htmlFor="schedEnd" className="text-xs font-medium mb-1.5 block text-foreground">
+                End Window (Date &amp; Time)
+              </label>
+              <Input
+                id="schedEnd"
+                type="datetime-local"
+                value={scheduleForm.endDate}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, endDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label htmlFor="schedDur" className="text-xs font-medium mb-1.5 block text-foreground">
+                Duration (Minutes)
+              </label>
+              <Input
+                id="schedDur"
+                type="number"
+                value={scheduleForm.durationMinutes}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, durationMinutes: Number(e.target.value) })}
+              />
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSchedulingExam(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleScheduleSubmit} disabled={isScheduling}>
+              {isScheduling ? 'Scheduling...' : 'Save Schedule'}
             </Button>
           </DialogFooter>
         </DialogContent>

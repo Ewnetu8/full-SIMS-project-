@@ -30,7 +30,15 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
   const [courses, setCourses] = React.useState<Course[]>([]);
 
   React.useEffect(() => {
-    lecturerService.getCourses().then(setCourses);
+    lecturerService.getCourses().then((loadedCourses) => {
+      setCourses(loadedCourses);
+      if (loadedCourses.length > 0) {
+        const exists = loadedCourses.some((c) => c.id === wizardData.courseId);
+        if (!exists && loadedCourses[0]) {
+          updateWizardData({ courseId: loadedCourses[0].id });
+        }
+      }
+    });
   }, []);
 
   function handleSubmit(e: React.FormEvent) {

@@ -48,6 +48,54 @@ export interface LecturerProfile {
   avatarUrl?: string;
 }
 
+export interface College {
+  id: string;
+  name: string;
+  code: string;
+  university?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Program {
+  id: string;
+  name: string;
+  code: string;
+  department: string;
+  degreeLevel: string;
+  totalCreditHoursRequired: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AcademicYearItem {
+  id: string;
+  displayLabel: string;
+  startBoundary: string;
+  endBoundary: string;
+  createdAt?: string;
+}
+
+export interface SemesterItem {
+  id: string;
+  academicYear: string;
+  academicYearLabel?: string;
+  semesterIndex: number;
+  createdAt?: string;
+}
+
+export interface AdminCourseOffering {
+  id: string;
+  course: string;
+  courseCode?: string;
+  courseTitle?: string;
+  semester: string;
+  semesterLabel?: string;
+  section: string;
+  capacity: number;
+  createdAt?: string;
+}
+
 export interface Department {
   id: string;
   code: string; // e.g. "CS"
@@ -65,25 +113,7 @@ export interface Department {
   createdAt: string;
 }
 
-export interface College {
-  id: string;
-  name: string;
-  code: string;
-  university?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
 
-export interface Program {
-  id: string;
-  department: string;
-  name: string;
-  code: string;
-  degreeLevel: 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA' | 'CERTIFICATE';
-  totalCreditHoursRequired: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
 
 export interface AcademicYear {
   id: string;

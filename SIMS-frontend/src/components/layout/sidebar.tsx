@@ -41,12 +41,13 @@ export const defaultNavItems: NavItem[] = [
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface SidebarProps {
-  navItems?:   NavItem[];
-  collapsed?:  boolean;
-  onCollapse?: (v: boolean) => void;
-  className?:  string;
-  logo?:       React.ReactNode;
-  footer?:     React.ReactNode;
+  navItems?:       NavItem[];
+  collapsed?:      boolean;
+  onCollapse?:     (v: boolean) => void;
+  onNavItemClick?: () => void;
+  className?:      string;
+  logo?:           React.ReactNode;
+  footer?:         React.ReactNode;
 }
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
@@ -61,6 +62,7 @@ export function Sidebar({
   navItems = defaultNavItems,
   collapsed = false,
   onCollapse,
+  onNavItemClick,
   className,
   logo,
   footer,
@@ -82,7 +84,7 @@ export function Sidebar({
       {/* Logo / Brand */}
       <div className="flex h-14 items-center border-b border-sidebar-border px-4 shrink-0">
         {logo ?? (
-          <Link href="/" className="flex items-center gap-3 min-w-0">
+          <Link href="/" onClick={onNavItemClick} className="flex items-center gap-3 min-w-0">
             <img src="/images/aastu-logo.jpg" alt="AASTU Logo" className="h-7 w-auto rounded-md bg-white p-0.5 shrink-0" />
             <AnimatePresence>
               {!collapsed && (
@@ -110,6 +112,7 @@ export function Sidebar({
             item={item}
             isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
             collapsed={collapsed}
+            onNavItemClick={onNavItemClick}
           />
         ))}
       </nav>
@@ -149,15 +152,17 @@ export function Sidebar({
 // ─── Sidebar Nav Item ─────────────────────────────────────────────────────────
 
 interface SidebarNavItemProps {
-  item:      NavItem;
-  isActive:  boolean;
-  collapsed: boolean;
+  item:           NavItem;
+  isActive:       boolean;
+  collapsed:      boolean;
+  onNavItemClick?: () => void;
 }
 
-function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
+function SidebarNavItem({ item, isActive, collapsed, onNavItemClick }: SidebarNavItemProps) {
   const link = (
     <Link
       href={item.href}
+      onClick={onNavItemClick}
       className={cn(
         'group flex items-center gap-3 rounded-lg px-2 py-2 text-sm',
         'transition-all duration-200 relative',

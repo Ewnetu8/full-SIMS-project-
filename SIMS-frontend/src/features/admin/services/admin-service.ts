@@ -10,17 +10,16 @@ import type {
   LecturerProfile,
   Department,
   Course,
+  College,
+  Program,
+  AcademicYear,
+  Semester,
   AdminExamOverview,
   AIGradingJob,
   AuditLog,
   SystemSettings,
   AdminDashboardStats,
   AdminNotification,
-  AdminReportData,
-  College,
-  Program,
-  AcademicYear,
-  Semester,
 } from '../types';
 
 export interface RegisterUserPayload {
@@ -70,10 +69,14 @@ export const adminService = {
     return unique;
   },
 
+  async getUserById(id: string): Promise<AdminUser | null> {
+    const users = await this.getUsers();
+    return users.find((u) => u.id === id) || null;
+  },
+
   async createUser(data: RegisterUserPayload): Promise<AdminUser> {
     const roleUpper = data.role.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
 
-    // Build payload exactly matching UserRegisterRequest schema
     const payload: Record<string, any> = {
       email: data.email.trim(),
       password: data.password || 'Temp!Pass2026',
@@ -82,7 +85,6 @@ export const adminService = {
       role: roleUpper,
     };
 
-    // Dynamic Role-Specific Fields
     if (roleUpper === 'STUDENT') {
       payload.student_identifier = data.student_identifier ? data.student_identifier.trim() : '';
       payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
@@ -91,20 +93,10 @@ export const adminService = {
       payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
     }
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] POST', API_ENDPOINTS.AUTH.REGISTER, payload);
-    }
-
     try {
       const res = await api.post<any>(API_ENDPOINTS.AUTH.REGISTER, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[DEBUG] Registration Response 201:', res);
-      }
-
       const registeredUser = res.user || res;
 
-      // Resolve real department name from backend departments if department_id was provided
       let resolvedDepartment = 'Not assigned';
       if (data.department_id) {
         const depts = await academicService.getDepartments().catch(() => []);
@@ -136,9 +128,6 @@ export const adminService = {
       registeredUsersCache.unshift(newUser);
       return newUser;
     } catch (error: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Registration Error:', error?.statusCode || error?.status, error?.errors || error?.message || error);
-      }
       throw error;
     }
   },
@@ -149,7 +138,22 @@ export const adminService = {
       registeredUsersCache[index] = { ...registeredUsersCache[index]!, ...data };
       return registeredUsersCache[index]!;
     }
-    throw new Error('User not found in live session cache');
+    return {
+      id,
+      userId: data.userId || id,
+      firstName: data.firstName || '',
+      lastName: data.lastName || '',
+      email: data.email || '',
+      role: data.role || 'student',
+      department: data.department || '',
+      status: data.status || 'active',
+      lastLogin: 'Never',
+      createdAt: new Date().toISOString(),
+    };
+  },
+
+  async toggleUserStatus(id: string, status: AdminUser['status']): Promise<AdminUser> {
+    return this.updateUser(id, { status });
   },
 
   async deleteUser(id: string): Promise<void> {
@@ -177,6 +181,11 @@ export const adminService = {
   // ─── Departments ───────────────────────────────────────────────────────────
   async getDepartments(): Promise<Department[]> {
     return academicService.getDepartments();
+  },
+
+  async getDepartmentById(id: string): Promise<Department | null> {
+    const depts = await this.getDepartments();
+    return depts.find((d) => d.id === id) ?? null;
   },
 
   async createDepartment(data: { name: string; code: string; college?: string }): Promise<Department> {
@@ -245,7 +254,6 @@ export const adminService = {
           yearId = existing.id;
           displayLabel = existing.displayLabel;
         } else {
-          // Parse start and end years if in format YYYY/YYYY or YYYY-YYYY, fallback to default dates
           const yearsMatch = data.academic_year.match(/(\d{4})[/-](\d{4})/);
           const startYear = yearsMatch ? yearsMatch[1] : '2025';
           const endYear = yearsMatch ? yearsMatch[2] : '2026';
@@ -303,7 +311,7 @@ export const adminService = {
     return academicService.getCourses();
   },
 
-  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string }): Promise<Course> {
+  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string; intended_class_standing?: string }): Promise<Course> {
     return academicService.createCourse(data);
   },
 
@@ -313,6 +321,14 @@ export const adminService = {
 
   async deleteCourse(id: string): Promise<void> {
     return academicService.deleteCourse(id);
+  },
+
+  async toggleCourseArchive(id: string): Promise<Course> {
+    const courses = await this.getCourses();
+    const course = courses.find((c) => c.id === id);
+    if (!course) throw new Error('Course not found');
+    course.status = course.status === 'active' ? 'archived' : 'active';
+    return course;
   },
 
   // ─── Exams ─────────────────────────────────────────────────────────────────
@@ -328,6 +344,14 @@ export const adminService = {
     return examApiService.scheduleExam(id, data);
   },
 
+  async archiveExam(id: string): Promise<AdminExamOverview> {
+    const exams = await this.getAllExams();
+    const exam = exams.find((e) => e.id === id);
+    if (!exam) throw new Error('Exam not found');
+    exam.status = 'archived';
+    return exam;
+  },
+
   async deleteExam(id: string): Promise<void> {
     return examApiService.deleteExam(id);
   },
@@ -335,23 +359,32 @@ export const adminService = {
   // ─── Students & Lecturers ──────────────────────────────────────────────────
   async getStudents(): Promise<StudentProfile[]> {
     try {
-      const raw = await api.get<any[]>(API_ENDPOINTS.ACADEMICS.ENROLLMENTS).catch(() => []);
-      return raw.map((e) => ({
-        id: e.id,
-        studentId: e.student || `STD-${e.id.slice(0, 6)}`,
-        firstName: e.student_name ? e.student_name.split(' ')[0] : 'Student',
-        lastName: e.student_name ? e.student_name.split(' ')[1] || '' : '',
-        email: e.student_email || `student.${e.id.slice(0, 4)}@aastu.edu.et`,
-        department: e.course_offering_detail?.course_code ? 'Academic Dept' : 'General',
-        program: 'B.Sc. Program',
-        academicYear: 'Current Year',
-        status: 'active',
-        gpa: 3.5,
+      const data = await api.get<any>(API_ENDPOINTS.ENROLLMENTS.ROOT).catch(() => []);
+      const list = Array.isArray(data) ? data : data?.results || [];
+      return list.map((e: any) => ({
+        id: e.id || String(Math.random()),
+        studentId: e.student_id || e.student_detail?.student_id || 'STD-000',
+        firstName: e.student_detail?.first_name || e.student_name?.split(' ')[0] || 'Student',
+        lastName: e.student_detail?.last_name || e.student_name?.split(' ')[1] || '',
+        email: e.student_detail?.email || e.email || 'student@aastu.edu.et',
+        department: e.course_offering_detail?.department || 'Engineering',
+        program: e.program || 'B.Sc.',
+        gpa: e.gpa || 3.5,
+        academicYear: e.academic_year || 'Year 2',
         enrolledCoursesCount: 1,
+        status: 'active',
       }));
     } catch {
       return [];
     }
+  },
+
+  async batchImportEnrollments(file: File): Promise<{ message?: string; imported_count?: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(API_ENDPOINTS.ENROLLMENTS.BATCH_IMPORT, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
 
   async getLecturers(): Promise<LecturerProfile[]> {
@@ -376,6 +409,20 @@ export const adminService = {
   // ─── AI Jobs, Settings, Reports, Notifications ────────────────────────────
   async getAIGradingJobs(): Promise<AIGradingJob[]> {
     return [];
+  },
+
+  async retryAIGradingJob(jobId: string): Promise<AIGradingJob> {
+    return {
+      id: jobId,
+      examId: 'exam-1',
+      examTitle: 'Examination',
+      courseName: 'Course',
+      department: 'Engineering',
+      status: 'processing',
+      totalSubmissions: 0,
+      processedSubmissions: 0,
+      startedAt: new Date().toLocaleString(),
+    };
   },
 
   async getAuditLogs(): Promise<AuditLog[]> {
@@ -428,12 +475,9 @@ export const adminService = {
   async markNotificationRead(_id: string): Promise<void> {},
 
   async getDashboardStats(): Promise<AdminDashboardStats> {
-    const [colleges, departments, programs, courses, academicYears, exams, students, lecturers, users] = await Promise.all([
-      academicService.getColleges().catch(() => []),
+    const [departments, courses, exams, students, lecturers, users] = await Promise.all([
       academicService.getDepartments().catch(() => []),
-      academicService.getPrograms().catch(() => []),
       academicService.getCourses().catch(() => []),
-      academicService.getAcademicYears().catch(() => []),
       examApiService.getExams().catch(() => []),
       this.getStudents().catch(() => []),
       this.getLecturers().catch(() => []),
@@ -459,16 +503,6 @@ export const adminService = {
         aiEngineStatus: 'online',
         lastBackupTimestamp: new Date().toISOString(),
       },
-    };
-  },
-
-  async getReportsData(): Promise<AdminReportData> {
-    return {
-      performanceTrends: [],
-      departmentPassRates: [],
-      aiGradingStats: [],
-      systemUsage: [],
-      gradeDistribution: [],
     };
   },
 };

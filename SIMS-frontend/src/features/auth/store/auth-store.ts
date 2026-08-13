@@ -164,7 +164,19 @@ export const useAuthStore = create<AuthStore>()(
           // 1. Update the flag so the custom storage adapter knows where to write.
           setRememberFlag(rememberMe);
 
-          // 2. Update the store state — persist middleware will call setItem
+          // 2. Sync session cookie with Next.js server/middleware
+          fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: session.user.id,
+              role: session.user.role,
+              exp: session.tokens.expiresAt || (Date.now() + 8 * 60 * 60 * 1000),
+              rememberMe,
+            }),
+          }).catch(() => {});
+
+          // 3. Update the store state — persist middleware will call setItem
           //    which now targets the correct storage.
           set(
             {
@@ -190,6 +202,7 @@ export const useAuthStore = create<AuthStore>()(
             if (get().isAuthenticated) {
               await authApi.logout();
             }
+            await fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
           } finally {
             purgeAllStorages();
             set({ ...initialState }, false, 'auth/logout/complete');
@@ -202,6 +215,7 @@ export const useAuthStore = create<AuthStore>()(
          */
         clearSession: () => {
           purgeAllStorages();
+          fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
           set({ ...initialState }, false, 'auth/clearSession');
         },
 

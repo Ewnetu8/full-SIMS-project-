@@ -23,6 +23,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -32,6 +33,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  FormSelect,
   Input,
   SearchInput,
   Textarea,
@@ -39,6 +41,7 @@ import {
 import { ROUTES } from '@/constants';
 
 import { useAdminStore } from '../store';
+import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { Department } from '../types';
 
@@ -61,7 +64,13 @@ export function DepartmentManagement() {
     updateDepartment,
     deleteDepartment,
     setDepartmentSearchQuery,
+    fetchAdminData,
+    isLoadingData,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingDept, setEditingDept] = React.useState<Department | null>(null);
@@ -72,6 +81,7 @@ export function DepartmentManagement() {
   const [formData, setFormData] = React.useState({
     code: '',
     name: '',
+    description: '',
     collegeId: '',
     hodId: lecturers[0]?.id || '',
   });
@@ -93,6 +103,7 @@ export function DepartmentManagement() {
     setFormData({
       code: '',
       name: '',
+      description: '',
       collegeId: defaultCollege ? defaultCollege.id : '',
       hodId: lecturers[0]?.id || '',
     });
@@ -105,8 +116,9 @@ export function DepartmentManagement() {
     setFormData({
       code: dept.code,
       name: dept.name,
+      description: dept.description || '',
       collegeId: dept.college && UUID_REGEX.test(dept.college) ? dept.college : '',
-      hodId: dept.headOfDepartment.id,
+      hodId: dept.headOfDepartment?.id || '',
     });
   };
 
@@ -191,11 +203,18 @@ export function DepartmentManagement() {
     }
   };
 
-  const filteredDepts = departments.filter(
-    (d) =>
-      d.name.toLowerCase().includes(departmentSearchQuery.toLowerCase()) ||
-      d.code.toLowerCase().includes(departmentSearchQuery.toLowerCase())
-  );
+  const [collegeFilter, setCollegeFilter] = React.useState<string>('ALL');
+
+  const filteredDepartments = departments.filter((dept) => {
+    const matchesSearch =
+      dept.name.toLowerCase().includes(departmentSearchQuery.toLowerCase()) ||
+      dept.code.toLowerCase().includes(departmentSearchQuery.toLowerCase());
+
+    const foundInfo = getDepartmentsByCollege().find((d) => d.name === dept.name);
+    const matchesCollege = collegeFilter === 'ALL' || (foundInfo && foundInfo.college === collegeFilter);
+
+    return matchesSearch && matchesCollege;
+  });
 
   const selectClass =
     'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground';
@@ -217,15 +236,31 @@ export function DepartmentManagement() {
         </Button>
       </div>
 
-      {/* Search Bar */}
+      {/* Search & Filter Bar */}
       <Card className="p-4">
-        <div className="max-w-md">
-          <SearchInput
-            placeholder="Search department by name or code..."
-            value={departmentSearchQuery}
-            onChange={(e) => setDepartmentSearchQuery(e.target.value)}
-            onClear={() => setDepartmentSearchQuery('')}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+          <div>
+            <SearchInput
+              placeholder="Search department by name or code..."
+              value={departmentSearchQuery}
+              onChange={(e) => setDepartmentSearchQuery(e.target.value)}
+              onClear={() => setDepartmentSearchQuery('')}
+            />
+          </div>
+          <div>
+            <select
+              className={selectClass}
+              value={collegeFilter}
+              onChange={(e) => setCollegeFilter(e.target.value)}
+            >
+              <option value="ALL">All Colleges</option>
+              {COLLEGES.map((col) => (
+                <option key={col} value={col}>
+                  {col}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </Card>
 
@@ -253,7 +288,7 @@ export function DepartmentManagement() {
             Attempt Retry
           </Button>
         </Card>
-      ) : filteredDepts.length === 0 ? (
+      ) : filteredDepartments.length === 0 ? (
         /* Empty State */
         <Card className="p-12 text-center flex flex-col items-center justify-center">
           <Building2 className="mx-auto h-12 w-12 text-muted-foreground/40 mb-3" />
@@ -272,10 +307,10 @@ export function DepartmentManagement() {
       ) : (
         /* Department Cards Grid */
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {filteredDepts.map((dept) => {
+          {filteredDepartments.map((dept) => {
             const parentCollege = colleges.find((c) => c.id === dept.college || c.code === dept.college);
-            const deptProgramsCount = programs.filter((p) => p.department === dept.id || p.department === dept.name).length;
-            const deptCoursesCount = courses.filter((c) => c.department === dept.name || c.department === dept.code).length;
+            const deptProgramsCount = programs ? programs.filter((p) => p.department === dept.id || p.department === dept.name).length : 0;
+            const deptCoursesCount = courses ? courses.filter((c) => c.department === dept.name || c.department === dept.code).length : 0;
 
             return (
               <Card key={dept.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-shadow border-border">
@@ -293,7 +328,7 @@ export function DepartmentManagement() {
                           </span>
                         )}
                         <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Created {new Date(dept.createdAt).toLocaleDateString()}
+                          Created {dept.createdAt ? new Date(dept.createdAt).toLocaleDateString() : 'Recently'}
                         </p>
                       </div>
                     </div>
@@ -366,7 +401,7 @@ export function DepartmentManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
             {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
               <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
                 {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
@@ -407,7 +442,7 @@ export function DepartmentManagement() {
             <div>
               <Label>Assigned College (Optional)</Label>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] mt-1.5 transition-all shadow-sm"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] mt-1.5 transition-all shadow-sm text-foreground"
                 value={formData.collegeId}
                 onChange={(e) => setFormData({ ...formData, collegeId: e.target.value })}
               >
@@ -420,7 +455,7 @@ export function DepartmentManagement() {
               </select>
               {fieldErrors.college && <p className="text-xs text-destructive mt-1">{fieldErrors.college}</p>}
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
@@ -456,7 +491,7 @@ export function DepartmentManagement() {
       {/* Assign HOD Modal */}
       {assigningHODDept && (
         <Dialog open={!!assigningHODDept} onOpenChange={() => setAssigningHODDept(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-primary" /> Assign Head of Department
@@ -466,12 +501,13 @@ export function DepartmentManagement() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-2">
+            <DialogBody className="space-y-4 py-3">
               <div>
-                <Label htmlFor="hodSelect">Select HOD</Label>
-                <select
+                <Label htmlFor="hodSelect" className="text-xs font-medium mb-1.5 block">
+                  Designated HOD
+                </Label>
+                <FormSelect
                   id="hodSelect"
-                  className={selectClass}
                   value={formData.hodId}
                   onChange={(e) => setFormData({ ...formData, hodId: e.target.value })}
                 >
@@ -480,9 +516,9 @@ export function DepartmentManagement() {
                       Dr. {l.firstName} {l.lastName} — {l.department}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setAssigningHODDept(null)}>

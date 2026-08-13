@@ -29,7 +29,7 @@ const lecturerNavigation: NavItem[] = [
   { label: 'Examinations', href: ROUTES.LECTURER.EXAMS, icon: <ClipboardCheck className="h-4 w-4" /> },
   { label: 'Create Exam', href: ROUTES.LECTURER.EXAM_CREATE, icon: <PlusCircle className="h-4 w-4" /> },
   { label: 'Class Analytics', href: ROUTES.LECTURER.ANALYTICS, icon: <ChartColumn className="h-4 w-4" /> },
-  { label: 'Notifications', href: ROUTES.LECTURER.NOTIFICATIONS, icon: <Bell className="h-4 w-4" />, badge: 2 },
+  { label: 'Notifications', href: ROUTES.LECTURER.NOTIFICATIONS, icon: <Bell className="h-4 w-4" /> },
   { label: 'My Profile', href: ROUTES.LECTURER.PROFILE, icon: <UserRound className="h-4 w-4" /> },
 ];
 

@@ -10,21 +10,31 @@ import { env } from '@/lib/env';
 import { API_ENDPOINTS } from '@/constants';
 import { createApiError } from '@/lib/errors';
 import { toast } from '@/components/feedback';
+import { getCsrfToken } from '@/utils/csrf';
 
 import type { ApiErrorResponse } from '@/types';
 
-// ─── CSRF Helper ──────────────────────────────────────────────────────────────
+// ─── Concurrent Refresh Control State ─────────────────────────────────────────
+
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
 
 /**
- * Read the Django CSRF token from the browser cookie.
- * Django sets a readable (non-HttpOnly) `csrftoken` cookie which is required
- * in the `X-CSRFToken` header for state-mutating requests.
+ * Resolves or rejects all queued requests waiting for a token refresh to complete.
  */
-function getCsrfToken(): string {
-  if (typeof document === 'undefined') return '';
-  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : '';
-}
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach((promise) => {
+    if (error) {
+      promise.reject(error);
+    } else if (token) {
+      promise.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
 
 // ─── Axios Client Factory ─────────────────────────────────────────────────────
 
@@ -32,8 +42,8 @@ function getCsrfToken(): string {
  * Creates a pre-configured Axios instance with:
  * - Base URL from environment
  * - JSON content-type headers
- * - Request interceptor (for auth token & CSRF token injection)
- * - Response interceptor (normalises API errors into typed ApiError instances)
+ * - Request interceptor (auth Bearer token & CSRF header injection)
+ * - Response interceptor (error normalization & silent 401 token refresh flow with concurrency queueing)
  */
 function createApiClient(): AxiosInstance {
   const client = axios.create({
@@ -43,20 +53,33 @@ function createApiClient(): AxiosInstance {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    withCredentials: true, // send cookies for refresh token flow
+    withCredentials: true, // send HttpOnly cookies (refresh_token, csrftoken)
+    xsrfCookieName: 'csrftoken',
+    xsrfHeaderName: 'X-CSRFToken',
   });
 
   // ── Request Interceptor ──────────────────────────────────────────────────────
   client.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      const token = useAuthStore.getState().tokens?.accessToken;
-      if (token) {
-        config.headers.set('Authorization', `Bearer ${token}`);
+      // Don't add auth token to login, register, or refresh endpoints
+      const isAuthEndpoint =
+        config.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
+        config.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
+        config.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
+
+      if (!isAuthEndpoint) {
+        const token = useAuthStore.getState().tokens?.accessToken;
+        if (token) {
+          config.headers.set('Authorization', `Bearer ${token}`);
+        }
       }
+
+      // Inject Django CSRF token for requests
       const csrfToken = getCsrfToken();
       if (csrfToken) {
         config.headers.set('X-CSRFToken', csrfToken);
       }
+
       return config;
     },
     (error: unknown) => Promise.reject(error),
@@ -119,41 +142,63 @@ function createApiClient(): AxiosInstance {
       };
 
       const apiError = createApiError(normalised);
+      const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
 
       const isAuthEndpoint =
-        error.config?.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
-        error.config?.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
-        error.config?.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
 
-      if (response.status === 401 && !isAuthEndpoint) {
+      // Handle 401 Unauthorized for non-auth endpoints by attempting silent refresh
+      if (response.status === 401 && !isAuthEndpoint && originalRequest && !originalRequest._retry) {
+        // If a refresh is ALREADY in progress, queue this request to await new token
+        if (isRefreshing) {
+          return new Promise<string>((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          })
+            .then((token: string) => {
+              originalRequest.headers.set('Authorization', `Bearer ${token}`);
+              return client(originalRequest);
+            })
+            .catch((err) => Promise.reject(err));
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
         try {
-          // Attempt to refresh the token using raw axios to avoid interceptor loops
-          const refreshRes = await axios.post<{ access_token?: string; access?: string; accessToken?: string }>(
-            `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
-            {},
-            { withCredentials: true }
-          );
-
-          // The exact field name depends on the backend framework (access, access_token, etc)
-          const newAccessToken = refreshRes.data.access || refreshRes.data.access_token || refreshRes.data.accessToken || '';
+          // Dynamically import authApi to avoid circular dependency
+          const { authApi } = await import('@/features/auth/services/auth-api');
+          const refreshRes = await authApi.refreshToken();
+          const newAccessToken = refreshRes.tokens?.accessToken || '';
 
           if (newAccessToken) {
             useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
+            originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
+
+            // Resolve all queued requests with the new access token
+            processQueue(null, newAccessToken);
+
             // Retry the original request
-            if (error.config) {
-              error.config.headers.set('Authorization', `Bearer ${newAccessToken}`);
-              return client(error.config);
-            }
+            return client(originalRequest);
+          } else {
+            throw new Error('No access token returned from refresh endpoint');
           }
-        } catch (refreshError) {
-          // If refresh fails, clear the session
-          useAuthStore.getState().clearSession();
-          toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+        } catch (refreshError: any) {
+          processQueue(refreshError, null);
+
+          const refreshStatus = refreshError?.response?.status;
+
+          // ONLY clear session if refresh explicitly fails with 401 (refresh token missing/expired)
+          if (refreshStatus === 401) {
+            useAuthStore.getState().clearSession();
+            toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+          }
+          // Do NOT clear session on 403 (CSRF failure or permission error)
           return Promise.reject(apiError);
+        } finally {
+          isRefreshing = false;
         }
-      } else if (response.status === 401 && !isAuthEndpoint) {
-        useAuthStore.getState().clearSession();
-        toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
       }
 
       return Promise.reject(apiError);

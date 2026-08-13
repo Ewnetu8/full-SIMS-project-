@@ -18,12 +18,18 @@ export type { SearchInputProps }             from './search-input';
 export { Textarea }                          from './textarea';
 export type { TextareaProps }                from './textarea';
 
+export { Label }                             from './label';
+export type { LabelProps }                   from './label';
+
 export {
   Select, SelectGroup, SelectValue,
   SelectTrigger, SelectContent, SelectLabel,
   SelectItem, SelectSeparator,
   SelectScrollUpButton, SelectScrollDownButton,
 }                                            from './select';
+
+export { FormSelect, formSelectClass }        from './form-select';
+export type { FormSelectProps }              from './form-select';
 
 export { Checkbox }                          from './checkbox';
 export type { CheckboxProps }                from './checkbox';

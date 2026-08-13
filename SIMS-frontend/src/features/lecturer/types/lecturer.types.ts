@@ -1,4 +1,4 @@
-export type ExamStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+export type ExamStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
 
 export type QuestionType =
   | 'multiple_choice'
@@ -81,6 +81,13 @@ export interface LecturerAnalytics {
   completionRate: number;
   scoreDistribution: { range: string; count: number }[];
   questionDifficulty: { questionId: string; prompt: string; averageScorePct: number; difficulty: 'Easy' | 'Medium' | 'Hard' }[];
+}
+
+export interface LecturerStats {
+  totalStudents: number;
+  totalCourses: number;
+  activeExams: number;
+  pendingGrading: number;
 }
 
 export interface LecturerNotification {
