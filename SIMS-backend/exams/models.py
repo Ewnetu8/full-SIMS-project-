@@ -32,7 +32,8 @@ class Examination(BaseModel):
     status = models.CharField(
         max_length=15,
         choices=ExamStatusChoices.choices,
-        default=ExamStatusChoices.DRAFT
+        default=ExamStatusChoices.DRAFT,
+        db_index=True,
     )
     start_window = models.DateTimeField()
     end_window = models.DateTimeField()

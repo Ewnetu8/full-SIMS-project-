@@ -528,22 +528,24 @@ class AutoSaveAnswerView(APIView):
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-            answer, _ = StudentAnswer.objects.update_or_create(
-                exam_attempt=attempt,
-                question=question,
-                defaults={"selected_option": option, "submitted_text": None},
-            )
+            with transaction.atomic():
+                answer, _ = StudentAnswer.objects.update_or_create(
+                    exam_attempt=attempt,
+                    question=question,
+                    defaults={"selected_option": option, "submitted_text": None},
+                )
         else:
             if selected_option is not None:
                 return Response(
                     {"detail": "Text questions must be answered with submitted_text."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            answer, _ = StudentAnswer.objects.update_or_create(
-                exam_attempt=attempt,
-                question=question,
-                defaults={"selected_option": None, "submitted_text": submitted_text},
-            )
+            with transaction.atomic():
+                answer, _ = StudentAnswer.objects.update_or_create(
+                    exam_attempt=attempt,
+                    question=question,
+                    defaults={"selected_option": None, "submitted_text": submitted_text},
+                )
         return Response(StudentAnswerSerializer(answer).data)
 
 
@@ -638,17 +640,18 @@ class SubmitExamView(APIView):
         is_disrupted = request.data.get("is_disrupted", False)
 
         # ── Freeze the attempt ────────────────────────────────────────
-        attempt.submission_time = now
-        attempt.is_disrupted = is_disrupted
-        attempt.grading_status = ExamAttempt.GradingStatusChoices.GRADING_PENDING
-        attempt.save(
-            update_fields=[
-                "submission_time",
-                "is_disrupted",
-                "grading_status",
-                "updated_at",
-            ]
-        )
+        with transaction.atomic():
+            attempt.submission_time = now
+            attempt.is_disrupted = is_disrupted
+            attempt.grading_status = ExamAttempt.GradingStatusChoices.GRADING_PENDING
+            attempt.save(
+                update_fields=[
+                    "submission_time",
+                    "is_disrupted",
+                    "grading_status",
+                    "updated_at",
+                ]
+            )
 
         # ── Enqueue async grading (handoff to Phase 4) ───────────────
         from exams.tasks import grade_exam_attempt
