@@ -24,6 +24,26 @@ from results.serializers import (
     ResultSerializer,
 )
 
+# Percentage score bands used for the distribution, plus the pass mark.
+# Aligned with `grade_letter_for` in exams/tasks.py (D = 60%+).
+SCORE_BANDS = [
+    ("0-39", 0.0, 39.999),
+    ("40-49", 40.0, 49.999),
+    ("50-59", 50.0, 59.999),
+    ("60-69", 60.0, 69.999),
+    ("70-79", 70.0, 79.999),
+    ("80-89", 80.0, 89.999),
+    ("90-100", 90.0, 100.0),
+]
+PASS_THRESHOLD = 60.0
+
+
+def score_band_for(percentage):
+    for label, low, high in SCORE_BANDS:
+        if low <= percentage <= high:
+            return label
+    return SCORE_BANDS[0][0]
+
 
 def get_examination(pk):
     from exams.models import Examination
@@ -44,13 +64,16 @@ class ExamAnalyticsView(APIView):
         tags=["Analytics"],
         summary="Exam analytics dashboard",
         description=(
-            "**Role: LECTURER / ADMIN**\n\n"
-            "Returns mean, median and standard deviation of `final_score` "
-            "across all graded results, plus per-question difficulty "
-            "(correct-rate) (FR-015).\n\n"
+            "**Role: LECTURER / ADMIN (owner-scoped)**\n\n"
+            "Returns summary statistics (mean, median, mode, stddev, min, "
+            "max) of `final_score`, a percentage score distribution, pass "
+            "rate (pass = score ≥ 60% of exam total), and per-question "
+            "difficulty (correct-rate, average points, unanswered count) "
+            "(FR-015).\n\n"
             "Empty-data state (§9.9): when no attempt has a `Result` yet, "
-            "the score summary is `null` and every question reports "
-            "`correct_rate = null` with 200 — never an error."
+            "the score summary is `null`, `pass_rate` is `null`, and every "
+            "question reports `correct_rate = null` with 200 — never an "
+            "error."
         ),
         responses={
             200: ExamAnalyticsSerializer,
@@ -84,10 +107,19 @@ class ExamAnalyticsView(APIView):
 
         scores = [float(a.result.final_score) for a in graded.select_related("result")]
 
+        exam_total = float(
+            sum(question.total_points for question in exam.questions.all())
+        )
+        percentages = [
+            (score / exam_total * 100.0) if exam_total else 0.0 for score in scores
+        ]
+
         if scores:
+            modes = statistics.multimode(scores)
             score_summary = {
                 "mean": statistics.mean(scores),
                 "median": statistics.median(scores),
+                "mode": modes[0] if len(modes) != len(scores) else None,
                 "stddev": statistics.pstdev(scores),
                 "min": min(scores),
                 "max": max(scores),
@@ -96,23 +128,43 @@ class ExamAnalyticsView(APIView):
             score_summary = {
                 "mean": None,
                 "median": None,
+                "mode": None,
                 "stddev": None,
                 "min": None,
                 "max": None,
             }
 
+        distribution = {label: 0 for label, _, _ in SCORE_BANDS}
+        for percentage in percentages:
+            distribution[score_band_for(percentage)] += 1
+        score_distribution = [
+            {"label": label, "count": distribution[label]}
+            for label, _, _ in SCORE_BANDS
+        ]
+
+        if graded_count:
+            pass_count = sum(1 for pct in percentages if pct >= PASS_THRESHOLD)
+            pass_rate = round(pass_count / graded_count * 100.0, 2)
+        else:
+            pass_rate = None
+
         graded_attempt_ids = list(graded.values_list("id", flat=True))
         question_ids = list(exam.questions.values_list("id", flat=True))
 
         correct_by_question = defaultdict(int)
+        awarded_by_question = defaultdict(float)
+        attempts_with_answer = defaultdict(set)
         if graded_attempt_ids and question_ids:
             answers = StudentAnswer.objects.filter(
                 exam_attempt_id__in=graded_attempt_ids,
                 question_id__in=question_ids,
             ).select_related("question", "selected_option")
             for answer in answers:
-                if grade_question(answer.question, answer) > 0:
+                awarded = grade_question(answer.question, answer)
+                if awarded > 0:
                     correct_by_question[answer.question_id] += 1
+                awarded_by_question[answer.question_id] += awarded
+                attempts_with_answer[answer.question_id].add(answer.exam_attempt_id)
 
         per_question = [
             {
@@ -127,6 +179,13 @@ class ExamAnalyticsView(APIView):
                     if graded_count
                     else None
                 ),
+                "average_points": (
+                    awarded_by_question.get(question.pk, 0.0) / graded_count
+                    if graded_count
+                    else None
+                ),
+                "unanswered_count": graded_count
+                - len(attempts_with_answer.get(question.pk, set())),
             }
             for question in exam.questions.all()
         ]
@@ -139,6 +198,9 @@ class ExamAnalyticsView(APIView):
                 "attempt_count": attempt_count,
                 "graded_count": graded_count,
                 "score": score_summary,
+                "pass_rate": pass_rate,
+                "pass_threshold": PASS_THRESHOLD,
+                "score_distribution": score_distribution,
                 "per_question": per_question,
             }
         )

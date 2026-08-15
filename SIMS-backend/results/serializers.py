@@ -11,11 +11,19 @@ class QuestionAnalyticsSerializer(serializers.Serializer):
     correct_count = serializers.IntegerField()
     attempts = serializers.IntegerField()
     correct_rate = serializers.FloatField(allow_null=True)
+    average_points = serializers.FloatField(allow_null=True)
+    unanswered_count = serializers.IntegerField()
+
+
+class ScoreBandSerializer(serializers.Serializer):
+    label = serializers.CharField()
+    count = serializers.IntegerField()
 
 
 class ScoreSummarySerializer(serializers.Serializer):
     mean = serializers.FloatField(allow_null=True)
     median = serializers.FloatField(allow_null=True)
+    mode = serializers.FloatField(allow_null=True)
     stddev = serializers.FloatField(allow_null=True)
     min = serializers.FloatField(allow_null=True)
     max = serializers.FloatField(allow_null=True)
@@ -28,6 +36,9 @@ class ExamAnalyticsSerializer(serializers.Serializer):
     attempt_count = serializers.IntegerField()
     graded_count = serializers.IntegerField()
     score = ScoreSummarySerializer()
+    pass_rate = serializers.FloatField(allow_null=True)
+    pass_threshold = serializers.FloatField()
+    score_distribution = ScoreBandSerializer(many=True)
     per_question = QuestionAnalyticsSerializer(many=True)
 
 
