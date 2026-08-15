@@ -17,7 +17,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from results.serializers import AdvisingReportSerializer, ExamAnalyticsSerializer
+from results.serializers import (
+    AdvisingReportSerializer,
+    ExamAnalyticsSerializer,
+    ExamResultsSerializer,
+    ResultSerializer,
+)
 
 
 def get_examination(pk):
@@ -135,6 +140,119 @@ class ExamAnalyticsView(APIView):
                 "graded_count": graded_count,
                 "score": score_summary,
                 "per_question": per_question,
+            }
+        )
+
+
+class StudentResultsView(APIView):
+    def get_permissions(self):
+        return [IsAuthenticated(), HasRole("STUDENT")()]
+
+    @extend_schema(
+        tags=["Results"],
+        summary="My results",
+        description=(
+            "**Role: STUDENT**\n\n"
+            "Returns the logged-in student's own graded results. "
+            "A `Result` row exists once an attempt has been graded; the "
+            "student only ever sees their own rows (self-scoped through "
+            "`ExamAttempt.student`)."
+        ),
+        responses={200: ResultSerializer(many=True)},
+    )
+    def get(self, request):
+        from results.models import Result
+
+        student = getattr(request.user, "student_profile", None)
+        if student is None:
+            return Response(
+                {"detail": "Authenticated user has no student profile."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        results = (
+            Result.objects.filter(exam_attempt__student=student)
+            .select_related(
+                "exam_attempt__examination__course_offering__course",
+                "certified_by",
+            )
+            .order_by("-created_at")
+        )
+        return Response(ResultSerializer(results, many=True).data)
+
+
+class ExamResultsView(APIView):
+    def get_permissions(self):
+        return [IsAuthenticated(), HasRole("LECTURER")()]
+
+    @extend_schema(
+        tags=["Results"],
+        summary="Per-student results for an examination",
+        description=(
+            "**Role: LECTURER / ADMIN**\n\n"
+            "Lists every attempt of one examination with the student's "
+            "identity, score, grade letter and grading state. Lecturers may "
+            "only query their own examinations (404 otherwise)."
+        ),
+        responses={
+            200: ExamResultsSerializer,
+            404: OpenApiResponse(description="Examination not found."),
+        },
+    )
+    def get(self, request, pk):
+        exam = get_examination(pk)
+        if exam is None:
+            return Response(
+                {"detail": "Examination not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        user_role = getattr(request.user, "role", None)
+        is_admin = getattr(request.user, "is_superuser", False) or user_role == "ADMIN"
+        if not is_admin:
+            lecturer = getattr(request.user, "lecturer_profile", None)
+            if lecturer is None or exam.lecturer_id != lecturer.pk:
+                return Response(
+                    {"detail": "Examination not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        attempts = exam.attempts.select_related("student__user", "result").order_by(
+            "student__student_identifier"
+        )
+
+        students = []
+        for attempt in attempts:
+            students.append(
+                {
+                    "student_id": attempt.student_id,
+                    "student_identifier": attempt.student.student_identifier,
+                    "student_name": (
+                        f"{attempt.student.user.first_name} "
+                        f"{attempt.student.user.last_name}".strip()
+                        or None
+                    ),
+                    "attempt_id": attempt.pk,
+                    "final_score": (
+                        attempt.result.final_score if attempt.result else None
+                    ),
+                    "grade_letter": (
+                        attempt.result.grade_letter if attempt.result else None
+                    ),
+                    "grading_status": attempt.grading_status,
+                    "submission_time": attempt.submission_time,
+                    "is_disrupted": attempt.is_disrupted,
+                }
+            )
+
+        return Response(
+            {
+                "exam_id": exam.pk,
+                "title": exam.title,
+                "status": exam.status,
+                "attempt_count": attempts.count(),
+                "graded_count": sum(
+                    1 for attempt in attempts if attempt.result is not None
+                ),
+                "students": students,
             }
         )
 
