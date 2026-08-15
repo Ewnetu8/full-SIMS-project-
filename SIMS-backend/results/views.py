@@ -62,6 +62,16 @@ class ExamAnalyticsView(APIView):
                 {"detail": "Examination not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
+        user_role = getattr(request.user, "role", None)
+        is_admin = getattr(request.user, "is_superuser", False) or user_role == "ADMIN"
+        if not is_admin:
+            lecturer = getattr(request.user, "lecturer_profile", None)
+            if lecturer is None or exam.lecturer_id != lecturer.pk:
+                return Response(
+                    {"detail": "Examination not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
         attempts = exam.attempts.all()
         attempt_count = attempts.count()
         graded = attempts.filter(result__isnull=False)

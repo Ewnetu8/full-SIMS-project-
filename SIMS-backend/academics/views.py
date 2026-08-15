@@ -770,7 +770,10 @@ class EnrollmentListView(APIView):
 
 
 class EnrollmentDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        if self.request.method in ("PUT", "PATCH", "DELETE"):
+            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+        return [IsAuthenticated()]
 
     def get_object(self, pk):
         try:
@@ -783,6 +786,11 @@ class EnrollmentDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Enrollment not found."}, status=status.HTTP_404_NOT_FOUND)
+        user_role = getattr(request.user, "role", None)
+        if user_role == "STUDENT":
+            student = getattr(request.user, "student_profile", None)
+            if student is None or obj.student_id != student.pk:
+                return Response({"detail": "Enrollment not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(EnrollmentSerializer(obj).data)
 
     @extend_schema(tags=["Enrollment"], summary="Update enrollment status/grade", request=EnrollmentSerializer, responses={200: EnrollmentSerializer})
