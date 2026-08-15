@@ -2,8 +2,9 @@ import logging
 
 from celery import shared_task
 from django.db import transaction
+from django.utils import timezone
 
-from exams.models import ExamAttempt
+from exams.models import ExamAttempt, ExamStatusChoices, Examination
 
 logger = logging.getLogger(__name__)
 
@@ -94,3 +95,42 @@ def grade_exam_attempt(self, attempt_id):
         except ExamAttempt.DoesNotExist:
             pass
         raise
+
+
+@shared_task(name='exams.tasks.close_expired_exams_and_grade')
+def close_expired_exams_and_grade():
+    """Periodic sweep (Celery beat) enforcing timer expiry.
+
+    1. Closes any ACTIVE examination whose `end_window` has passed (→ CLOSED).
+    2. Freezes and enqueues grading for any attempt that was never submitted
+       but whose effective deadline — `min(end_window, start_time +
+       duration_minutes)`, the same formula as SubmitExamView — has passed.
+       The attempt is frozen at the deadline itself, so an abandoned attempt
+       can never stay stuck in GRADING_PENDING.
+    """
+    now = timezone.now()
+
+    expired_exams = Examination.objects.filter(
+        status=ExamStatusChoices.ACTIVE,
+        end_window__lte=now,
+    )
+    for exam in expired_exams:
+        exam.status = ExamStatusChoices.CLOSED
+        exam.save(update_fields=["status", "updated_at"])
+
+    abandoned = ExamAttempt.objects.filter(
+        submission_time__isnull=True,
+        grading_status=ExamAttempt.GradingStatusChoices.GRADING_PENDING,
+    ).select_related("examination")
+
+    for attempt in abandoned:
+        deadline = min(
+            attempt.examination.end_window,
+            attempt.start_time
+            + timezone.timedelta(minutes=attempt.examination.duration_minutes),
+        )
+        if now < deadline:
+            continue
+        attempt.submission_time = deadline
+        attempt.save(update_fields=["submission_time", "updated_at"])
+        grade_exam_attempt.delay(str(attempt.pk))

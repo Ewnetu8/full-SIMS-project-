@@ -501,6 +501,23 @@ class AutoSaveAnswerView(APIView):
                 {"detail": "This attempt has already been submitted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        now = timezone.now()
+        deadline_by_window = attempt.examination.end_window
+        deadline_by_duration = attempt.start_time + timezone.timedelta(
+            minutes=attempt.examination.duration_minutes
+        )
+        if now >= min(deadline_by_window, deadline_by_duration):
+            return Response(
+                {
+                    "detail": (
+                        "Auto-save rejected: the exam window or duration "
+                        "has expired. Answers can no longer be changed."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             question = Question.objects.get(
                 pk=question_pk, examination=attempt.examination

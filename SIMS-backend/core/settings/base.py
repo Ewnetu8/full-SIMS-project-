@@ -225,6 +225,10 @@ CELERY_TIMEZONE = 'UTC'
 
 # Celery Beat schedule
 CELERY_BEAT_SCHEDULE = {
+    'exam-expiry-sweep': {
+        'task': 'exams.tasks.close_expired_exams_and_grade',
+        'schedule': 60.0,  # Every minute
+    },
     'archive-old-records': {
         'task': 'notifications.tasks.archive_old_records',
         'schedule': 86400.0,  # Run daily (in seconds)
