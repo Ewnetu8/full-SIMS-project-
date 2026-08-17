@@ -29,6 +29,8 @@ import {
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
+import { examApiService } from '../services/exam-api-service';
+import { ExamAnalyticsView } from '@/features/analytics/components/exam-analytics-view';
 
 import type { AdminExamOverview } from '../types';
 
@@ -268,11 +270,38 @@ export function ExaminationManagement() {
                   </span>
                 </div>
               </div>
+
+              {/* Embedded Live Exam Analytics */}
+              <div className="border-t border-border pt-4">
+                <h4 className="font-semibold text-foreground text-sm mb-3">Live Exam Analytics Dashboard</h4>
+                <ExamAnalyticsView examId={selectedExam.id} examTitle={selectedExam.title} />
+              </div>
             </DialogBody>
 
             <DialogFooter>
-              <Button onClick={() => setSelectedExam(null)}>Close</Button>
+              {selectedExam.status === 'completed' && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await examApiService.publishExam(selectedExam.id);
+                      toast.success('Exam results published successfully.');
+                      fetchExams();
+                      setSelectedExam(null);
+                    } catch (err: any) {
+                      toast.error('Cannot publish examination', {
+                        description: 'Ensure all student attempts are fully graded before publishing.',
+                      });
+                    }
+                  }}
+                >
+                  Publish Results
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setSelectedExam(null)}>Close</Button>
             </DialogFooter>
+
           </DialogContent>
         </Dialog>
       )}

@@ -121,13 +121,24 @@ export function ExamList() {
 
   async function handleTogglePublish(exam: LecturerExam) {
     setPublishingId(exam.id);
-    const updated = await lecturerService.togglePublishExam(exam.id);
-    if (updated) {
-      setExams((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    try {
+      const updated = await lecturerService.togglePublishExam(exam.id);
+      if (updated) {
+        setExams((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+        toast.success(`Exam ${updated.status === 'PUBLISHED' ? 'published' : 'updated'} successfully.`, {
+          description: `Status changed to ${updated.status}.`,
+        });
+      }
+    } catch (err) {
+      toast.error('Unable to publish examination', {
+        description: 'Ensure all student attempts are fully graded before publishing.',
+      });
+    } finally {
+      setConfirmPublish(null);
+      setPublishingId(null);
     }
-    setConfirmPublish(null);
-    setPublishingId(null);
   }
+
 
   async function handleDuplicate(examId: string) {
     const copy = await lecturerService.duplicateExam(examId);

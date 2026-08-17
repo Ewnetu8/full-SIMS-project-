@@ -187,6 +187,18 @@ export async function scheduleExamination(
   return api.post<Examination>(API_ENDPOINTS.EXAMS.SCHEDULE(id), data);
 }
 
+/**
+ * Publish examination results.
+ * Moves status from CLOSED -> PUBLISHED once all attempts are graded.
+ *
+ * @param id - Examination UUID
+ * @returns Promise resolving to updated examination
+ */
+export async function publishExamination(id: string): Promise<Examination> {
+  return api.post<Examination>(API_ENDPOINTS.EXAMS.PUBLISH(id));
+}
+
+
 // ─── Examination Status Management ────────────────────────────────────────────
 
 /**

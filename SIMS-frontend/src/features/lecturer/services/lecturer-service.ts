@@ -15,6 +15,7 @@ import {
   getExamination,
   createExamination,
   patchExamination,
+  publishExamination,
   deleteExamination,
 } from './examinations-api';
 import {
@@ -219,26 +220,32 @@ export const lecturerService = {
 
   /**
    * Toggle or transition exam status strictly enforcing Django lifecycle:
-   * DRAFT -> SCHEDULED -> ACTIVE -> CLOSED -> PUBLISHED
+   * DRAFT -> SCHEDULED -> ACTIVE -> CLOSED -> PUBLISHED (via publish endpoint)
    */
   async togglePublishExam(id: string): Promise<LecturerExam | null> {
     try {
       const current = await getExamination(id);
       if (!current) return null;
 
+      if (current.status === 'CLOSED') {
+        const published = await publishExamination(id);
+        return transformExamToUi(published);
+      }
+
       let nextStatus: Examination['status'] = 'SCHEDULED';
       if (current.status === 'DRAFT') nextStatus = 'SCHEDULED';
       else if (current.status === 'SCHEDULED') nextStatus = 'ACTIVE';
       else if (current.status === 'ACTIVE') nextStatus = 'CLOSED';
-      else if (current.status === 'CLOSED') nextStatus = 'PUBLISHED';
       else if (current.status === 'PUBLISHED') nextStatus = 'DRAFT';
 
       const updated = await patchExamination(id, { status: nextStatus });
       return transformExamToUi(updated);
-    } catch {
-      return null;
+    } catch (err: any) {
+      console.error('Failed to update/publish exam status:', err);
+      throw err;
     }
   },
+
 
   /**
    * Save (create or update) an examination and its questions to backend

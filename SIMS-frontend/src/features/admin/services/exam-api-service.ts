@@ -98,9 +98,14 @@ export const examApiService = {
     await api.post(API_ENDPOINTS.EXAMS.SCHEDULE(id), data);
   },
 
+  async publishExam(id: string): Promise<ApiExamination> {
+    return api.post<ApiExamination>(API_ENDPOINTS.EXAMS.PUBLISH(id));
+  },
+
   async deleteExam(id: string): Promise<void> {
     await api.delete(API_ENDPOINTS.EXAMS.BY_ID(id));
   },
+
 
   async getQuestions(): Promise<ApiQuestion[]> {
     return api.get<ApiQuestion[]>(API_ENDPOINTS.QUESTIONS.ROOT);

@@ -62,6 +62,7 @@ export const API_ENDPOINTS = {
     ACTIVE: '/api/v1/exams/active',
     BY_ID: (id: string) => `/api/v1/exams/${id}`,
     SCHEDULE: (id: string) => `/api/v1/exams/${id}/schedule`,
+    PUBLISH: (id: string) => `/api/v1/exams/${id}/publish`,
     START: (id: string) => `/api/v1/exams/${id}/start`,
     SUBMIT: (id: string) => `/api/v1/exams/${id}/submit`,
   },
@@ -159,6 +160,8 @@ export const API_ENDPOINTS = {
   ANALYTICS: {
     OVERVIEW: '/analytics/overview',
     EXAM: (id: string) => `/analytics/exams/${id}`,
+    EXAM_ANALYTICS: (id: string) => `/api/v1/analytics/exam/${id}`,
+    ADVISING: '/api/v1/analytics/advising',
     STUDENT: (id: string) => `/analytics/students/${id}`,
   },
 } as const;
