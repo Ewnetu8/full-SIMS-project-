@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -262,11 +263,19 @@ export function CollegeManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
+              <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>College Code</Label>
+                <Label htmlFor="code" required>
+                  College Code
+                </Label>
                 <Input
+                  id="code"
                   placeholder="e.g. COEE"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
@@ -277,8 +286,11 @@ export function CollegeManagement() {
               </div>
 
               <div>
-                <Label required>College Name</Label>
+                <Label htmlFor="name" required>
+                  College Name
+                </Label>
                 <Input
+                  id="name"
                   placeholder="e.g. College of Electrical & Mechanical Engineering"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -290,9 +302,12 @@ export function CollegeManagement() {
             </div>
 
             <div>
-              <Label required>University</Label>
+              <Label htmlFor="university" required>
+                University
+              </Label>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm"
+                id="university"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm text-foreground"
                 value={formData.university}
                 onChange={(e) => setFormData({ ...formData, university: e.target.value })}
                 disabled={isLoadingUniversities}
@@ -311,7 +326,7 @@ export function CollegeManagement() {
               </select>
               {fieldErrors.university && <p className="text-xs text-destructive mt-1">{fieldErrors.university}</p>}
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
