@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -256,10 +257,19 @@ export function AcademicYearManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
+              <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
+              </div>
+            )}
+
             <div>
-              <Label required>Display Label</Label>
+              <Label htmlFor="display_label" required>
+                Display Label
+              </Label>
               <Input
+                id="display_label"
                 placeholder="e.g. 2026/2027 Academic Year"
                 value={formData.display_label}
                 onChange={(e) => setFormData({ ...formData, display_label: e.target.value })}
@@ -271,8 +281,11 @@ export function AcademicYearManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>Start Boundary Date</Label>
+                <Label htmlFor="start_boundary" required>
+                  Start Boundary Date
+                </Label>
                 <Input
+                  id="start_boundary"
                   type="date"
                   value={formData.start_boundary}
                   onChange={(e) => setFormData({ ...formData, start_boundary: e.target.value })}
@@ -282,8 +295,11 @@ export function AcademicYearManagement() {
               </div>
 
               <div>
-                <Label required>End Boundary Date</Label>
+                <Label htmlFor="end_boundary" required>
+                  End Boundary Date
+                </Label>
                 <Input
+                  id="end_boundary"
                   type="date"
                   value={formData.end_boundary}
                   onChange={(e) => setFormData({ ...formData, end_boundary: e.target.value })}
@@ -292,7 +308,7 @@ export function AcademicYearManagement() {
                 {fieldErrors.end_boundary && <p className="text-xs text-destructive mt-1">{fieldErrors.end_boundary}</p>}
               </div>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
