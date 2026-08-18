@@ -21,6 +21,7 @@ from exams.serializers import (
     ExaminationSerializer,
     ExamScheduleSerializer,
     StudentAnswerSerializer,
+    StudentExaminationSerializer,
     StudentQuestionSerializer,
 )
 from exams.services import gradeability_errors
@@ -61,13 +62,17 @@ class ExaminationListView(APIView):
             .order_by("-created_at")
         )
         user_role = getattr(request.user, "role", None)
+        is_student = False
         if user_role == "LECTURER" and hasattr(request.user, "lecturer_profile"):
             queryset = queryset.filter(lecturer=request.user.lecturer_profile)
         elif user_role == "STUDENT" and hasattr(request.user, "student_profile"):
+            is_student = True
             student = request.user.student_profile
             queryset = queryset.filter(
                 course_offering__enrollments__student=student,
                 course_offering__enrollments__status=EnrollmentStatusChoices.ENROLLED,
+            ).exclude(
+                status__in=(ExamStatusChoices.DRAFT, ExamStatusChoices.SCHEDULED)
             ).distinct()
         status_filter = request.query_params.get("status")
         if status_filter:
@@ -75,7 +80,10 @@ class ExaminationListView(APIView):
         course_offering = request.query_params.get("course_offering")
         if course_offering:
             queryset = queryset.filter(course_offering_id=course_offering)
-        return Response(ExaminationSerializer(queryset, many=True).data)
+        serializer_class = (
+            StudentExaminationSerializer if is_student else ExaminationSerializer
+        )
+        return Response(serializer_class(queryset, many=True).data)
 
     @extend_schema(
         tags=["Examination"],
@@ -117,6 +125,11 @@ class ExaminationDetailView(APIView):
     @extend_schema(
         tags=["Examination"],
         summary="Retrieve examination",
+        description=(
+            "Students only see examinations for course offerings they are "
+            "enrolled in, with status ACTIVE/CLOSED/PUBLISHED, and never "
+            "receive the answer key (is_correct is omitted)."
+        ),
         responses={200: ExaminationSerializer},
     )
     def get(self, request, pk):
@@ -125,6 +138,26 @@ class ExaminationDetailView(APIView):
             return Response(
                 {"detail": "Examination not found."}, status=status.HTTP_404_NOT_FOUND
             )
+        user_role = getattr(request.user, "role", None)
+        if user_role == "STUDENT":
+            student = getattr(request.user, "student_profile", None)
+            enrolled = (
+                student is not None
+                and Enrollment.objects.filter(
+                    student=student,
+                    course_offering=obj.course_offering,
+                    status=EnrollmentStatusChoices.ENROLLED,
+                ).exists()
+            )
+            if not enrolled or obj.status in (
+                ExamStatusChoices.DRAFT,
+                ExamStatusChoices.SCHEDULED,
+            ):
+                return Response(
+                    {"detail": "Examination not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return Response(StudentExaminationSerializer(obj).data)
         return Response(ExaminationSerializer(obj).data)
 
     @extend_schema(
@@ -376,7 +409,7 @@ class StudentActiveExamsView(APIView):
             .distinct()
             .order_by("start_window")
         )
-        return Response(ExaminationSerializer(queryset, many=True).data)
+        return Response(StudentExaminationSerializer(queryset, many=True).data)
 
 
 class StartExamView(APIView):
@@ -501,6 +534,23 @@ class AutoSaveAnswerView(APIView):
                 {"detail": "This attempt has already been submitted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        now = timezone.now()
+        deadline_by_window = attempt.examination.end_window
+        deadline_by_duration = attempt.start_time + timezone.timedelta(
+            minutes=attempt.examination.duration_minutes
+        )
+        if now >= min(deadline_by_window, deadline_by_duration):
+            return Response(
+                {
+                    "detail": (
+                        "Auto-save rejected: the exam window or duration "
+                        "has expired. Answers can no longer be changed."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             question = Question.objects.get(
                 pk=question_pk, examination=attempt.examination
