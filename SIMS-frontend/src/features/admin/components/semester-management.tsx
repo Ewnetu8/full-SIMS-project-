@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -259,11 +260,20 @@ export function SemesterManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
+              <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>Academic Year</Label>
+                <Label htmlFor="academicYear" required>
+                  Academic Year
+                </Label>
                 <Input
+                  id="academicYear"
                   placeholder="e.g. 2025/2026"
                   value={formData.academicYear}
                   onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
@@ -274,12 +284,14 @@ export function SemesterManagement() {
               </div>
 
               <div>
-                <Label required>Semester Term</Label>
+                <Label htmlFor="semesterIndex" required>
+                  Semester Term
+                </Label>
                 <Select
                   value={formData.semesterIndex}
                   onValueChange={(val: any) => setFormData({ ...formData, semesterIndex: val })}
                 >
-                  <SelectTrigger className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
+                  <SelectTrigger id="semesterIndex" className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -290,7 +302,7 @@ export function SemesterManagement() {
                 {fieldErrors.semester_index && <p className="text-xs text-destructive mt-1">{fieldErrors.semester_index}</p>}
               </div>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
