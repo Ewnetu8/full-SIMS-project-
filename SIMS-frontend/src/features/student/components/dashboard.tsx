@@ -172,8 +172,9 @@ export function StudentDashboard() {
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-foreground">{exam.title}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {courseCode} · {courseTitle}
+                      <p className="mt-1.5 text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{courseCode}</span>
+                        <span>· {courseTitle}</span>
                       </p>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
@@ -283,11 +284,12 @@ export function StudentDashboard() {
                         <p className="font-semibold text-foreground">
                           {course?.title || 'Enrolled Course'}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {course?.course_code || 'CODE'} · {course?.credit_hours || 0} credit hrs · Section {offering?.section || 'A'}
+                        <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{course?.course_code || 'CODE'}</span>
+                          <span>· {course?.credit_hours || 0} credit hrs · Section {offering?.section || 'A'}</span>
                         </p>
                       </div>
-                      <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
+                      <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary">
                         {enrollment.status}
                       </span>
                     </div>

@@ -181,3 +181,13 @@ export interface StudentProfile {
   program: string;
   yearOfStudy: string;
 }
+
+export interface AcademicProfileDetails {
+  studentId: string | null;
+  department: string | null;
+  college: string | null;
+  program: string | null;
+  academicYear: string | null;
+  classStanding: string | null;
+  totalEnrolledCourses: number;
+}

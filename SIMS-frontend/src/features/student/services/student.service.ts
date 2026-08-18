@@ -16,6 +16,7 @@ import type {
   Notification,
   NotificationMarkRead,
   NotificationMarkReadRequest,
+  AcademicProfileDetails,
 } from '../types/student.types';
 
 export const studentService = {
@@ -148,14 +149,76 @@ export const studentService = {
   },
 
   /**
-   * Helper to get initial student profile details.
+   * Aggregates real academic profile details from backend endpoints.
    */
-  getProfile: () => ({
-    fullName: 'Amina Njeri',
-    studentId: 'ETS0001/16',
-    email: 'student@sims.com',
-    department: 'Software Engineering & AI',
-    program: 'B.Sc. in Software Engineering',
-    yearOfStudy: 'Year 2 (Sophomore)',
-  }),
+  getAcademicProfileDetails: async (): Promise<AcademicProfileDetails> => {
+    try {
+      const enrollments = await studentService.getEnrollments();
+      
+      let studentId: string | null = null;
+      let department: string | null = null;
+      let college: string | null = null;
+      let program: string | null = null;
+      let academicYear: string | null = null;
+      let classStanding: string | null = null;
+
+      if (enrollments.length > 0) {
+        const first = enrollments[0];
+        if (first) {
+          if (first.student) {
+            studentId = first.student;
+          }
+          const offering = first.course_offering_detail;
+          if (offering) {
+          const course = offering.course_detail;
+          if (course) {
+            if (course.intended_class_standing) {
+              classStanding = course.intended_class_standing;
+            }
+            const prog = course.program_detail;
+            if (prog) {
+              program = prog.name ? `${prog.name}${prog.code ? ` (${prog.code})` : ''}` : prog.code || null;
+              const dept = prog.department_detail;
+              if (dept) {
+                department = dept.name ? `${dept.name}${dept.code ? ` (${dept.code})` : ''}` : dept.code || null;
+                if (typeof dept.college === 'string') {
+                  college = dept.college;
+                }
+              }
+            }
+          }
+          const semester = offering.semester_detail;
+          if (semester) {
+            const yearObj = semester.academic_year_detail;
+            if (yearObj?.display_label) {
+              academicYear = yearObj.display_label;
+            } else if (semester.academic_year) {
+              academicYear = semester.academic_year;
+            }
+          }
+        }
+      }
+    }
+
+      return {
+        studentId,
+        department,
+        college,
+        program,
+        academicYear,
+        classStanding,
+        totalEnrolledCourses: enrollments.length,
+      };
+    } catch {
+      return {
+        studentId: null,
+        department: null,
+        college: null,
+        program: null,
+        academicYear: null,
+        classStanding: null,
+        totalEnrolledCourses: 0,
+      };
+    }
+  },
 };

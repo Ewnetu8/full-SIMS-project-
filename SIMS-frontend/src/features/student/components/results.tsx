@@ -75,17 +75,17 @@ export function ResultsPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs font-semibold text-primary">
+                      <span className="inline-block font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded">
                         {course?.course_code || 'CODE'}
-                      </p>
-                      <CardTitle className="mt-1">{course?.title || 'Enrolled Course'}</CardTitle>
+                      </span>
+                      <CardTitle className="mt-2">{course?.title || 'Enrolled Course'}</CardTitle>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Section {offering?.section || 'A'} · {course?.credit_hours || 0} Credit Hrs
                       </p>
                     </div>
                     <div className="text-right">
                       {grade ? (
-                        <p className="text-2xl font-bold text-success">{grade}</p>
+                        <p className="text-2xl font-mono font-bold text-success">{grade}</p>
                       ) : (
                         <Badge
                           variant={
@@ -169,7 +169,7 @@ export function ResultDetails({ resultId }: { resultId: string }) {
             <CardTitle>Course Grade & Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-center">
-            <p className="text-5xl font-bold text-success">{enrollment.grade || 'N/A'}</p>
+            <p className="text-5xl font-mono font-bold text-success">{enrollment.grade || 'N/A'}</p>
             <p className="text-base font-semibold text-foreground">
               Official Status: {enrollment.status}
             </p>
@@ -190,15 +190,15 @@ export function ResultDetails({ resultId }: { resultId: string }) {
             </div>
             <div className="flex justify-between border-b py-2">
               <span className="text-muted-foreground">Course Code:</span>
-              <span className="font-medium">{course?.course_code || 'N/A'}</span>
+              <span className="font-mono text-xs font-bold text-primary">{course?.course_code || 'N/A'}</span>
             </div>
             <div className="flex justify-between border-b py-2">
               <span className="text-muted-foreground">Credit Hours:</span>
-              <span className="font-medium">{course?.credit_hours || 'N/A'}</span>
+              <span className="font-mono text-xs font-semibold">{course?.credit_hours || 'N/A'}</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-muted-foreground">Section:</span>
-              <span className="font-medium">Section {offering?.section || 'A'}</span>
+              <span className="font-mono text-xs font-semibold">Section {offering?.section || 'A'}</span>
             </div>
           </CardContent>
         </Card>
