@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -339,7 +340,7 @@ export function ProgramManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
             {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
               <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
                 {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
@@ -348,9 +349,12 @@ export function ProgramManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>College</Label>
+                <Label htmlFor="college" required>
+                  College
+                </Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] mt-1.5 transition-all shadow-sm"
+                  id="college"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] mt-1.5 transition-all shadow-sm text-foreground"
                   value={formData.collegeId}
                   onChange={(e) => {
                     const newCollegeId = e.target.value;
@@ -372,9 +376,12 @@ export function ProgramManagement() {
               </div>
 
               <div>
-                <Label required>Department</Label>
+                <Label htmlFor="department" required>
+                  Department
+                </Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm"
+                  id="department"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm text-foreground"
                   value={formData.departmentId}
                   onChange={(e) => setFormData((prev) => ({ ...prev, departmentId: e.target.value }))}
                   disabled={!formData.collegeId}
@@ -400,8 +407,11 @@ export function ProgramManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>Program Code</Label>
+                <Label htmlFor="code" required>
+                  Program Code
+                </Label>
                 <Input
+                  id="code"
                   placeholder="e.g. BS-CS"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
@@ -412,8 +422,11 @@ export function ProgramManagement() {
               </div>
 
               <div>
-                <Label required>Program Name</Label>
+                <Label htmlFor="name" required>
+                  Program Name
+                </Label>
                 <Input
+                  id="name"
                   placeholder="e.g. B.Sc. in Computer Science"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -424,12 +437,14 @@ export function ProgramManagement() {
               </div>
 
               <div>
-                <Label required>Degree Level</Label>
+                <Label htmlFor="degreeLevel" required>
+                  Degree Level
+                </Label>
                 <Select
                   value={formData.degreeLevel}
                   onValueChange={(val: any) => setFormData({ ...formData, degreeLevel: val })}
                 >
-                  <SelectTrigger className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
+                  <SelectTrigger id="degreeLevel" className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -444,8 +459,11 @@ export function ProgramManagement() {
               </div>
 
               <div>
-                <Label required>Total Credit Hours</Label>
+                <Label htmlFor="totalCreditHoursRequired" required>
+                  Total Credit Hours
+                </Label>
                 <Input
+                  id="totalCreditHoursRequired"
                   type="number"
                   min={0}
                   value={formData.totalCreditHoursRequired}
@@ -457,7 +475,7 @@ export function ProgramManagement() {
                 )}
               </div>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
