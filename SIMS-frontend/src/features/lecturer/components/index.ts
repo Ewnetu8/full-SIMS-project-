@@ -8,3 +8,6 @@ export * from './submissions-list';
 export * from './lecturer-analytics';
 export * from './lecturer-notifications';
 export * from './exam-wizard/exam-wizard';
+export * from './lecturer-profile';
+export * from './lecturer-settings';
+

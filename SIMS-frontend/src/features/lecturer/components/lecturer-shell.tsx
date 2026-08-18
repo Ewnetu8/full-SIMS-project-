@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   PlusCircle,
+  Settings,
   UserRound,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -31,6 +32,7 @@ const lecturerNavigation: NavItem[] = [
   { label: 'Class Analytics', href: ROUTES.LECTURER.ANALYTICS, icon: <ChartColumn className="h-4 w-4" /> },
   { label: 'Notifications', href: ROUTES.LECTURER.NOTIFICATIONS, icon: <Bell className="h-4 w-4" /> },
   { label: 'My Profile', href: ROUTES.LECTURER.PROFILE, icon: <UserRound className="h-4 w-4" /> },
+  { label: 'Settings', href: ROUTES.LECTURER.SETTINGS, icon: <Settings className="h-4 w-4" /> },
 ];
 
 export function LecturerShell({ children }: { children: React.ReactNode }) {

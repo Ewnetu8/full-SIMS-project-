@@ -9,6 +9,7 @@ import {
   listCourseOfferings,
   getCourseOffering,
   listEnrollments,
+  listDepartments,
 } from './academic-api';
 import {
   listExaminations,
@@ -444,5 +445,57 @@ export const lecturerService = {
       end_window: endWindow,
       duration_minutes: durationMinutes,
     });
+  },
+
+  /**
+   * Get academic profile details for the authenticated lecturer from real backend endpoints
+   */
+  async getProfileDetails(): Promise<{
+    departmentName?: string;
+    collegeName?: string;
+    assignedCoursesCount: number;
+    totalStudentsCount: number;
+    activeExamsCount: number;
+    courses: Course[];
+  }> {
+    try {
+      const [courses, stats] = await Promise.all([
+        this.getCourses(),
+        this.getStats(),
+      ]);
+
+      let departmentName: string | undefined = undefined;
+      let collegeName: string | undefined = undefined;
+
+      try {
+        const departments = await listDepartments();
+        if (departments.length > 0 && departments[0]) {
+          departmentName = departments[0].name;
+          const college = departments[0].college_detail;
+          if (college && typeof college === 'object' && 'name' in college && college.name) {
+            collegeName = college.name;
+          }
+        }
+      } catch {
+        // Silently ignore if department list fails or requires admin scope
+      }
+
+      return {
+        departmentName,
+        collegeName,
+        assignedCoursesCount: courses.length,
+        totalStudentsCount: stats.totalStudents,
+        activeExamsCount: stats.activeExams,
+        courses,
+      };
+    } catch (err) {
+      console.error('Error fetching lecturer profile details:', err);
+      return {
+        assignedCoursesCount: 0,
+        totalStudentsCount: 0,
+        activeExamsCount: 0,
+        courses: [],
+      };
+    }
   },
 };
