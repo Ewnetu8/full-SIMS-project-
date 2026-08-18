@@ -52,3 +52,48 @@ export interface PaginationParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
+
+// ─── Analytics Types ─────────────────────────────────────────────────────────
+
+export interface ScoreSummary {
+  mean: number | null;
+  median: number | null;
+  stddev: number | null;
+  min: number | null;
+  max: number | null;
+}
+
+export interface QuestionAnalytics {
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  total_points: string;
+  correct_count: number;
+  attempts: number;
+  correct_rate: number | null;
+}
+
+export interface ExamAnalyticsResponse {
+  exam_id: string;
+  title: string;
+  status: string;
+  attempt_count: number;
+  graded_count: number;
+  score: ScoreSummary;
+  per_question: QuestionAnalytics[];
+}
+
+export interface AdvisingStudent {
+  student_id: string;
+  student_identifier: string;
+  class_standing: string;
+  enrolled_credit_hours: number;
+  min_credit_hours: number;
+}
+
+export interface AdvisingReportResponse {
+  semester_id: string;
+  semester_label: string;
+  students: AdvisingStudent[];
+}
+
