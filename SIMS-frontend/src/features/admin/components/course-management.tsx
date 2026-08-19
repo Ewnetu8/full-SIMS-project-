@@ -11,7 +11,7 @@ import * as React from 'react';
 
 import { toast } from '@/components/feedback';
 import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
-import { CollegeDepartmentSelect, Label } from '@/components/forms';
+import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -29,7 +29,6 @@ import {
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
-import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { Course } from '../types';
 
@@ -64,6 +63,20 @@ export function CourseManagement() {
   const [editingCourse, setEditingCourse] = React.useState<Course | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [courseCollegeFilter, setCourseCollegeFilter] = React.useState<string>('ALL');
+
+  const filteredDepartments = React.useMemo(() => {
+    if (!courseCollegeFilter || courseCollegeFilter === 'ALL') return departments;
+    return departments.filter(
+      (d) =>
+        d.college === courseCollegeFilter ||
+        (colleges.find((c) => c.name === courseCollegeFilter || c.code === courseCollegeFilter)?.id === d.college)
+    );
+  }, [departments, colleges, courseCollegeFilter]);
+
+  const formAvailableDepartments = React.useMemo(() => {
+    if (!courseCollegeFilter) return departments;
+    return departments;
+  }, [departments, courseCollegeFilter]);
 
   const [formData, setFormData] = React.useState({
     code: '',
@@ -232,9 +245,9 @@ export function CourseManagement() {
               }}
             >
               <option value="ALL">All Colleges</option>
-              {COLLEGES.map((col) => (
-                <option key={col} value={col}>
-                  {col}
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
                 </option>
               ))}
             </select>
@@ -247,9 +260,9 @@ export function CourseManagement() {
               onChange={(e) => setCourseDeptFilter(e.target.value)}
             >
               <option value="ALL">All Academic Departments</option>
-              {getDepartmentsByCollege(courseCollegeFilter).map((d) => (
+              {filteredDepartments.map((d) => (
                 <option key={d.id} value={d.name}>
-                  {d.name}
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>
@@ -268,7 +281,6 @@ export function CourseManagement() {
                 <th className="px-4 py-3.5">Credits</th>
                 <th className="px-4 py-3.5">Department</th>
                 <th className="px-4 py-3.5">Assigned Lecturer</th>
-                <th className="px-4 py-3.5">Enrolled</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
@@ -276,39 +288,42 @@ export function CourseManagement() {
             <tbody className="divide-y divide-border">
               {filteredCourses.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No courses match the specified filter conditions.
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No courses match the current filters.
                   </td>
                 </tr>
               ) : (
                 filteredCourses.map((crs) => (
                   <tr key={crs.id} className="hover:bg-accent/40 transition-colors">
-                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-success">{crs.code}</td>
-                    <td className="px-4 py-3.5 font-semibold text-foreground">{crs.name}</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{crs.creditHours} Hrs</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{crs.department}</td>
-                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{crs.assignedLecturer?.name || 'Unassigned'}</td>
-                    <td className="px-4 py-3.5 text-xs font-semibold text-foreground">{crs.studentCount} Students</td>
+                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">{crs.code}</td>
+                    <td className="px-4 py-3.5 text-xs font-medium text-foreground">{crs.name}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground font-mono">{crs.creditHours} Cr.</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{crs.department}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{crs.assignedLecturer?.name || '—'}</td>
                     <td className="px-4 py-3.5">
-                      <Badge variant={crs.status === 'active' ? 'success' : 'secondary'} className="capitalize">
+                      <Badge variant={crs.status === 'active' ? 'success' : 'secondary'} className="text-[11px]">
                         {crs.status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-right space-x-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleOpenEditModal(crs)}>
-                        <Edit2 className="h-4 w-4 mr-1" /> Edit
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleToggleArchive(crs)}>
-                        {crs.status === 'active' ? (
-                          <>
-                            <Archive className="h-4 w-4 mr-1 text-accent" /> Archive
-                          </>
-                        ) : (
-                          <>
-                            <RotateCcw className="h-4 w-4 mr-1 text-success" /> Restore
-                          </>
-                        )}
-                      </Button>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => handleOpenEditModal(crs)}
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-7 w-7 p-0 ${crs.status === 'active' ? 'text-destructive' : 'text-success'}`}
+                          onClick={() => handleToggleArchive(crs)}
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -318,9 +333,9 @@ export function CourseManagement() {
         </div>
       </Card>
 
-      {/* Add / Edit Course Modal */}
+      {/* Add / Edit Course Dialog */}
       <Dialog
-        open={isAddModalOpen || !!editingCourse}
+        open={isAddModalOpen}
         onOpenChange={(open) => {
           if (!open) {
             setIsAddModalOpen(false);
@@ -328,15 +343,15 @@ export function CourseManagement() {
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl text-[#102A7A] dark:text-foreground font-bold">
-              {editingCourse ? 'Edit Course Details' : 'Create New Course'}
+              {editingCourse ? 'Edit Course Offering' : 'Register New Course Offering'}
             </DialogTitle>
             <DialogDescription>
               {editingCourse
-                ? 'Update course details, title, code, and credit allocation.'
-                : 'Create a new course offering for the academic catalog.'}
+                ? 'Modify the course curriculum metadata, credits, and prerequisites.'
+                : 'Add a new academic course offering into the university curriculum registry.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -350,11 +365,10 @@ export function CourseManagement() {
                   id="crsCode"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g. CS301"
-                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                  placeholder="e.g. SE4201"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50 font-mono"
                   maxLength={20}
                 />
-                {fieldErrors.course_code && <p className="text-xs text-destructive mt-1">{fieldErrors.course_code}</p>}
                 {fieldErrors.code && <p className="text-xs text-destructive mt-1">{fieldErrors.code}</p>}
               </div>
 
@@ -374,14 +388,27 @@ export function CourseManagement() {
               </div>
             </div>
 
-            <CollegeDepartmentSelect
-              collegeValue={formData.collegeId}
-              onCollegeChange={(colId) => setFormData((prev) => ({ ...prev, collegeId: colId }))}
-              departmentValue={formData.departmentId}
-              onDepartmentChange={(deptId) => setFormData((prev) => ({ ...prev, departmentId: deptId }))}
-            />
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <Label htmlFor="courseDepartment" required>
+                  Department
+                </Label>
+                <select
+                  id="courseDepartment"
+                  className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                  value={formData.departmentId}
+                  onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                >
+                  <option value="">-- Select Department --</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name} ({dept.code})
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.department && <p className="text-xs text-destructive mt-1">{fieldErrors.department}</p>}
+              </div>
+
               <div>
                 <Label htmlFor="programId">Program (Optional)</Label>
                 <select
@@ -399,7 +426,9 @@ export function CourseManagement() {
                 </select>
                 {fieldErrors.program && <p className="text-xs text-destructive mt-1">{fieldErrors.program}</p>}
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <Label htmlFor="classStanding">Intended Class Standing</Label>
                 <select

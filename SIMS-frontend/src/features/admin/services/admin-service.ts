@@ -1,9 +1,9 @@
-import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
-import { useAuthStore } from '@/features/auth/store';
+import { isValidUuid } from '@/lib/user-identifier';
+import { api } from '@/services/api-client';
+
 import { academicService } from './academic-service';
 import { examApiService } from './exam-api-service';
-import { saveUserIdentifier, isValidUuid } from '@/lib/user-identifier';
 
 import type {
   AdminUser,
@@ -34,61 +34,47 @@ export interface RegisterUserPayload {
   department_id?: string | null;
 }
 
-const REGISTERED_USERS_KEY = 'sims_registered_users';
-
-function loadCachedRegisteredUsers(): AdminUser[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(REGISTERED_USERS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCachedRegisteredUsers(users: AdminUser[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
-  } catch {}
-}
-
-// In-memory store for newly registered users during session, initialized from storage
-const registeredUsersCache: AdminUser[] = loadCachedRegisteredUsers();
-
 export const adminService = {
   // ─── Users ─────────────────────────────────────────────────────────────────
   async getUsers(): Promise<AdminUser[]> {
-    const list: AdminUser[] = [];
-    const authUser = useAuthStore.getState().user;
-
-    if (authUser) {
-      const currentUser: AdminUser = {
-        id: authUser.id,
-        userId: authUser.studentIdentifier || authUser.facultyIdentifier || authUser.id,
-        firstName: authUser.firstName || 'User',
-        lastName: authUser.lastName || '',
-        email: authUser.email,
-        role: (authUser.role ? authUser.role.toLowerCase() : 'admin') as any,
-        department: '—',
-        status: 'active',
-        lastLogin: 'Active session',
-        studentIdentifier: authUser.studentIdentifier,
-        facultyIdentifier: authUser.facultyIdentifier,
-        createdAt: authUser.createdAt || new Date().toISOString(),
-      };
-      list.push(currentUser);
-    }
-
-    list.push(...registeredUsersCache);
-
-    const unique = Array.from(new Map(list.map((u) => [u.id, u])).values());
-    return unique;
+    const raw = await api.get<any>(API_ENDPOINTS.USERS.ROOT);
+    const list: any[] = Array.isArray(raw) ? raw : raw?.results || (raw?.users ? raw.users : []);
+    return list.map((u: any) => ({
+      id: u.id || '',
+      userId: u.student_identifier || u.faculty_identifier || u.studentIdentifier || u.facultyIdentifier || u.userId || u.id,
+      firstName: u.first_name || u.firstName || '',
+      lastName: u.last_name || u.lastName || '',
+      email: u.email || '',
+      role: (u.role ? String(u.role).toLowerCase() : 'student') as any,
+      department: u.department_name || u.department?.name || u.department || 'Not assigned',
+      status: u.is_active === false || u.status === 'inactive' ? 'inactive' : 'active',
+      lastLogin: u.last_login ? new Date(u.last_login).toLocaleString() : 'Never',
+      studentIdentifier: u.student_identifier || u.studentIdentifier,
+      facultyIdentifier: u.faculty_identifier || u.facultyIdentifier,
+      createdAt: u.created_at || u.createdAt || new Date().toISOString(),
+    }));
   },
 
   async getUserById(id: string): Promise<AdminUser | null> {
-    const users = await this.getUsers();
-    return users.find((u) => u.id === id) || null;
+    try {
+      const u = await api.get<any>(API_ENDPOINTS.USERS.BY_ID(id));
+      return {
+        id: u.id || id,
+        userId: u.student_identifier || u.faculty_identifier || u.studentIdentifier || u.facultyIdentifier || u.userId || u.id,
+        firstName: u.first_name || u.firstName || '',
+        lastName: u.last_name || u.lastName || '',
+        email: u.email || '',
+        role: (u.role ? String(u.role).toLowerCase() : 'student') as any,
+        department: u.department_name || u.department?.name || u.department || 'Not assigned',
+        status: u.is_active === false || u.status === 'inactive' ? 'inactive' : 'active',
+        lastLogin: u.last_login ? new Date(u.last_login).toLocaleString() : 'Never',
+        studentIdentifier: u.student_identifier || u.studentIdentifier,
+        facultyIdentifier: u.faculty_identifier || u.facultyIdentifier,
+        createdAt: u.created_at || u.createdAt || new Date().toISOString(),
+      };
+    } catch {
+      return null;
+    }
   },
 
   async createUser(data: RegisterUserPayload): Promise<AdminUser> {
@@ -132,7 +118,7 @@ export const adminService = {
       const displayUserId = studentId || facultyId || registeredUser.id;
 
       const newUser: AdminUser = {
-        id: registeredUser.id || `usr-${Date.now()}`,
+        id: registeredUser.id,
         userId: displayUserId,
         firstName: registeredUser.first_name || data.first_name,
         lastName: registeredUser.last_name || data.last_name,
@@ -146,19 +132,6 @@ export const adminService = {
         createdAt: registeredUser.created_at || new Date().toISOString(),
       };
 
-      // Persist student/faculty identifier mapping
-      if (newUser.email) {
-        saveUserIdentifier({
-          email: newUser.email,
-          id: registeredUser.id,
-          studentIdentifier: studentId,
-          facultyIdentifier: facultyId,
-          role: newUser.role,
-        });
-      }
-
-      registeredUsersCache.unshift(newUser);
-      saveCachedRegisteredUsers(registeredUsersCache);
       return newUser;
     } catch (error: any) {
       throw error;
@@ -166,23 +139,18 @@ export const adminService = {
   },
 
   async updateUser(id: string, data: Partial<AdminUser>): Promise<AdminUser> {
-    const index = registeredUsersCache.findIndex((u) => u.id === id);
-    if (index !== -1) {
-      registeredUsersCache[index] = { ...registeredUsersCache[index]!, ...data };
-      saveCachedRegisteredUsers(registeredUsersCache);
-      return registeredUsersCache[index]!;
-    }
+    const res = await api.patch<any>(API_ENDPOINTS.USERS.BY_ID(id), data);
     return {
-      id,
-      userId: data.userId || id,
-      firstName: data.firstName || '',
-      lastName: data.lastName || '',
-      email: data.email || '',
-      role: data.role || 'student',
-      department: data.department || '',
-      status: data.status || 'active',
-      lastLogin: 'Never',
-      createdAt: new Date().toISOString(),
+      id: res?.id || id,
+      userId: res?.student_identifier || res?.faculty_identifier || data.userId || id,
+      firstName: res?.first_name || data.firstName || '',
+      lastName: res?.last_name || data.lastName || '',
+      email: res?.email || data.email || '',
+      role: (res?.role ? String(res.role).toLowerCase() : data.role || 'student') as any,
+      department: res?.department || data.department || '',
+      status: res?.is_active === false || data.status === 'inactive' ? 'inactive' : 'active',
+      lastLogin: res?.last_login ? new Date(res.last_login).toLocaleString() : (data.lastLogin || 'Never'),
+      createdAt: res?.created_at || data.createdAt || new Date().toISOString(),
     };
   },
 
@@ -191,11 +159,7 @@ export const adminService = {
   },
 
   async deleteUser(id: string): Promise<void> {
-    const index = registeredUsersCache.findIndex((u) => u.id === id);
-    if (index !== -1) {
-      registeredUsersCache.splice(index, 1);
-      saveCachedRegisteredUsers(registeredUsersCache);
-    }
+    await api.delete(API_ENDPOINTS.USERS.BY_ID(id));
   },
 
   // ─── Colleges ───────────────────────────────────────────────────────────────
@@ -399,17 +363,17 @@ export const adminService = {
       const data = await api.get<any>(API_ENDPOINTS.ENROLLMENTS.ROOT).catch(() => []);
       const list = Array.isArray(data) ? data : data?.results || [];
       return list.map((e: any) => ({
-        id: e.id || String(Math.random()),
-        studentId: e.student_id || e.student_detail?.student_id || 'STD-000',
-        firstName: e.student_detail?.first_name || e.student_name?.split(' ')[0] || 'Student',
-        lastName: e.student_detail?.last_name || e.student_name?.split(' ')[1] || '',
-        email: e.student_detail?.email || e.email || 'student@aastu.edu.et',
-        department: e.course_offering_detail?.department || 'Engineering',
-        program: e.program || 'B.Sc.',
-        gpa: e.gpa || 3.5,
-        academicYear: e.academic_year || 'Year 2',
+        id: e.id,
+        studentId: e.student_id || e.student_detail?.student_id || e.student || 'Not assigned',
+        firstName: e.student_detail?.first_name || (e.student_name ? e.student_name.split(' ')[0] : 'Student'),
+        lastName: e.student_detail?.last_name || (e.student_name ? e.student_name.split(' ').slice(1).join(' ') : ''),
+        email: e.student_detail?.email || e.student_email || '—',
+        department: e.course_offering_detail?.course_detail?.program_detail?.department_detail?.name || e.course_offering_detail?.department || 'Not assigned',
+        program: e.course_offering_detail?.course_detail?.program_detail?.name || '—',
+        gpa: e.gpa ?? 0,
+        academicYear: e.course_offering_detail?.semester_detail?.academic_year_detail?.display_label || '—',
         enrolledCoursesCount: 1,
-        status: 'active',
+        status: e.status === 'ENROLLED' ? 'active' : (e.status ? e.status.toLowerCase() : 'active'),
       }));
     } catch {
       return [];
@@ -424,23 +388,13 @@ export const adminService = {
     });
   },
 
+  /**
+   * Returns lecturer profiles.
+   * Currently, the backend does not provide a dedicated lecturer directory endpoint.
+   * Returns empty array to prevent displaying fabricated mock data.
+   */
   async getLecturers(): Promise<LecturerProfile[]> {
-    try {
-      const raw = await api.get<any[]>(API_ENDPOINTS.ACADEMICS.COURSE_OFFERINGS).catch(() => []);
-      return raw.map((co) => ({
-        id: co.id,
-        lecturerId: `LEC-${co.id.slice(0, 6)}`,
-        firstName: 'Faculty',
-        lastName: 'Member',
-        email: `faculty.${co.id.slice(0, 4)}@aastu.edu.et`,
-        department: 'Academic Dept',
-        office: 'Block 201',
-        coursesAssigned: [co.course_detail?.course_code || 'Course'],
-        status: 'active',
-      }));
-    } catch {
-      return [];
-    }
+    return [];
   },
 
   // ─── AI Jobs, Settings, Reports, Notifications ────────────────────────────
@@ -448,18 +402,8 @@ export const adminService = {
     return [];
   },
 
-  async retryAIGradingJob(jobId: string): Promise<AIGradingJob> {
-    return {
-      id: jobId,
-      examId: 'exam-1',
-      examTitle: 'Examination',
-      courseName: 'Course',
-      department: 'Engineering',
-      status: 'processing',
-      totalSubmissions: 0,
-      processedSubmissions: 0,
-      startedAt: new Date().toLocaleString(),
-    };
+  async retryAIGradingJob(_jobId: string): Promise<AIGradingJob | null> {
+    return null;
   },
 
   async getAuditLogs(): Promise<AuditLog[]> {
@@ -524,19 +468,19 @@ export const adminService = {
     return {
       totalStudents: students.length,
       totalLecturers: lecturers.length,
-      totalAdministrators: users.filter((u) => u.role === 'admin').length || (users.length > 0 ? users.length : 1),
+      totalAdministrators: users.filter((u) => u.role === 'admin').length,
       totalCourses: courses.length,
       totalDepartments: departments.length,
       totalExams: exams.length,
-      activeExams: exams.filter((e) => e.status === 'active').length,
+      activeExams: exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length,
       pendingAIGrading: 0,
       publishedResults: exams.filter((e) => e.status === 'published').length,
       systemHealth: {
         status: 'healthy',
-        cpuUsage: 12,
-        memoryUsage: 35,
-        activeDbConnections: 6,
-        apiLatencyMs: 28,
+        cpuUsage: 0,
+        memoryUsage: 0,
+        activeDbConnections: 0,
+        apiLatencyMs: 0,
         aiEngineStatus: 'online',
         lastBackupTimestamp: new Date().toISOString(),
       },

@@ -31,7 +31,6 @@ import {
 
 import { adminService } from '../services/admin-service';
 import { useAdminStore } from '../store';
-import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { StudentProfile } from '../types';
 
@@ -39,6 +38,7 @@ export function StudentManagement() {
   const {
     students,
     departments,
+    colleges,
     studentSearchQuery,
     studentDeptFilter,
     fetchStudents,
@@ -52,7 +52,17 @@ export function StudentManagement() {
 
   const [selectedStudent, setSelectedStudent] = React.useState<StudentProfile | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [studentCollegeFilter, setStudentCollegeFilter] = React.useState<string>('ALL');
   const itemsPerPage = 5;
+
+  const filteredDepartments = React.useMemo(() => {
+    if (!studentCollegeFilter || studentCollegeFilter === 'ALL') return departments;
+    return departments.filter(
+      (d) =>
+        d.college === studentCollegeFilter ||
+        (colleges.find((c) => c.name === studentCollegeFilter || c.code === studentCollegeFilter)?.id === d.college)
+    );
+  }, [departments, colleges, studentCollegeFilter]);
 
   const filteredStudents = students.filter((s) => {
     const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
@@ -95,8 +105,6 @@ export function StudentManagement() {
       setIsImporting(false);
     }
   };
-
-  const [studentCollegeFilter, setStudentCollegeFilter] = React.useState<string>('ALL');
 
   return (
     <div className="space-y-6">
@@ -141,9 +149,9 @@ export function StudentManagement() {
               }}
             >
               <option value="ALL">All Colleges</option>
-              {COLLEGES.map((col) => (
-                <option key={col} value={col}>
-                  {col}
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
                 </option>
               ))}
             </select>
@@ -159,9 +167,9 @@ export function StudentManagement() {
               }}
             >
               <option value="ALL">All Academic Departments</option>
-              {getDepartmentsByCollege(studentCollegeFilter).map((d) => (
+              {filteredDepartments.map((d) => (
                 <option key={d.id} value={d.name}>
-                  {d.name}
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>

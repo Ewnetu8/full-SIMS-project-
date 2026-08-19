@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { adminService, type RegisterUserPayload } from '../services/admin-service';
+
 import { getUserFriendlyErrorMessage } from '@/lib/errors';
+import { adminService, type RegisterUserPayload } from '../services/admin-service';
 
 import type {
   AdminUser,
@@ -283,7 +284,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     try {
       const users = await adminService.getUsers();
       set({ users, isLoadingUsers: false, usersError: null });
-    } catch (err: any) {
+    } catch (err: unknown) {
       set({ users: [], isLoadingUsers: false, usersError: getUserFriendlyErrorMessage(err) });
     }
   },
@@ -317,7 +318,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     try {
       const departments = await adminService.getDepartments();
       set({ departments, isLoadingDepartments: false, departmentsError: null });
-    } catch (err: any) {
+    } catch (err: unknown) {
       set({ departments: [], isLoadingDepartments: false, departmentsError: getUserFriendlyErrorMessage(err) });
     }
   },
@@ -376,23 +377,19 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   setUsers: (users) => set({ users }),
   addUser: async (payload) => {
     const newUser = await adminService.createUser(payload);
-    set((state) => ({ users: [newUser, ...state.users] }));
+    await get().fetchUsers();
     return newUser;
   },
 
   updateUser: async (id, data) => {
     const updated = await adminService.updateUser(id, data);
-    set((state) => ({
-      users: state.users.map((u) => (u.id === id ? updated : u)),
-    }));
+    await get().fetchUsers();
     return updated;
   },
 
   deleteUser: async (id) => {
     await adminService.deleteUser(id);
-    set((state) => ({
-      users: state.users.filter((u) => u.id !== id),
-    }));
+    await get().fetchUsers();
   },
 
   setUserSearchQuery: (userSearchQuery) => set({ userSearchQuery }),

@@ -106,26 +106,16 @@ export function ProgramManagement() {
   }, [colleges, departments]);
 
   const availableDepartments = React.useMemo(() => {
-    if (!formData.collegeId) return [];
+    if (!formData.collegeId) return departments;
 
-    const selectedCollege = colleges.find((c) => c.id === formData.collegeId);
-    const colCode = (selectedCollege?.code || (formData.collegeId === 'col-coe-001' ? 'COE' : formData.collegeId === 'col-coas-002' ? 'COAS' : '')).toUpperCase();
-
-    const coeCodes = ['CHE', 'EME', 'ECE', 'CE', 'ENV', 'SE', 'MNE', 'ME'];
-    const coasCodes = ['FN', 'BT', 'IND', 'GL'];
-
-    const targetCodes = colCode === 'COE' ? coeCodes : colCode === 'COAS' ? coasCodes : [];
+    const selectedCollege = colleges.find(
+      (c) => c.id === formData.collegeId || c.name === formData.collegeId || c.code === formData.collegeId
+    );
 
     return departments.filter((d) => {
-      const codeUpper = d.code.toUpperCase();
-      // Direct match: department's college FK === selected college ID
       if (d.college === formData.collegeId) return true;
-      // Match by college code
-      if (selectedCollege && d.college === selectedCollege.code) return true;
-      // Match by seed collegeId
-      if (selectedCollege && (d as any).collegeId === formData.collegeId) return true;
-      // Match by expected department codes for the selected college
-      if (targetCodes.length > 0 && targetCodes.includes(codeUpper)) return true;
+      if (selectedCollege && (d.college === selectedCollege.id || d.college === selectedCollege.name || d.college === selectedCollege.code)) return true;
+      if (!d.college) return true;
       return false;
     });
   }, [departments, colleges, formData.collegeId]);

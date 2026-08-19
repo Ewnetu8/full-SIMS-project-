@@ -41,7 +41,6 @@ import {
 import { ROUTES } from '@/constants';
 
 import { useAdminStore } from '../store';
-import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { Department } from '../types';
 
@@ -210,8 +209,10 @@ export function DepartmentManagement() {
       dept.name.toLowerCase().includes(departmentSearchQuery.toLowerCase()) ||
       dept.code.toLowerCase().includes(departmentSearchQuery.toLowerCase());
 
-    const foundInfo = getDepartmentsByCollege().find((d) => d.name === dept.name);
-    const matchesCollege = collegeFilter === 'ALL' || (foundInfo && foundInfo.college === collegeFilter);
+    const selectedCollege = colleges.find((c) => c.name === collegeFilter || c.id === collegeFilter || c.code === collegeFilter);
+    const matchesCollege =
+      collegeFilter === 'ALL' ||
+      (selectedCollege ? dept.college === selectedCollege.id || dept.college === selectedCollege.name : dept.college === collegeFilter);
 
     return matchesSearch && matchesCollege;
   });
@@ -254,9 +255,9 @@ export function DepartmentManagement() {
               onChange={(e) => setCollegeFilter(e.target.value)}
             >
               <option value="ALL">All Colleges</option>
-              {COLLEGES.map((col) => (
-                <option key={col} value={col}>
-                  {col}
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
                 </option>
               ))}
             </select>

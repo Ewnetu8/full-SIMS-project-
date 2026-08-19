@@ -18,82 +18,24 @@ export interface UserIdentifierRecord {
   role?: string;
 }
 
-const STORAGE_KEY = 'sims_user_identifiers';
-
 /**
- * Retrieves all stored user identifier mappings from localStorage.
+ * No-op helper preserved for interface compatibility.
+ * Fake localStorage persistence removed per Single Source of Truth architecture.
  */
-export function getAllStoredUserIdentifiers(): Record<string, UserIdentifierRecord> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+export function saveUserIdentifier(_record: UserIdentifierRecord): void {
+  // Pure no-op: Local storage must never act as a database.
 }
 
 /**
- * Persists a user identifier record (e.g. entered by Admin during registration).
+ * No-op helper preserved for interface compatibility.
+ * Fake localStorage persistence removed per Single Source of Truth architecture.
  */
-export function saveUserIdentifier(record: UserIdentifierRecord): void {
-  if (typeof window === 'undefined' || !record.email) return;
-  try {
-    const records = getAllStoredUserIdentifiers();
-    const normalizedEmail = record.email.toLowerCase().trim();
-    
-    // Clean identifiers to ensure UUIDs are never stored as student/faculty identifiers
-    const cleanStudentId = record.studentIdentifier && !isValidUuid(record.studentIdentifier)
-      ? record.studentIdentifier.trim()
-      : undefined;
-      
-    const cleanFacultyId = record.facultyIdentifier && !isValidUuid(record.facultyIdentifier)
-      ? record.facultyIdentifier.trim()
-      : undefined;
-
-    const existing: Partial<UserIdentifierRecord> = records[normalizedEmail] || {};
-    const updated: UserIdentifierRecord = {
-      ...existing,
-      ...record,
-      email: normalizedEmail,
-      studentIdentifier: cleanStudentId || existing.studentIdentifier,
-      facultyIdentifier: cleanFacultyId || existing.facultyIdentifier,
-    };
-
-    records[normalizedEmail] = updated;
-    if (record.id && isValidUuid(record.id)) {
-      records[record.id] = updated;
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch (e) {
-    console.warn('Failed to save user identifier in localStorage:', e);
-  }
-}
-
-/**
- * Finds a stored user identifier record by email or user ID.
- */
-export function getStoredUserIdentifier(email?: string | null, id?: string | null): UserIdentifierRecord | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const records = getAllStoredUserIdentifiers();
-    if (email) {
-      const normalizedEmail = email.toLowerCase().trim();
-      if (records[normalizedEmail]) return records[normalizedEmail];
-    }
-    if (id && records[id]) {
-      return records[id];
-    }
-  } catch {
-    return null;
-  }
+export function getStoredUserIdentifier(_email?: string | null, _id?: string | null): UserIdentifierRecord | null {
   return null;
 }
 
 /**
- * Safely resolves the authentic Student Identifier for a student account.
+ * Safely resolves the authentic Student Identifier for a student account from real backend user data.
  * Guarantees that internal database UUIDs are never returned as student identifiers.
  */
 export function resolveStudentIdentifier(
@@ -123,7 +65,7 @@ export function resolveStudentIdentifier(
     if (trimmed) return trimmed;
   }
 
-  // 4. Check extra sources provided by callers (e.g. academic data)
+  // 4. Check extra sources provided by callers (e.g. backend academic data / enrollments)
   if (extraSources) {
     for (const source of extraSources) {
       if (source && typeof source === 'string' && !isValidUuid(source)) {
@@ -133,13 +75,6 @@ export function resolveStudentIdentifier(
         }
       }
     }
-  }
-
-  // 5. Check persistent identifier registry by email or ID
-  const stored = getStoredUserIdentifier(user?.email, user?.id);
-  if (stored?.studentIdentifier && !isValidUuid(stored.studentIdentifier)) {
-    const trimmed = stored.studentIdentifier.trim();
-    if (trimmed) return trimmed;
   }
 
   return null;

@@ -16,7 +16,7 @@ import { apiClient } from '@/services';
 import { API_ENDPOINTS } from '@/constants';
 import { env } from '@/lib/env';
 import { getCsrfToken } from '@/utils/csrf';
-import { getStoredUserIdentifier, saveUserIdentifier, isValidUuid } from '@/lib/user-identifier';
+import { isValidUuid } from '@/lib/user-identifier';
 
 import type {
   LoginCredentials,
@@ -56,16 +56,6 @@ export const authApi = {
             (rawUser?.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
             (rawUser?.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
             undefined;
-
-          if (userEmail && (studentIdentifier || facultyIdentifier)) {
-            saveUserIdentifier({
-              email: userEmail,
-              id: userId,
-              studentIdentifier,
-              facultyIdentifier,
-              role: rawUser.role || data.role,
-            });
-          }
 
           const user: BaseUser = {
             id: rawUser.id || 'usr-default',
@@ -111,28 +101,6 @@ export const authApi = {
       (rawUser.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
       (rawUser.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
       undefined;
-
-    // Fall back to persistent storage mapping by email or ID
-    if (!studentIdentifier || !facultyIdentifier) {
-      const stored = getStoredUserIdentifier(userEmail, userId);
-      if (stored?.studentIdentifier && !studentIdentifier && !isValidUuid(stored.studentIdentifier)) {
-        studentIdentifier = stored.studentIdentifier.trim();
-      }
-      if (stored?.facultyIdentifier && !facultyIdentifier && !isValidUuid(stored.facultyIdentifier)) {
-        facultyIdentifier = stored.facultyIdentifier.trim();
-      }
-    }
-
-    // Persist identifier mapping
-    if (userEmail && (studentIdentifier || facultyIdentifier)) {
-      saveUserIdentifier({
-        email: userEmail,
-        id: userId,
-        studentIdentifier,
-        facultyIdentifier,
-        role: rawUser.role,
-      });
-    }
 
     const formattedUser: BaseUser = {
       id: rawUser.id || 'usr-default',
@@ -269,26 +237,6 @@ export const authApi = {
           (rawUser.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
           (rawUser.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
           undefined;
-
-        if (!studentIdentifier || !facultyIdentifier) {
-          const stored = getStoredUserIdentifier(userEmail, userId);
-          if (stored?.studentIdentifier && !studentIdentifier && !isValidUuid(stored.studentIdentifier)) {
-            studentIdentifier = stored.studentIdentifier.trim();
-          }
-          if (stored?.facultyIdentifier && !facultyIdentifier && !isValidUuid(stored.facultyIdentifier)) {
-            facultyIdentifier = stored.facultyIdentifier.trim();
-          }
-        }
-
-        if (userEmail && (studentIdentifier || facultyIdentifier)) {
-          saveUserIdentifier({
-            email: userEmail,
-            id: userId,
-            studentIdentifier,
-            facultyIdentifier,
-            role: rawUser.role,
-          });
-        }
 
         const user: BaseUser = {
           id: rawUser.id || 'usr-default',

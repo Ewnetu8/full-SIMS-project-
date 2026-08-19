@@ -1,6 +1,5 @@
 import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
-import { AASTU_ACADEMIC_STRUCTURE } from '@/constants/academic-structure';
 import type { College, Program, AcademicYear, Semester, Department, Course } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -88,7 +87,7 @@ export const academicService = {
   async getColleges(): Promise<College[]> {
     try {
       const raw = await api.get<ApiCollege[]>(API_ENDPOINTS.ACADEMICS.COLLEGES);
-      if (raw && raw.length > 0) {
+      if (Array.isArray(raw)) {
         return raw.map((c) => ({
           id: c.id,
           name: c.name,
@@ -98,16 +97,10 @@ export const academicService = {
           updatedAt: c.updated_at,
         }));
       }
+      return [];
     } catch {
-      // fallback to seed
+      return [];
     }
-
-    return AASTU_ACADEMIC_STRUCTURE.map((c) => ({
-      id: c.id,
-      name: c.name,
-      code: c.code,
-      university: 'uni-aastu-001',
-    }));
   },
 
   async createCollege(data: { name: string; code: string; university?: string }): Promise<College> {
@@ -154,11 +147,10 @@ export const academicService = {
 
   // ── Departments ──────────────────────────────────────────────────────────────
   async getDepartments(): Promise<Department[]> {
-    let backendDepts: Department[] = [];
     try {
       const raw = await api.get<ApiDepartment[]>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS);
       if (Array.isArray(raw)) {
-        backendDepts = raw.map((d) => ({
+        return raw.map((d) => ({
           id: d.id,
           code: d.code,
           name: d.name,
@@ -175,41 +167,10 @@ export const academicService = {
           createdAt: d.created_at || new Date().toISOString(),
         }));
       }
+      return [];
     } catch {
-      // ignore API error, fallback will fill missing items
+      return [];
     }
-
-    const seedDepts: Department[] = AASTU_ACADEMIC_STRUCTURE.flatMap((c) =>
-      c.departments.map((d) => ({
-        id: d.id,
-        code: d.code,
-        name: d.name,
-        college: d.collegeId,
-        description: `Department of ${d.name}`,
-        headOfDepartment: {
-          id: 'hod-default',
-          name: 'Head of Department',
-          email: `hod.${d.code.toLowerCase()}@aastu.edu.et`,
-        },
-        lecturerCount: 0,
-        studentCount: 0,
-        courseCount: 0,
-        createdAt: new Date().toISOString(),
-      })),
-    );
-
-    // Merge: seed departments first, overridden by backend departments if matching by code or id
-    const mergedMap = new Map<string, Department>();
-
-    for (const d of seedDepts) {
-      mergedMap.set(d.code.toUpperCase(), d);
-    }
-
-    for (const d of backendDepts) {
-      mergedMap.set(d.code.toUpperCase(), d);
-    }
-
-    return Array.from(mergedMap.values());
   },
 
   async createDepartment(data: { name: string; code: string; college?: string }): Promise<Department> {
@@ -333,21 +294,7 @@ export const academicService = {
   },
 
   async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number; collegeId?: string }): Promise<Program> {
-    let departmentId = data.department;
-
-    // Auto-create department in backend if it's a seed ID
-    if (!isValidUuid(departmentId)) {
-      const allDepts = await this.getDepartments();
-      const seedDept = allDepts.find((d) => d.id === departmentId);
-      if (seedDept) {
-        const createdDept = await this.createDepartment({
-          name: seedDept.name,
-          code: seedDept.code,
-          college: data.collegeId && isValidUuid(data.collegeId) ? data.collegeId : undefined,
-        });
-        departmentId = createdDept.id;
-      }
-    }
+    const departmentId = data.department;
 
     const payload: Record<string, any> = {
       department: departmentId,

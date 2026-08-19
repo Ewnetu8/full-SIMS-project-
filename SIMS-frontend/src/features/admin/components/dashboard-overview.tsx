@@ -197,69 +197,53 @@ export function DashboardOverview() {
           </div>
         </Card>
 
-        {/* Real-time System Infrastructure Health */}
+        {/* System Infrastructure & API Status */}
         <Card className="p-5 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Activity className="h-4 w-4 text-success" /> Infrastructure & AI Engine Health
+                <Activity className="h-4 w-4 text-success" /> Infrastructure & Backend Connectivity
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Overview of system health, active background services, and evaluation activity.
+                Real-time connection status with SIMS Django REST backend APIs.
               </p>
             </div>
             <Badge variant="outline" className="border-success/30 text-success bg-success/10 gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-success animate-pulse" /> All Systems Nominal
+              <span className="h-2 w-2 rounded-full bg-success animate-pulse" /> SIMS Backend Connected
             </Badge>
           </div>
 
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* CPU Metric */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Cpu className="h-3.5 w-3.5 text-primary" /> System CPU Usage
-                </span>
-                <span className="font-semibold text-foreground">28.4%</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Server className="h-3.5 w-3.5 text-primary" /> API Gateway
               </div>
-              <Progress value={28.4} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">8 Workers active (Peak: 64%)</span>
+              <p className="text-sm font-semibold text-foreground">Operational</p>
+              <span className="text-[10px] text-muted-foreground">Connected to DRF REST v1 API</span>
             </div>
 
-            {/* RAM Metric */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <HardDrive className="h-3.5 w-3.5 text-primary" /> Memory Allocation
-                </span>
-                <span className="font-semibold text-foreground">54.2%</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Database className="h-3.5 w-3.5 text-primary" /> Database Services
               </div>
-              <Progress value={54.2} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">17.3 GB of 32 GB utilized</span>
+              <p className="text-sm font-semibold text-foreground">Synchronized</p>
+              <span className="text-[10px] text-muted-foreground">PostgreSQL academic database active</span>
             </div>
 
-            {/* DB Connections */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Database className="h-3.5 w-3.5 text-success" /> Database Health
-                </span>
-                <span className="font-semibold text-foreground">Active</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <ClipboardCheck className="h-3.5 w-3.5 text-primary" /> Examination Engine
               </div>
-              <Progress value={24} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">Database response latency: 14ms</span>
+              <p className="text-sm font-semibold text-foreground">{totalExamsCount} Registered Assessments</p>
+              <span className="text-[10px] text-muted-foreground">{activeExamsCount} active session(s)</span>
             </div>
 
-            {/* AI Model Worker Pool */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Brain className="h-3.5 w-3.5 text-ai-primary" /> Automated Grading Engine
-                </span>
-                <span className="font-semibold text-success">ONLINE</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Brain className="h-3.5 w-3.5 text-primary" /> AI Evaluation Infrastructure
               </div>
-              <Progress value={65} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">GPT-4o fine-tuned • 95.8% avg confidence</span>
+              <p className="text-sm font-semibold text-foreground">Ready</p>
+              <span className="text-[10px] text-muted-foreground">Automated grading pipeline initialized</span>
             </div>
           </div>
         </Card>
@@ -287,25 +271,32 @@ export function DashboardOverview() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {auditLogs.slice(0, 4).map((log) => (
-              <div key={log.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-accent/40 transition-colors">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
-                  <FileText className="h-3.5 w-3.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-foreground truncate">{log.actionEvent}</p>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{log.timestamp}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.details}</p>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <span className="font-medium text-foreground">{log.actorName}</span>
-                    <span>•</span>
-                    <span>IP: {log.ipAddress}</span>
-                  </div>
-                </div>
+            {auditLogs.length === 0 ? (
+              <div className="p-8 text-center bg-muted/20 border-dashed border rounded-lg">
+                <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">No recent system audit logs recorded.</p>
               </div>
-            ))}
+            ) : (
+              auditLogs.slice(0, 4).map((log) => (
+                <div key={log.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-accent/40 transition-colors">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
+                    <FileText className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-foreground truncate">{log.actionEvent}</p>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{log.timestamp}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.details}</p>
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{log.actorName}</span>
+                      <span>•</span>
+                      <span>IP: {log.ipAddress}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Card>
 
@@ -329,40 +320,47 @@ export function DashboardOverview() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {aiJobs.map((job) => {
-              const progressPct = Math.round((job.processedSubmissions / job.totalSubmissions) * 100);
-              return (
-                <div key={job.id} className="p-3 rounded-lg border border-border bg-card/40 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground truncate">{job.examTitle}</span>
-                    <Badge
-                      variant={
-                        job.status === 'completed'
-                          ? 'success'
-                          : job.status === 'processing'
-                          ? 'warning'
-                          : job.status === 'failed'
-                          ? 'destructive'
-                          : 'secondary'
-                      }
-                      className="text-[10px] capitalize"
-                    >
-                      {job.status}
-                    </Badge>
+            {aiJobs.length === 0 ? (
+              <div className="p-8 text-center bg-muted/20 border-dashed border rounded-lg">
+                <Brain className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">No active AI evaluation jobs in queue.</p>
+              </div>
+            ) : (
+              aiJobs.map((job) => {
+                const progressPct = Math.round((job.processedSubmissions / job.totalSubmissions) * 100);
+                return (
+                  <div key={job.id} className="p-3 rounded-lg border border-border bg-card/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground truncate">{job.examTitle}</span>
+                      <Badge
+                        variant={
+                          job.status === 'completed'
+                            ? 'success'
+                            : job.status === 'processing'
+                            ? 'warning'
+                            : job.status === 'failed'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                        className="text-[10px] capitalize"
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{job.courseName}</span>
+                      <span>
+                        {job.processedSubmissions} / {job.totalSubmissions} ({progressPct}%)
+                      </span>
+                    </div>
+                    <Progress value={progressPct} className="h-1.5" />
+                    {job.errorReason && (
+                      <p className="text-[10px] text-destructive font-medium">⚠️ {job.errorReason}</p>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{job.courseName}</span>
-                    <span>
-                      {job.processedSubmissions} / {job.totalSubmissions} ({progressPct}%)
-                    </span>
-                  </div>
-                  <Progress value={progressPct} className="h-1.5" />
-                  {job.errorReason && (
-                    <p className="text-[10px] text-destructive font-medium">⚠️ {job.errorReason}</p>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </Card>
       </div>

@@ -149,11 +149,11 @@ export const API_ENDPOINTS = {
     EXAM: (id: string) => `/api/v1/results/exam/${id}`,
   },
 
-  // ── Legacy/Users/Grades/Analytics ─────────────────────────────────────────
+  // ── Users / Grades / Analytics ──────────────────────────────────────────
   USERS: {
-    ROOT: '/users',
-    BY_ID: (id: string) => `/users/${id}`,
-    PROFILE: '/users/profile',
+    ROOT: '/api/v1/users',
+    BY_ID: (id: string) => `/api/v1/users/${id}`,
+    PROFILE: '/api/v1/users/profile',
   },
 
   GRADES: {

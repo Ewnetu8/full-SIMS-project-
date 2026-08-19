@@ -43,7 +43,6 @@ import {
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
-import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { AdminUser, UserRole, UserStatus } from '../types';
 
@@ -53,6 +52,7 @@ export function UserManagement() {
     isLoadingUsers,
     usersError,
     departments,
+    colleges,
     userSearchQuery,
     userRoleFilter,
     userDeptFilter,
@@ -69,20 +69,29 @@ export function UserManagement() {
     fetchAdminData,
   } = useAdminStore();
 
+  // Modals & Drawers state
+  const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<AdminUser | null>(null);
+  const [editingUser, setEditingUser] = React.useState<AdminUser | null>(null);
+  const [viewingUser, setViewingUser] = React.useState<AdminUser | null>(null);
+  const [deletingUser, setDeletingUser] = React.useState<AdminUser | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [userCollegeFilter, setUserCollegeFilter] = React.useState<string>('ALL');
+
+  const filteredDepartments = React.useMemo(() => {
+    if (!userCollegeFilter || userCollegeFilter === 'ALL') return departments;
+    return departments.filter(
+      (d) =>
+        d.college === userCollegeFilter ||
+        (colleges.find((c) => c.name === userCollegeFilter || c.code === userCollegeFilter)?.id === d.college)
+    );
+  }, [departments, colleges, userCollegeFilter]);
+
   React.useEffect(() => {
     fetchUsers();
     fetchDepartments();
     void fetchAdminData();
   }, [fetchUsers, fetchDepartments, fetchAdminData]);
-
-  // Modals & Drawers state
-  const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
-  const [editingUser, setEditingUser] = React.useState<AdminUser | null>(null);
-  const [viewingUser, setViewingUser] = React.useState<AdminUser | null>(null);
-  const [deletingUser, setDeletingUser] = React.useState<AdminUser | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  const [userCollegeFilter, setUserCollegeFilter] = React.useState<string>('ALL');
 
   // Form State matching UserRegisterRequest
   const [formData, setFormData] = React.useState({
@@ -300,9 +309,9 @@ export function UserManagement() {
               }}
             >
               <option value="ALL">All Colleges</option>
-              {COLLEGES.map((col) => (
-                <option key={col} value={col}>
-                  {col}
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
                 </option>
               ))}
             </select>
@@ -315,9 +324,9 @@ export function UserManagement() {
               onChange={(e) => setUserDeptFilter(e.target.value)}
             >
               <option value="ALL">All Departments</option>
-              {getDepartmentsByCollege(userCollegeFilter).map((d) => (
+              {filteredDepartments.map((d) => (
                 <option key={d.id} value={d.name}>
-                  {d.name}
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>

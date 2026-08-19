@@ -30,7 +30,6 @@ import {
 } from '@/components/ui';
 
 import { adminService } from '../services/admin-service';
-import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 import type {
   College,
   Program,
@@ -394,33 +393,41 @@ export function AcademicStructureManagement() {
             {activeTab === 'programs' && (
               <>
                 <div>
-                  <Label htmlFor="prgCollege">College *</Label>
+                  <Label htmlFor="prgCollege">College</Label>
                   <FormSelect
                     id="prgCollege"
                     value={programForm.college}
                     onChange={(e) => {
                       const newCol = e.target.value;
-                      const depts = getDepartmentsByCollege(newCol);
                       setProgramForm({
                         ...programForm,
                         college: newCol,
-                        department: depts[0]?.id || '',
                       });
                     }}
                   >
-                    {COLLEGES.map((col) => (
-                      <option key={col} value={col}>
-                        {col}
+                    <option value="">-- Select College (Optional) --</option>
+                    {colleges.map((col) => (
+                      <option key={col.id} value={col.id}>
+                        {col.name} ({col.code})
                       </option>
                     ))}
                   </FormSelect>
                 </div>
                 <div>
                   <Label htmlFor="prgDept">Department *</Label>
-                  <FormSelect id="prgDept" value={programForm.department} onChange={(e) => setProgramForm({ ...programForm, department: e.target.value })}>
-                    {getDepartmentsByCollege(programForm.college).map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
+                  <FormSelect
+                    id="prgDept"
+                    value={programForm.department}
+                    onChange={(e) => setProgramForm({ ...programForm, department: e.target.value })}
+                  >
+                    <option value="">-- Select Department --</option>
+                    {departments
+                      .filter((d) => !programForm.college || d.college === programForm.college)
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
                   </FormSelect>
                 </div>
                 <div>
