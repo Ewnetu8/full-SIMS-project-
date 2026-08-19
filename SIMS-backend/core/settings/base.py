@@ -223,6 +223,12 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
+# Registration domain restriction
+ALLOWED_REGISTRATION_DOMAIN_REGEX = os.environ.get(
+    'ALLOWED_REGISTRATION_DOMAIN_REGEX',
+    r'.*\.?aastu\.edu\.et$',
+)
+
 # Celery Beat schedule
 CELERY_BEAT_SCHEDULE = {
     'exam-expiry-sweep': {

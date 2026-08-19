@@ -1,4 +1,6 @@
 import re
+
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.core.validators import validate_email
@@ -36,7 +38,15 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         email_normalized = value.lower().strip()
         if User.objects.filter(email__iexact=email_normalized).exists():
             raise serializers.ValidationError("A user with this email address already exists.")
-        
+
+        # Domain restriction for all roles
+        domain = email_normalized.split('@')[-1]
+        pattern = settings.ALLOWED_REGISTRATION_DOMAIN_REGEX
+        if not re.match(pattern, domain):
+            raise serializers.ValidationError(
+                "Only emails from approved educational domains are allowed for registration."
+            )
+
         return email_normalized
 
     def validate_password(self, value):
