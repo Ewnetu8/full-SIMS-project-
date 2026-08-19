@@ -16,6 +16,7 @@ import { apiClient } from '@/services';
 import { API_ENDPOINTS } from '@/constants';
 import { env } from '@/lib/env';
 import { getCsrfToken } from '@/utils/csrf';
+import { getStoredUserIdentifier, saveUserIdentifier, isValidUuid } from '@/lib/user-identifier';
 
 import type {
   LoginCredentials,
@@ -39,18 +40,45 @@ export const authApi = {
         const backendResponse = r.data;
         
         if (backendResponse?.user) {
-          const user: any = { ...backendResponse.user };
-          if (user.first_name) { 
-            user.firstName = user.first_name; 
-            delete user.first_name; 
+          const rawUser = backendResponse.user;
+          const userEmail = rawUser.email || data.email;
+          const userId = rawUser.id;
+
+          let studentIdentifier =
+            (data?.student_identifier && !isValidUuid(data.student_identifier) ? String(data.student_identifier).trim() : null) ||
+            (rawUser?.student_identifier && !isValidUuid(rawUser.student_identifier) ? String(rawUser.student_identifier).trim() : null) ||
+            (rawUser?.studentIdentifier && !isValidUuid(rawUser.studentIdentifier) ? String(rawUser.studentIdentifier).trim() : null) ||
+            (rawUser?.student_id && !isValidUuid(rawUser.student_id) ? String(rawUser.student_id).trim() : null) ||
+            undefined;
+
+          let facultyIdentifier =
+            (data?.faculty_identifier && !isValidUuid(data.faculty_identifier) ? String(data.faculty_identifier).trim() : null) ||
+            (rawUser?.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
+            (rawUser?.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
+            undefined;
+
+          if (userEmail && (studentIdentifier || facultyIdentifier)) {
+            saveUserIdentifier({
+              email: userEmail,
+              id: userId,
+              studentIdentifier,
+              facultyIdentifier,
+              role: rawUser.role || data.role,
+            });
           }
-          if (user.last_name) { 
-            user.lastName = user.last_name; 
-            delete user.last_name; 
-          }
-          if (user.role) {
-            user.role = user.role.toLowerCase();
-          }
+
+          const user: BaseUser = {
+            id: rawUser.id || 'usr-default',
+            email: userEmail,
+            firstName: rawUser.first_name || data.first_name || 'User',
+            lastName: rawUser.last_name || data.last_name || '',
+            role: (rawUser.role ? rawUser.role.toLowerCase() : (data.role ? data.role.toLowerCase() : 'student')) as any,
+            avatarUrl: rawUser.avatar_url || rawUser.avatarUrl,
+            studentIdentifier,
+            facultyIdentifier,
+            createdAt: rawUser.created_at || new Date().toISOString(),
+            updatedAt: rawUser.updated_at || new Date().toISOString(),
+          };
           
           return {
             message: 'Registration successful',
@@ -70,13 +98,51 @@ export const authApi = {
     const data = response.data || {};
 
     const rawUser = data.user || {};
+    const userEmail = rawUser.email || credentials.email;
+    const userId = rawUser.id;
+
+    let studentIdentifier =
+      (rawUser.student_identifier && !isValidUuid(rawUser.student_identifier) ? String(rawUser.student_identifier).trim() : null) ||
+      (rawUser.studentIdentifier && !isValidUuid(rawUser.studentIdentifier) ? String(rawUser.studentIdentifier).trim() : null) ||
+      (rawUser.student_id && !isValidUuid(rawUser.student_id) ? String(rawUser.student_id).trim() : null) ||
+      undefined;
+
+    let facultyIdentifier =
+      (rawUser.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
+      (rawUser.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
+      undefined;
+
+    // Fall back to persistent storage mapping by email or ID
+    if (!studentIdentifier || !facultyIdentifier) {
+      const stored = getStoredUserIdentifier(userEmail, userId);
+      if (stored?.studentIdentifier && !studentIdentifier && !isValidUuid(stored.studentIdentifier)) {
+        studentIdentifier = stored.studentIdentifier.trim();
+      }
+      if (stored?.facultyIdentifier && !facultyIdentifier && !isValidUuid(stored.facultyIdentifier)) {
+        facultyIdentifier = stored.facultyIdentifier.trim();
+      }
+    }
+
+    // Persist identifier mapping
+    if (userEmail && (studentIdentifier || facultyIdentifier)) {
+      saveUserIdentifier({
+        email: userEmail,
+        id: userId,
+        studentIdentifier,
+        facultyIdentifier,
+        role: rawUser.role,
+      });
+    }
+
     const formattedUser: BaseUser = {
       id: rawUser.id || 'usr-default',
-      email: rawUser.email || credentials.email,
+      email: userEmail,
       firstName: rawUser.first_name || rawUser.firstName || 'User',
       lastName: rawUser.last_name || rawUser.lastName || '',
       role: (rawUser.role ? rawUser.role.toLowerCase() : 'student') as any,
       avatarUrl: rawUser.avatar_url || rawUser.avatarUrl,
+      studentIdentifier,
+      facultyIdentifier,
       createdAt: rawUser.created_at || rawUser.createdAt || new Date().toISOString(),
       updatedAt: rawUser.updated_at || rawUser.updatedAt || new Date().toISOString(),
     };
@@ -189,20 +255,55 @@ export const authApi = {
     apiClient
       .get<any>(API_ENDPOINTS.AUTH.ME)
       .then((r) => {
-        // Transform user fields
-        const user: any = { ...r.data };
-        if (user.first_name) { 
-          user.firstName = user.first_name; 
-          delete user.first_name; 
+        const rawUser = r.data || {};
+        const userEmail = rawUser.email;
+        const userId = rawUser.id;
+
+        let studentIdentifier =
+          (rawUser.student_identifier && !isValidUuid(rawUser.student_identifier) ? String(rawUser.student_identifier).trim() : null) ||
+          (rawUser.studentIdentifier && !isValidUuid(rawUser.studentIdentifier) ? String(rawUser.studentIdentifier).trim() : null) ||
+          (rawUser.student_id && !isValidUuid(rawUser.student_id) ? String(rawUser.student_id).trim() : null) ||
+          undefined;
+
+        let facultyIdentifier =
+          (rawUser.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
+          (rawUser.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
+          undefined;
+
+        if (!studentIdentifier || !facultyIdentifier) {
+          const stored = getStoredUserIdentifier(userEmail, userId);
+          if (stored?.studentIdentifier && !studentIdentifier && !isValidUuid(stored.studentIdentifier)) {
+            studentIdentifier = stored.studentIdentifier.trim();
+          }
+          if (stored?.facultyIdentifier && !facultyIdentifier && !isValidUuid(stored.facultyIdentifier)) {
+            facultyIdentifier = stored.facultyIdentifier.trim();
+          }
         }
-        if (user.last_name) { 
-          user.lastName = user.last_name; 
-          delete user.last_name; 
+
+        if (userEmail && (studentIdentifier || facultyIdentifier)) {
+          saveUserIdentifier({
+            email: userEmail,
+            id: userId,
+            studentIdentifier,
+            facultyIdentifier,
+            role: rawUser.role,
+          });
         }
-        if (user.role) {
-          user.role = user.role.toLowerCase();
-        }
+
+        const user: BaseUser = {
+          id: rawUser.id || 'usr-default',
+          email: userEmail || '',
+          firstName: rawUser.first_name || rawUser.firstName || 'User',
+          lastName: rawUser.last_name || rawUser.lastName || '',
+          role: (rawUser.role ? rawUser.role.toLowerCase() : 'student') as any,
+          avatarUrl: rawUser.avatar_url || rawUser.avatarUrl,
+          studentIdentifier,
+          facultyIdentifier,
+          createdAt: rawUser.created_at || rawUser.createdAt || new Date().toISOString(),
+          updatedAt: rawUser.updated_at || rawUser.updatedAt || new Date().toISOString(),
+        };
         
         return { user };
       }),
 };
+

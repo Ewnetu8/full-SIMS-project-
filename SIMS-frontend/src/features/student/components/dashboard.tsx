@@ -47,21 +47,26 @@ export function StudentDashboard() {
     enrollments,
     activeExams,
     notifications,
+    results,
     isLoadingEnrollments,
     isLoadingExams,
     isLoadingNotifications,
+    isLoadingResults,
     enrollmentsError,
     examsError,
     notificationsError,
+    resultsError,
     fetchEnrollments,
     fetchActiveExams,
     fetchNotifications,
+    fetchResults,
   } = useStudentStore();
 
   React.useEffect(() => {
     void fetchEnrollments();
     void fetchActiveExams();
-  }, [fetchEnrollments, fetchActiveExams]);
+    void fetchResults();
+  }, [fetchEnrollments, fetchActiveExams, fetchResults]);
 
   const currentHour = new Date().getHours();
   const greeting =
@@ -71,12 +76,10 @@ export function StudentDashboard() {
   const enrolledCount = enrollments.length;
   const activeExamsCount = activeExams.length;
   const unreadNotificationsCount = notifications.filter((n) => !n.is_read).length;
-  const gradedEnrollments = enrollments.filter(
-    (e) => e.status === 'PASSED' || e.status === 'FAILED' || Boolean(e.grade)
-  );
+  const gradedResultsCount = results.length;
 
-  const isLoading = isLoadingEnrollments || isLoadingExams;
-  const hasError = enrollmentsError || examsError;
+  const isLoading = isLoadingEnrollments || isLoadingExams || isLoadingResults;
+  const hasError = enrollmentsError || examsError || resultsError;
 
   return (
     <motion.div
@@ -106,14 +109,14 @@ export function StudentDashboard() {
           icon={<ClipboardCheck className="h-5 w-5" />}
         />
         <StatsCard
+          title="Official Results"
+          value={isLoadingResults ? '...' : gradedResultsCount}
+          icon={<GraduationCap className="h-5 w-5" />}
+        />
+        <StatsCard
           title="Unread Notifications"
           value={unreadNotificationsCount}
           icon={<Bell className="h-5 w-5" />}
-        />
-        <StatsCard
-          title="Completed / Graded"
-          value={isLoading ? '...' : gradedEnrollments.length}
-          icon={<CheckCircle2 className="h-5 w-5" />}
         />
       </section>
 

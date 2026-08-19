@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '@/constants/api-endpoints';
 import { useAuthStore } from '@/features/auth/store';
 import { academicService } from './academic-service';
 import { examApiService } from './exam-api-service';
+import { saveUserIdentifier, isValidUuid } from '@/lib/user-identifier';
 
 import type {
   AdminUser,
@@ -33,13 +34,27 @@ export interface RegisterUserPayload {
   department_id?: string | null;
 }
 
-// In-memory store for newly registered users during session
-const registeredUsersCache: AdminUser[] = [];
+const REGISTERED_USERS_KEY = 'sims_registered_users';
 
-const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-function isValidUuid(id?: string | null): boolean {
-  return typeof id === 'string' && UUID_REGEX.test(id);
+function loadCachedRegisteredUsers(): AdminUser[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(REGISTERED_USERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 }
+
+function saveCachedRegisteredUsers(users: AdminUser[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users));
+  } catch {}
+}
+
+// In-memory store for newly registered users during session, initialized from storage
+const registeredUsersCache: AdminUser[] = loadCachedRegisteredUsers();
 
 export const adminService = {
   // ─── Users ─────────────────────────────────────────────────────────────────
@@ -50,7 +65,7 @@ export const adminService = {
     if (authUser) {
       const currentUser: AdminUser = {
         id: authUser.id,
-        userId: authUser.id,
+        userId: authUser.studentIdentifier || authUser.facultyIdentifier || authUser.id,
         firstName: authUser.firstName || 'User',
         lastName: authUser.lastName || '',
         email: authUser.email,
@@ -58,6 +73,8 @@ export const adminService = {
         department: '—',
         status: 'active',
         lastLogin: 'Active session',
+        studentIdentifier: authUser.studentIdentifier,
+        facultyIdentifier: authUser.facultyIdentifier,
         createdAt: authUser.createdAt || new Date().toISOString(),
       };
       list.push(currentUser);
@@ -106,8 +123,12 @@ export const adminService = {
         }
       }
 
-      const studentId = data.student_identifier || registeredUser.student_identifier || undefined;
-      const facultyId = data.faculty_identifier || registeredUser.faculty_identifier || undefined;
+      const rawStudentId = data.student_identifier || registeredUser.student_identifier;
+      const studentId = rawStudentId && !isValidUuid(rawStudentId) ? String(rawStudentId).trim() : undefined;
+
+      const rawFacultyId = data.faculty_identifier || registeredUser.faculty_identifier;
+      const facultyId = rawFacultyId && !isValidUuid(rawFacultyId) ? String(rawFacultyId).trim() : undefined;
+
       const displayUserId = studentId || facultyId || registeredUser.id;
 
       const newUser: AdminUser = {
@@ -125,7 +146,19 @@ export const adminService = {
         createdAt: registeredUser.created_at || new Date().toISOString(),
       };
 
+      // Persist student/faculty identifier mapping
+      if (newUser.email) {
+        saveUserIdentifier({
+          email: newUser.email,
+          id: registeredUser.id,
+          studentIdentifier: studentId,
+          facultyIdentifier: facultyId,
+          role: newUser.role,
+        });
+      }
+
       registeredUsersCache.unshift(newUser);
+      saveCachedRegisteredUsers(registeredUsersCache);
       return newUser;
     } catch (error: any) {
       throw error;
@@ -136,6 +169,7 @@ export const adminService = {
     const index = registeredUsersCache.findIndex((u) => u.id === id);
     if (index !== -1) {
       registeredUsersCache[index] = { ...registeredUsersCache[index]!, ...data };
+      saveCachedRegisteredUsers(registeredUsersCache);
       return registeredUsersCache[index]!;
     }
     return {
@@ -158,7 +192,10 @@ export const adminService = {
 
   async deleteUser(id: string): Promise<void> {
     const index = registeredUsersCache.findIndex((u) => u.id === id);
-    if (index !== -1) registeredUsersCache.splice(index, 1);
+    if (index !== -1) {
+      registeredUsersCache.splice(index, 1);
+      saveCachedRegisteredUsers(registeredUsersCache);
+    }
   },
 
   // ─── Colleges ───────────────────────────────────────────────────────────────

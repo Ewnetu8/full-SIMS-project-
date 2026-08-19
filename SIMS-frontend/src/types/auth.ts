@@ -20,6 +20,8 @@ export interface BaseUser {
   lastName: string;
   role: UserRole;
   avatarUrl?: string;
+  studentIdentifier?: string;
+  facultyIdentifier?: string;
   createdAt: string;
   updatedAt: string;
 }

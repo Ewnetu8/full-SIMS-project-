@@ -143,6 +143,12 @@ export const API_ENDPOINTS = {
     BY_ID: (id: string) => `/api/v1/notifications/${id}/`,
   },
 
+  // ── Results (SIMS API 4) ───────────────────────────────────────────────────
+  RESULTS: {
+    ME: '/api/v1/results/me',
+    EXAM: (id: string) => `/api/v1/results/exam/${id}`,
+  },
+
   // ── Legacy/Users/Grades/Analytics ─────────────────────────────────────────
   USERS: {
     ROOT: '/users',

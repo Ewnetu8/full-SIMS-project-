@@ -1,8 +1,6 @@
-// ─── Analytics API Service ──────────────────────────────────────────────────
-
 import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
-import type { AdvisingReportResponse, ExamAnalyticsResponse } from '@/types/api';
+import type { AdvisingReportResponse, ExamAnalyticsResponse, ExamResults } from '@/types/api';
 
 /**
  * Fetch advising report for a semester.
@@ -18,7 +16,7 @@ export async function getAdvisingReport(semesterId: string): Promise<AdvisingRep
 
 /**
  * Fetch exam analytics dashboard metrics for a specific examination.
- * Returns mean, median, stddev, min/max scores and per-question difficulty rates.
+ * Returns mean, median, mode, stddev, min/max scores, pass rate, score distribution, and per-question difficulty rates.
  * 
  * @param examId - Examination UUID
  */
@@ -26,7 +24,19 @@ export async function getExamAnalytics(examId: string): Promise<ExamAnalyticsRes
   return api.get<ExamAnalyticsResponse>(API_ENDPOINTS.ANALYTICS.EXAM_ANALYTICS(examId));
 }
 
+/**
+ * Fetch per-student results for a specific examination (Lecturer / Admin).
+ * Endpoint: GET /api/v1/results/exam/{id}
+ * 
+ * @param examId - Examination UUID
+ */
+export async function getExamResults(examId: string): Promise<ExamResults> {
+  return api.get<ExamResults>(API_ENDPOINTS.RESULTS.EXAM(examId));
+}
+
 export const analyticsApiService = {
   getAdvisingReport,
   getExamAnalytics,
+  getExamResults,
 };
+

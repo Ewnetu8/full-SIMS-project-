@@ -24,6 +24,7 @@ import {
   createQuestionOption,
   deleteQuestion,
 } from './questions-api';
+import { getExamAnalytics, getExamResults } from '@/features/analytics/services/analytics-api';
 
 import type { Examination, Question as BackendQuestion, CourseOffering, Enrollment } from '@/types/lecturer';
 import type { Course, LecturerExam, LecturerNotification, LecturerStats, LecturerAnalytics, Question as UiQuestion, StudentSubmission } from '../types';
@@ -374,45 +375,17 @@ export const lecturerService = {
   },
 
   /**
-   * Get class analytics derived from available exam & enrollment data
+   * Get exam analytics directly from backend endpoint GET /api/v1/analytics/exam/{id}
    */
-  async getAnalytics(): Promise<LecturerAnalytics> {
-    try {
-      const exams = await listExaminations();
-      const offerings = await listCourseOfferings();
-      const enrollments = await listEnrollments();
+  async getExamAnalytics(examId: string) {
+    return getExamAnalytics(examId);
+  },
 
-      const totalEnrolled = enrollments.filter((e) => e.status === 'ENROLLED').length;
-      const publishedExams = exams.filter((e) => e.status === 'PUBLISHED' || e.status === 'ACTIVE');
-
-      return {
-        classAverage: publishedExams.length > 0 ? 78.5 : 0,
-        passRate: publishedExams.length > 0 ? 85.0 : 0,
-        submissionRate: totalEnrolled > 0 ? 92.0 : 0,
-        completionRate: publishedExams.length > 0 ? 95.0 : 0,
-        scoreDistribution: [
-          { range: '90-100%', count: 8 },
-          { range: '80-89%', count: 14 },
-          { range: '70-79%', count: 18 },
-          { range: '60-69%', count: 7 },
-          { range: '< 60%', count: 3 },
-        ],
-        questionDifficulty: [
-          { questionId: 'q1', prompt: 'Data Structures & Algorithms Fundamentals', averageScorePct: 88, difficulty: 'Easy' },
-          { questionId: 'q2', prompt: 'Time & Space Complexity Analysis', averageScorePct: 72, difficulty: 'Medium' },
-          { questionId: 'q3', prompt: 'Graph Traversal Algorithms (BFS/DFS)', averageScorePct: 54, difficulty: 'Hard' },
-        ],
-      };
-    } catch {
-      return {
-        classAverage: 0,
-        passRate: 0,
-        submissionRate: 0,
-        completionRate: 0,
-        scoreDistribution: [],
-        questionDifficulty: [],
-      };
-    }
+  /**
+   * Get exam results directly from backend endpoint GET /api/v1/results/exam/{id}
+   */
+  async getExamResults(examId: string) {
+    return getExamResults(examId);
   },
 
   /**

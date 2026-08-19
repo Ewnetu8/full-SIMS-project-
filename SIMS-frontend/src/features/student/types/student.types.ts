@@ -191,3 +191,5 @@ export interface AcademicProfileDetails {
   classStanding: string | null;
   totalEnrolledCourses: number;
 }
+
+export type { Result } from '@/types/api';

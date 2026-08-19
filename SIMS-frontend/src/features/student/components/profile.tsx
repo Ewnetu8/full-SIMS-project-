@@ -32,6 +32,7 @@ import {
   CardTitle,
 } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { resolveStudentIdentifier } from '@/lib/user-identifier';
 import { studentService } from '../services';
 import type { AcademicProfileDetails } from '../types';
 
@@ -80,6 +81,10 @@ export function ProfilePage() {
         day: 'numeric',
       })
     : 'Not provided';
+
+  // Resolve the authentic Student Identifier entered during registration (guaranteeing no UUID is displayed)
+  const resolvedStudentId = resolveStudentIdentifier(user, [academicData?.studentId]);
+  const displayedAccountId = resolvedStudentId || 'Not available';
 
   return (
     <div className="space-y-6">
@@ -206,7 +211,7 @@ export function ProfilePage() {
                 <ReadOnlyField label="First Name" value={user?.firstName || 'Not provided'} icon={<UserRound className="h-4 w-4" />} />
                 <ReadOnlyField label="Last Name" value={user?.lastName || 'Not provided'} icon={<UserRound className="h-4 w-4" />} />
                 <ReadOnlyField label="Email Address" value={user?.email || 'Not provided'} icon={<UserRound className="h-4 w-4" />} />
-                <ReadOnlyField label="Account ID" value={user?.id || 'Not provided'} icon={<ShieldCheck className="h-4 w-4" />} isMono />
+                <ReadOnlyField label="Account ID" value={displayedAccountId} icon={<ShieldCheck className="h-4 w-4" />} isMono />
                 <ReadOnlyField label="User Role" value={user?.role ? user.role.toUpperCase() : 'STUDENT'} icon={<Award className="h-4 w-4" />} />
               </div>
             </CardContent>
@@ -252,7 +257,7 @@ export function ProfilePage() {
                   />
                   <ReadOnlyField
                     label="Student Identifier"
-                    value={academicData?.studentId || 'Not provided'}
+                    value={displayedAccountId}
                     icon={<GraduationCap className="h-4 w-4" />}
                     isMono
                   />
@@ -294,7 +299,7 @@ function ReadOnlyField({
   icon?: React.ReactNode;
   isMono?: boolean;
 }) {
-  const isMissing = value === 'Not provided';
+  const isMissing = value === 'Not provided' || value === 'Not available';
 
   return (
     <div className="rounded-lg border border-border/80 p-3.5 bg-muted/20 flex flex-col justify-between">

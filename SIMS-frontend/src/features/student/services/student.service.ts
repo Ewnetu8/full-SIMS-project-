@@ -1,5 +1,7 @@
 import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
+import { useAuthStore } from '@/features/auth/store';
+import { resolveStudentIdentifier, isValidUuid } from '@/lib/user-identifier';
 import type {
   Enrollment,
   Examination,
@@ -17,6 +19,7 @@ import type {
   NotificationMarkRead,
   NotificationMarkReadRequest,
   AcademicProfileDetails,
+  Result,
 } from '../types/student.types';
 
 export const studentService = {
@@ -154,8 +157,10 @@ export const studentService = {
   getAcademicProfileDetails: async (): Promise<AcademicProfileDetails> => {
     try {
       const enrollments = await studentService.getEnrollments();
+      const authUser = useAuthStore.getState().user;
       
-      let studentId: string | null = null;
+      // Resolve student identifier authentically (ensuring UUID is never used)
+      let studentId: string | null = resolveStudentIdentifier(authUser);
       let department: string | null = null;
       let college: string | null = null;
       let program: string | null = null;
@@ -165,40 +170,41 @@ export const studentService = {
       if (enrollments.length > 0) {
         const first = enrollments[0];
         if (first) {
-          if (first.student) {
+          // If first.student is a human-readable identifier and not a UUID, use it
+          if (first.student && !isValidUuid(first.student)) {
             studentId = first.student;
           }
           const offering = first.course_offering_detail;
           if (offering) {
-          const course = offering.course_detail;
-          if (course) {
-            if (course.intended_class_standing) {
-              classStanding = course.intended_class_standing;
-            }
-            const prog = course.program_detail;
-            if (prog) {
-              program = prog.name ? `${prog.name}${prog.code ? ` (${prog.code})` : ''}` : prog.code || null;
-              const dept = prog.department_detail;
-              if (dept) {
-                department = dept.name ? `${dept.name}${dept.code ? ` (${dept.code})` : ''}` : dept.code || null;
-                if (typeof dept.college === 'string') {
-                  college = dept.college;
+            const course = offering.course_detail;
+            if (course) {
+              if (course.intended_class_standing) {
+                classStanding = course.intended_class_standing;
+              }
+              const prog = course.program_detail;
+              if (prog) {
+                program = prog.name ? `${prog.name}${prog.code ? ` (${prog.code})` : ''}` : prog.code || null;
+                const dept = prog.department_detail;
+                if (dept) {
+                  department = dept.name ? `${dept.name}${dept.code ? ` (${dept.code})` : ''}` : dept.code || null;
+                  if (typeof dept.college === 'string') {
+                    college = dept.college;
+                  }
                 }
               }
             }
-          }
-          const semester = offering.semester_detail;
-          if (semester) {
-            const yearObj = semester.academic_year_detail;
-            if (yearObj?.display_label) {
-              academicYear = yearObj.display_label;
-            } else if (semester.academic_year) {
-              academicYear = semester.academic_year;
+            const semester = offering.semester_detail;
+            if (semester) {
+              const yearObj = semester.academic_year_detail;
+              if (yearObj?.display_label) {
+                academicYear = yearObj.display_label;
+              } else if (semester.academic_year) {
+                academicYear = semester.academic_year;
+              }
             }
           }
         }
       }
-    }
 
       return {
         studentId,
@@ -220,5 +226,14 @@ export const studentService = {
         totalEnrolledCourses: 0,
       };
     }
+  },
+
+  /**
+   * GET /api/v1/results/me
+   * Retrieves official graded examination results for the authenticated student.
+   */
+  getMyResults: async (): Promise<Result[]> => {
+    const data = await api.get<Result[]>(API_ENDPOINTS.RESULTS.ME);
+    return Array.isArray(data) ? data : [];
   },
 };
