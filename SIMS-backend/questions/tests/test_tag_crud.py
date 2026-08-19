@@ -13,7 +13,7 @@ pytestmark = pytest.mark.django_db
 LIST_URL = reverse("tag_list")
 
 
-def create_user(email="admin@example.com", password="strongpass123", role=RoleChoices.ADMIN):
+def create_user(email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.ADMIN):
     return User.objects.create_user(email=email, password=password, role=role)
 
 
@@ -142,7 +142,7 @@ def test_tag_delete(client):
 
 
 def test_non_admin_cannot_create(client):
-    student = create_user(email="student@example.com", role=RoleChoices.STUDENT)
+    student = create_user(email="student@aastu.edu.et", role=RoleChoices.STUDENT)
     token = auth_client(client, student)
 
     response = client.post(

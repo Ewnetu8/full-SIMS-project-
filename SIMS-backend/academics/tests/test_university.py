@@ -14,7 +14,7 @@ LIST_URL = reverse("university_list")
 
 
 def create_user(
-    email="admin@example.com", password="strongpass123", role=RoleChoices.ADMIN
+    email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.ADMIN
 ):
     return User.objects.create_user(email=email, password=password, role=role)
 
@@ -88,7 +88,7 @@ def test_create_duplicate_code_rejected(client):
 
 
 def test_non_admin_gets_403(client):
-    student = create_user(email="student@example.com", role=RoleChoices.STUDENT)
+    student = create_user(email="student@aastu.edu.et", role=RoleChoices.STUDENT)
     token = auth_client(client, student)
 
     response = client.get(

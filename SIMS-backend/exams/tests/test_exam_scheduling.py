@@ -30,7 +30,7 @@ _counter = 0
 def create_lecturer():
     global _counter
     _counter += 1
-    email = f"lecturer{_counter}@example.com"
+    email = f"lecturer{_counter}@aastu.edu.et"
     identifier = f"L{_counter:03d}"
     user = User.objects.create_user(
         email=email, password="strongpass123", role=RoleChoices.LECTURER
@@ -85,7 +85,7 @@ def make_course_offering():
 def create_student():
     global _counter
     _counter += 1
-    email = f"student{_counter}@example.com"
+    email = f"student{_counter}@aastu.edu.et"
     user = User.objects.create_user(
         email=email, password="strongpass123", role=RoleChoices.STUDENT
     )
