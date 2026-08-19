@@ -129,3 +129,32 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+
+
+class MFAVerifySerializer(serializers.Serializer):
+    totp_code = serializers.CharField(min_length=6, max_length=8)
+
+    def validate_totp_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("TOTP code must be digits only.")
+        return value
+
+
+class MFADisableSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+    totp_code = serializers.CharField(min_length=6, max_length=8)
+
+    def validate_totp_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("TOTP code must be digits only.")
+        return value
+
+
+class MFALoginSerializer(serializers.Serializer):
+    mfa_token = serializers.CharField()
+    totp_code = serializers.CharField(min_length=6, max_length=8)
+
+    def validate_totp_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("TOTP code must be digits only.")
+        return value

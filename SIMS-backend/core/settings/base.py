@@ -229,6 +229,15 @@ ALLOWED_REGISTRATION_DOMAIN_REGEX = os.environ.get(
     r'.*\.?aastu\.edu\.et$',
 )
 
+# MFA (TOTP) settings
+MFA_TOTP_STEP = 30           # TOTP time step in seconds
+MFA_VALID_WINDOW = 1         # Accept codes ±N steps from current
+MFA_TOKEN_LIFETIME = 300     # Short-lived mfa_token JWT lifetime in seconds (5 min)
+MFA_ENCRYPTION_KEY = os.environ.get(
+    'MFA_ENCRYPTION_KEY',
+    'mfa-dev-encryption-key-change-in-prod',
+)
+
 # Celery Beat schedule
 CELERY_BEAT_SCHEDULE = {
     'exam-expiry-sweep': {
