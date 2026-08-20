@@ -49,6 +49,7 @@ export function AcademicStructureManagement() {
   const [academicYears, setAcademicYears] = React.useState<AcademicYearItem[]>([]);
   const [semesters, setSemesters] = React.useState<Semester[]>([]);
   const [departments, setDepartments] = React.useState<Department[]>([]);
+  const [universities, setUniversities] = React.useState<Array<{ id: string; name: string; code: string }>>([]);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -56,26 +57,45 @@ export function AcademicStructureManagement() {
   const [deletingItem, setDeletingItem] = React.useState<{ type: string; id: string; name: string } | null>(null);
 
   // Form states
-  const [collegeForm, setCollegeForm] = React.useState({ name: '', code: '' });
-  const [programForm, setProgramForm] = React.useState({ college: 'College of Engineering', department: '', name: '', code: '', degreeLevel: 'B.Sc.', totalCreditHoursRequired: 120 });
+  const [collegeForm, setCollegeForm] = React.useState({ name: '', code: '', university: '' });
+  const [programForm, setProgramForm] = React.useState<{
+    college: string;
+    department: string;
+    name: string;
+    code: string;
+    degreeLevel: 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA' | 'CERTIFICATE';
+    totalCreditHoursRequired: number;
+  }>({
+    college: '',
+    department: '',
+    name: '',
+    code: '',
+    degreeLevel: 'BACHELOR',
+    totalCreditHoursRequired: 120,
+  });
   const [yearForm, setYearForm] = React.useState({ displayLabel: '', startBoundary: '', endBoundary: '' });
-  const [semesterForm, setSemesterForm] = React.useState({ academicYear: '', semesterIndex: 1 });
+  const [semesterForm, setSemesterForm] = React.useState<{
+    academicYear: string;
+    semesterIndex: 'FIRST' | 'SECOND' | 'SUMMER';
+  }>({ academicYear: '', semesterIndex: 'FIRST' });
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [cols, progs, years, sems, depts] = await Promise.all([
+      const [cols, progs, years, sems, depts, unis] = await Promise.all([
         adminService.getColleges(),
         adminService.getPrograms(),
         adminService.getAcademicYears(),
         adminService.getSemesters(),
         adminService.getDepartments(),
+        adminService.getUniversities().catch(() => []),
       ]);
       setColleges(cols);
       setPrograms(progs);
       setAcademicYears(years);
       setSemesters(sems);
       setDepartments(depts);
+      setUniversities(unis);
     } catch {
       toast.error('Failed to load academic structure data');
     } finally {
@@ -89,10 +109,11 @@ export function AcademicStructureManagement() {
 
   const handleOpenAddModal = () => {
     setEditingItem(null);
-    setCollegeForm({ name: '', code: '' });
-    setProgramForm({ college: 'College of Engineering', department: departments[0]?.id || '', name: '', code: '', degreeLevel: 'B.Sc.', totalCreditHoursRequired: 120 });
-    setYearForm({ displayLabel: '2026/2027', startBoundary: '2026-09-01', endBoundary: '2027-06-30' });
-    setSemesterForm({ academicYear: academicYears[0]?.id || '', semesterIndex: 1 });
+    setCollegeForm({ name: '', code: '', university: '' });
+    setProgramForm({ college: '', department: '', name: '', code: '', degreeLevel: 'BACHELOR', totalCreditHoursRequired: 120 });
+    const todayStr = new Date().toISOString().split('T')[0] || '';
+    setYearForm({ displayLabel: '2026/2027', startBoundary: todayStr, endBoundary: todayStr });
+    setSemesterForm({ academicYear: '', semesterIndex: 'FIRST' });
     setIsModalOpen(true);
   };
 
@@ -104,10 +125,22 @@ export function AcademicStructureManagement() {
           return;
         }
         if (editingItem) {
-          await adminService.updateCollege(editingItem.id, collegeForm);
+          await adminService.updateCollege(editingItem.id, {
+            name: collegeForm.name.trim(),
+            code: collegeForm.code.trim().toUpperCase(),
+            ...(collegeForm.university ? { university: collegeForm.university } : {}),
+          });
           toast.success('College updated');
         } else {
-          await adminService.createCollege(collegeForm);
+          if (!collegeForm.university) {
+            toast.error('Missing fields', { description: 'University is required for college creation.' });
+            return;
+          }
+          await adminService.createCollege({
+            name: collegeForm.name.trim(),
+            code: collegeForm.code.trim().toUpperCase(),
+            university: collegeForm.university,
+          });
           toast.success('College created');
         }
       } else if (activeTab === 'programs') {
@@ -115,11 +148,18 @@ export function AcademicStructureManagement() {
           toast.error('Missing fields', { description: 'Name, Code, and Department are required.' });
           return;
         }
+        const programPayload = {
+          department: programForm.department,
+          name: programForm.name.trim(),
+          code: programForm.code.trim().toUpperCase(),
+          degree_level: programForm.degreeLevel,
+          total_credit_hours_required: Number(programForm.totalCreditHoursRequired),
+        };
         if (editingItem) {
-          await adminService.updateProgram(editingItem.id, programForm);
+          await adminService.updateProgram(editingItem.id, programPayload);
           toast.success('Program updated');
         } else {
-          await adminService.createProgram(programForm);
+          await adminService.createProgram(programPayload);
           toast.success('Program created');
         }
       } else if (activeTab === 'years') {
@@ -128,7 +168,7 @@ export function AcademicStructureManagement() {
           return;
         }
         const yearPayload = {
-          display_label: yearForm.displayLabel,
+          display_label: yearForm.displayLabel.trim(),
           start_boundary: yearForm.startBoundary,
           end_boundary: yearForm.endBoundary,
         };
@@ -144,12 +184,11 @@ export function AcademicStructureManagement() {
           toast.error('Missing fields', { description: 'Academic Year is required.' });
           return;
         }
-        const semesterIndexParam: 'FIRST' | 'SECOND' = semesterForm.semesterIndex === 2 ? 'SECOND' : 'FIRST';
         if (editingItem) {
-          await adminService.updateSemester(editingItem.id, { semester_index: semesterIndexParam });
+          await adminService.updateSemester(editingItem.id, { semester_index: semesterForm.semesterIndex });
           toast.success('Semester updated');
         } else {
-          await adminService.createSemester({ academic_year: semesterForm.academicYear, semester_index: semesterIndexParam });
+          await adminService.createSemester({ academic_year: semesterForm.academicYear, semester_index: semesterForm.semesterIndex });
           toast.success('Semester created');
         }
       }
@@ -248,7 +287,7 @@ export function AcademicStructureManagement() {
                         <td className="px-4 py-3.5 font-semibold text-foreground">{col.name}</td>
                         <td className="px-4 py-3.5 text-xs text-muted-foreground">{col.university || 'AASTU'}</td>
                         <td className="px-4 py-3.5 text-right space-x-2">
-                          <Button size="xs" variant="ghost" onClick={() => { setEditingItem(col); setCollegeForm({ name: col.name, code: col.code }); setIsModalOpen(true); }}>
+                          <Button size="xs" variant="ghost" onClick={() => { setEditingItem(col); setCollegeForm({ name: col.name, code: col.code, university: col.university || '' }); setIsModalOpen(true); }}>
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="xs" variant="ghost" className="text-destructive" onClick={() => setDeletingItem({ type: 'college', id: col.id, name: col.name })}>
@@ -282,7 +321,20 @@ export function AcademicStructureManagement() {
                         <td className="px-4 py-3.5 text-xs">{prg.degreeLevel}</td>
                         <td className="px-4 py-3.5 text-xs">{prg.totalCreditHoursRequired} hrs</td>
                         <td className="px-4 py-3.5 text-right space-x-2">
-                          <Button size="xs" variant="ghost" onClick={() => { setEditingItem(prg); setProgramForm({ college: 'College of Engineering', department: prg.department, name: prg.name, code: prg.code, degreeLevel: prg.degreeLevel, totalCreditHoursRequired: prg.totalCreditHoursRequired }); setIsModalOpen(true); }}>
+                          <Button size="xs" variant="ghost" onClick={() => {
+                            setEditingItem(prg);
+                            const validDegree: 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA' | 'CERTIFICATE' =
+                              (['BACHELOR', 'MASTER', 'DOCTORATE', 'DIPLOMA', 'CERTIFICATE'].includes(prg.degreeLevel) ? prg.degreeLevel : 'BACHELOR') as any;
+                            setProgramForm({
+                              college: '',
+                              department: prg.department,
+                              name: prg.name,
+                              code: prg.code,
+                              degreeLevel: validDegree,
+                              totalCreditHoursRequired: prg.totalCreditHoursRequired,
+                            });
+                            setIsModalOpen(true);
+                          }}>
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="xs" variant="ghost" className="text-destructive" onClick={() => setDeletingItem({ type: 'program', id: prg.id, name: prg.name })}>
@@ -339,7 +391,7 @@ export function AcademicStructureManagement() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {semesters.map((sem) => {
-                    const semLabel = sem.semesterIndex === 'FIRST' ? '1st Semester' : sem.semesterIndex === 'SECOND' ? '2nd Semester' : `Semester ${sem.semesterIndex}`;
+                    const semLabel = sem.semesterIndex === 'FIRST' ? '1st Semester' : sem.semesterIndex === 'SECOND' ? '2nd Semester' : sem.semesterIndex === 'SUMMER' ? 'Summer Semester' : `Semester ${sem.semesterIndex}`;
                     const yearLabel = sem.academicYearDetail?.displayLabel || sem.academicYear;
                     return (
                       <tr key={sem.id} className="hover:bg-accent/40">
@@ -347,7 +399,7 @@ export function AcademicStructureManagement() {
                         <td className="px-4 py-3.5 text-xs text-muted-foreground">{yearLabel}</td>
                         <td className="px-4 py-3.5 text-xs text-muted-foreground">{sem.createdAt || 'N/A'}</td>
                         <td className="px-4 py-3.5 text-right space-x-2">
-                          <Button size="xs" variant="ghost" onClick={() => { setEditingItem(sem); setSemesterForm({ academicYear: sem.academicYear, semesterIndex: sem.semesterIndex === 'FIRST' ? 1 : 2 }); setIsModalOpen(true); }}>
+                          <Button size="xs" variant="ghost" onClick={() => { setEditingItem(sem); setSemesterForm({ academicYear: sem.academicYearDetail?.id || sem.academicYear, semesterIndex: sem.semesterIndex }); setIsModalOpen(true); }}>
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
                           <Button size="xs" variant="ghost" className="text-destructive" onClick={() => setDeletingItem({ type: 'semester', id: sem.id, name: semLabel })}>
@@ -379,6 +431,21 @@ export function AcademicStructureManagement() {
           <DialogBody className="space-y-4 py-2">
             {activeTab === 'colleges' && (
               <>
+                <div>
+                  <Label htmlFor="colUni">University *</Label>
+                  <FormSelect
+                    id="colUni"
+                    value={collegeForm.university}
+                    onChange={(e) => setCollegeForm({ ...collegeForm, university: e.target.value })}
+                  >
+                    <option value="">-- Select University --</option>
+                    {universities.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.code})
+                      </option>
+                    ))}
+                  </FormSelect>
+                </div>
                 <div>
                   <Label htmlFor="colName">College Name *</Label>
                   <Input id="colName" value={collegeForm.name} onChange={(e) => setCollegeForm({ ...collegeForm, name: e.target.value })} placeholder="e.g. College of Applied Sciences" />
@@ -440,7 +507,17 @@ export function AcademicStructureManagement() {
                 </div>
                 <div>
                   <Label htmlFor="prgDegree">Degree Level</Label>
-                  <Input id="prgDegree" value={programForm.degreeLevel} onChange={(e) => setProgramForm({ ...programForm, degreeLevel: e.target.value })} placeholder="B.Sc." />
+                  <FormSelect
+                    id="prgDegree"
+                    value={programForm.degreeLevel}
+                    onChange={(e) => setProgramForm({ ...programForm, degreeLevel: e.target.value as any })}
+                  >
+                    <option value="BACHELOR">Bachelor</option>
+                    <option value="MASTER">Master</option>
+                    <option value="DOCTORATE">Doctorate</option>
+                    <option value="DIPLOMA">Diploma</option>
+                    <option value="CERTIFICATE">Certificate</option>
+                  </FormSelect>
                 </div>
                 <div>
                   <Label htmlFor="prgCredits">Credit Hours Required</Label>
@@ -471,14 +548,23 @@ export function AcademicStructureManagement() {
                 <div>
                   <Label htmlFor="semYear">Academic Year *</Label>
                   <FormSelect id="semYear" value={semesterForm.academicYear} onChange={(e) => setSemesterForm({ ...semesterForm, academicYear: e.target.value })}>
+                    <option value="">-- Select Academic Year --</option>
                     {academicYears.map((y) => (
                       <option key={y.id} value={y.id}>{y.displayLabel}</option>
                     ))}
                   </FormSelect>
                 </div>
                 <div>
-                  <Label htmlFor="semIdx">Semester Index (e.g. 1 or 2)</Label>
-                  <Input id="semIdx" type="number" value={semesterForm.semesterIndex} onChange={(e) => setSemesterForm({ ...semesterForm, semesterIndex: Number(e.target.value) })} />
+                  <Label htmlFor="semIdx">Semester Term *</Label>
+                  <FormSelect
+                    id="semIdx"
+                    value={semesterForm.semesterIndex}
+                    onChange={(e) => setSemesterForm({ ...semesterForm, semesterIndex: e.target.value as any })}
+                  >
+                    <option value="FIRST">First Semester</option>
+                    <option value="SECOND">Second Semester</option>
+                    <option value="SUMMER">Summer Semester</option>
+                  </FormSelect>
                 </div>
               </>
             )}

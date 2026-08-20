@@ -82,12 +82,9 @@ export function CourseManagement() {
     code: '',
     title: '',
     creditHours: 3,
-    collegeId: 'col-coe-001',
-    departmentId: 'dept-se-006',
+    departmentId: '',
     programId: '',
     intendedClassStanding: '',
-    lecturerId: '',
-    semester: 'Semester 1',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -105,12 +102,9 @@ export function CourseManagement() {
       code: '',
       title: '',
       creditHours: 3,
-      collegeId: colleges[0]?.id || 'col-coe-001',
-      departmentId: departments[0]?.id || 'dept-se-006',
-      programId: programs[0]?.id || '',
+      departmentId: '',
+      programId: '',
       intendedClassStanding: '',
-      lecturerId: lecturers[0]?.id || '',
-      semester: 'Semester 1',
     });
     setIsAddModalOpen(true);
   };
@@ -118,16 +112,14 @@ export function CourseManagement() {
   const handleOpenEditModal = (course: Course) => {
     setFieldErrors({});
     setEditingCourse(course);
+    const courseProgram = programs.find((p) => p.id === course.program);
     setFormData({
       code: course.code,
       title: course.name,
       creditHours: course.creditHours,
-      collegeId: colleges[0]?.id || 'col-coe-001',
-      departmentId: departments[0]?.id || 'dept-se-006',
-      programId: programs[0]?.id || '',
-      intendedClassStanding: '',
-      lecturerId: course.assignedLecturer?.id || '',
-      semester: course.semester || 'Semester 1',
+      departmentId: courseProgram?.department || '',
+      programId: course.program || '',
+      intendedClassStanding: course.intendedClassStanding || '',
     });
   };
 
@@ -160,18 +152,20 @@ export function CourseManagement() {
     try {
       if (editingCourse) {
         await updateCourse(editingCourse.id, {
-          course_code: formData.code.toUpperCase(),
-          title: formData.title,
-          credit_hours: formData.creditHours,
+          course_code: formData.code.trim().toUpperCase(),
+          title: formData.title.trim(),
+          credit_hours: Number(formData.creditHours),
+          program: formData.programId ? formData.programId : null,
+          intended_class_standing: formData.intendedClassStanding || undefined,
         });
         toast.success('Course updated successfully.');
         setEditingCourse(null);
       } else {
         await addCourse({
-          course_code: formData.code.toUpperCase(),
-          title: formData.title,
-          credit_hours: formData.creditHours,
-          program: formData.programId || undefined,
+          course_code: formData.code.trim().toUpperCase(),
+          title: formData.title.trim(),
+          credit_hours: Number(formData.creditHours),
+          program: formData.programId ? formData.programId : undefined,
           intended_class_standing: formData.intendedClassStanding || undefined,
         });
         toast.success('Course created successfully.');
@@ -390,23 +384,28 @@ export function CourseManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="courseDepartment" required>
-                  Department
+                <Label htmlFor="courseDepartment">
+                  Filter by Department (Optional)
                 </Label>
                 <select
                   id="courseDepartment"
                   className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                   value={formData.departmentId}
-                  onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                  onChange={(e) => {
+                    const deptId = e.target.value;
+                    setFormData({
+                      ...formData,
+                      departmentId: deptId,
+                    });
+                  }}
                 >
-                  <option value="">-- Select Department --</option>
+                  <option value="">-- All Departments --</option>
                   {departments.map((dept) => (
                     <option key={dept.id} value={dept.id}>
                       {dept.name} ({dept.code})
                     </option>
                   ))}
                 </select>
-                {fieldErrors.department && <p className="text-xs text-destructive mt-1">{fieldErrors.department}</p>}
               </div>
 
               <div>
@@ -415,14 +414,24 @@ export function CourseManagement() {
                   id="programId"
                   className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                   value={formData.programId}
-                  onChange={(e) => setFormData({ ...formData, programId: e.target.value })}
+                  onChange={(e) => {
+                    const progId = e.target.value;
+                    const prog = programs.find((p) => p.id === progId);
+                    setFormData({
+                      ...formData,
+                      programId: progId,
+                      ...(prog?.department ? { departmentId: prog.department } : {}),
+                    });
+                  }}
                 >
                   <option value="">-- Unassigned Program --</option>
-                  {programs.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.code})
-                    </option>
-                  ))}
+                  {programs
+                    .filter((p) => !formData.departmentId || p.department === formData.departmentId)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.code})
+                      </option>
+                    ))}
                 </select>
                 {fieldErrors.program && <p className="text-xs text-destructive mt-1">{fieldErrors.program}</p>}
               </div>

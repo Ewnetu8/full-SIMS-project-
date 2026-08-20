@@ -126,15 +126,15 @@ interface AdminStoreState {
 
   // Actions - Semesters
   setSemesterSearchQuery: (q: string) => void;
-  addSemester: (data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }) => Promise<Semester>;
-  updateSemester: (id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>) => Promise<Semester>;
+  addSemester: (data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }) => Promise<Semester>;
+  updateSemester: (id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }>) => Promise<Semester>;
   deleteSemester: (id: string) => Promise<void>;
 
   // Actions - Courses
   setCourseSearchQuery: (q: string) => void;
   setCourseDeptFilter: (dept: string) => void;
   addCourse: (data: { title: string; course_code: string; credit_hours: number; program?: string; intended_class_standing?: string }) => Promise<Course>;
-  updateCourse: (id: string, data: Partial<{ title: string; course_code: string; credit_hours: number }>) => Promise<Course>;
+  updateCourse: (id: string, data: Partial<{ title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: string }>) => Promise<Course>;
   deleteCourse: (id: string) => Promise<void>;
   toggleCourseArchive: (id: string) => void;
 
@@ -293,14 +293,14 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     try {
       const students = await adminService.getStudents();
       set({ students });
-    } catch {}
+    } catch { }
   },
 
   fetchLecturers: async () => {
     try {
       const lecturers = await adminService.getLecturers();
       set({ lecturers });
-    } catch {}
+    } catch { }
   },
 
   fetchColleges: async () => {

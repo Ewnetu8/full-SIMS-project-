@@ -57,7 +57,7 @@ export interface ApiSemester {
   id: string;
   academic_year: string;
   academic_year_detail?: ApiAcademicYear;
-  semester_index: 'FIRST' | 'SECOND';
+  semester_index: 'FIRST' | 'SECOND' | 'SUMMER';
   created_at?: string;
   updated_at?: string;
 }
@@ -65,6 +65,7 @@ export interface ApiSemester {
 export interface ApiCourse {
   id: string;
   program?: string | null;
+  program_detail?: ApiProgram;
   title: string;
   course_code: string;
   credit_hours: number;
@@ -293,7 +294,7 @@ export const academicService = {
     }));
   },
 
-  async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number; collegeId?: string }): Promise<Program> {
+  async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
     const departmentId = data.department;
 
     const payload: Record<string, any> = {
@@ -439,11 +440,11 @@ export const academicService = {
       academicYear: s.academic_year,
       academicYearDetail: s.academic_year_detail
         ? {
-            id: s.academic_year_detail.id,
-            displayLabel: s.academic_year_detail.display_label,
-            startBoundary: s.academic_year_detail.start_boundary,
-            endBoundary: s.academic_year_detail.end_boundary,
-          }
+          id: s.academic_year_detail.id,
+          displayLabel: s.academic_year_detail.display_label,
+          startBoundary: s.academic_year_detail.start_boundary,
+          endBoundary: s.academic_year_detail.end_boundary,
+        }
         : undefined,
       semesterIndex: s.semester_index,
       createdAt: s.created_at,
@@ -451,18 +452,18 @@ export const academicService = {
     }));
   },
 
-  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }): Promise<Semester> {
+  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }): Promise<Semester> {
     const res = await api.post<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTERS, data);
     return {
       id: res.id,
       academicYear: res.academic_year,
       academicYearDetail: res.academic_year_detail
         ? {
-            id: res.academic_year_detail.id,
-            displayLabel: res.academic_year_detail.display_label,
-            startBoundary: res.academic_year_detail.start_boundary,
-            endBoundary: res.academic_year_detail.end_boundary,
-          }
+          id: res.academic_year_detail.id,
+          displayLabel: res.academic_year_detail.display_label,
+          startBoundary: res.academic_year_detail.start_boundary,
+          endBoundary: res.academic_year_detail.end_boundary,
+        }
         : undefined,
       semesterIndex: res.semester_index,
       createdAt: res.created_at,
@@ -470,18 +471,18 @@ export const academicService = {
     };
   },
 
-  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>): Promise<Semester> {
+  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }>): Promise<Semester> {
     const res = await api.patch<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTER_BY_ID(id), data);
     return {
       id: res.id,
       academicYear: res.academic_year,
       academicYearDetail: res.academic_year_detail
         ? {
-            id: res.academic_year_detail.id,
-            displayLabel: res.academic_year_detail.display_label,
-            startBoundary: res.academic_year_detail.start_boundary,
-            endBoundary: res.academic_year_detail.end_boundary,
-          }
+          id: res.academic_year_detail.id,
+          displayLabel: res.academic_year_detail.display_label,
+          startBoundary: res.academic_year_detail.start_boundary,
+          endBoundary: res.academic_year_detail.end_boundary,
+        }
         : undefined,
       semesterIndex: res.semester_index,
       createdAt: res.created_at,

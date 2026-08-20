@@ -125,10 +125,6 @@ export function ProgramManagement() {
     const trimmedCode = formData.code.trim();
     const trimmedName = formData.name.trim();
 
-    if (!formData.collegeId) {
-      errors.college = 'College selection is required.';
-    }
-
     if (!formData.departmentId) {
       errors.department = 'Department selection is required.';
     }
@@ -165,7 +161,6 @@ export function ProgramManagement() {
       code: formData.code.trim().toUpperCase(),
       degree_level: formData.degreeLevel,
       total_credit_hours_required: Number(formData.totalCreditHoursRequired),
-      collegeId: formData.collegeId,
     };
 
     try {
@@ -339,8 +334,8 @@ export function ProgramManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="college" required>
-                  College
+                <Label htmlFor="college">
+                  Filter by College (Optional)
                 </Label>
                 <select
                   id="college"
@@ -351,18 +346,16 @@ export function ProgramManagement() {
                     setFormData((prev) => ({
                       ...prev,
                       collegeId: newCollegeId,
-                      departmentId: '', // Reset department selection when college changes
                     }));
                   }}
                 >
-                  <option value="">-- Select College --</option>
+                  <option value="">-- All Colleges --</option>
                   {colleges.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} ({c.code})
                     </option>
                   ))}
                 </select>
-                {fieldErrors.college && <p className="text-xs text-destructive mt-1">{fieldErrors.college}</p>}
               </div>
 
               <div>
@@ -373,23 +366,22 @@ export function ProgramManagement() {
                   id="department"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm text-foreground"
                   value={formData.departmentId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, departmentId: e.target.value }))}
-                  disabled={!formData.collegeId}
+                  onChange={(e) => {
+                    const deptId = e.target.value;
+                    const dept = departments.find((d) => d.id === deptId);
+                    setFormData((prev) => ({
+                      ...prev,
+                      departmentId: deptId,
+                      ...(dept?.college ? { collegeId: dept.college } : {}),
+                    }));
+                  }}
                 >
-                  {!formData.collegeId ? (
-                    <option value="">-- Select College First --</option>
-                  ) : availableDepartments.length === 0 ? (
-                    <option value="">No departments available</option>
-                  ) : (
-                    <>
-                      <option value="">-- Select Department --</option>
-                      {availableDepartments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} ({d.code})
-                        </option>
-                      ))}
-                    </>
-                  )}
+                  <option value="">-- Select Department --</option>
+                  {availableDepartments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.code})
+                    </option>
+                  ))}
                 </select>
                 {fieldErrors.department && <p className="text-xs text-destructive mt-1">{fieldErrors.department}</p>}
               </div>

@@ -80,9 +80,7 @@ export function DepartmentManagement() {
   const [formData, setFormData] = React.useState({
     code: '',
     name: '',
-    description: '',
     collegeId: '',
-    hodId: lecturers[0]?.id || '',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -98,13 +96,10 @@ export function DepartmentManagement() {
 
   const handleOpenAddModal = () => {
     setFieldErrors({});
-    const defaultCollege = colleges.find((c) => UUID_REGEX.test(c.id));
     setFormData({
       code: '',
       name: '',
-      description: '',
-      collegeId: defaultCollege ? defaultCollege.id : '',
-      hodId: lecturers[0]?.id || '',
+      collegeId: '',
     });
     setIsAddModalOpen(true);
   };
@@ -115,9 +110,7 @@ export function DepartmentManagement() {
     setFormData({
       code: dept.code,
       name: dept.name,
-      description: dept.description || '',
       collegeId: dept.college && UUID_REGEX.test(dept.college) ? dept.college : '',
-      hodId: dept.headOfDepartment?.id || '',
     });
   };
 
@@ -153,7 +146,7 @@ export function DepartmentManagement() {
         await updateDepartment(editingDept.id, {
           code: formData.code.trim().toUpperCase(),
           name: formData.name.trim(),
-          college: formData.collegeId || undefined,
+          college: formData.collegeId ? formData.collegeId : undefined,
         });
         toast.success('Department updated successfully.');
         setEditingDept(null);
@@ -161,7 +154,7 @@ export function DepartmentManagement() {
         await addDepartment({
           code: formData.code.trim().toUpperCase(),
           name: formData.name.trim(),
-          college: formData.collegeId || undefined,
+          college: formData.collegeId ? formData.collegeId : undefined,
         });
         toast.success('Department created successfully.');
         setIsAddModalOpen(false);
@@ -175,14 +168,12 @@ export function DepartmentManagement() {
     }
   };
 
+  const [selectedHodId, setSelectedHodId] = React.useState('');
+
   const handleAssignHOD = () => {
     if (assigningHODDept) {
-      const selectedLecturer = lecturers.find((l) => l.id === formData.hodId);
+      const selectedLecturer = lecturers.find((l) => l.id === selectedHodId);
       if (selectedLecturer) {
-        updateDepartment(assigningHODDept.id, {
-          name: assigningHODDept.name,
-          code: assigningHODDept.code,
-        });
         toast.success(`Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName} assigned as HOD for ${assigningHODDept.name}.`);
       }
       setAssigningHODDept(null);
@@ -509,9 +500,10 @@ export function DepartmentManagement() {
                 </Label>
                 <FormSelect
                   id="hodSelect"
-                  value={formData.hodId}
-                  onChange={(e) => setFormData({ ...formData, hodId: e.target.value })}
+                  value={selectedHodId}
+                  onChange={(e) => setSelectedHodId(e.target.value)}
                 >
+                  <option value="">-- Select Faculty Member --</option>
                   {lecturers.map((l) => (
                     <option key={l.id} value={l.id}>
                       Dr. {l.firstName} {l.lastName} — {l.department}

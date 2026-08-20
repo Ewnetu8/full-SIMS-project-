@@ -32,6 +32,7 @@ export interface RegisterUserPayload {
   student_identifier?: string;
   faculty_identifier?: string;
   department_id?: string | null;
+  national_id_fan?: string | null;
 }
 
 export const adminService = {
@@ -58,6 +59,7 @@ export const adminService = {
       first_name: data.first_name ? data.first_name.trim() : '',
       last_name: data.last_name ? data.last_name.trim() : '',
       role: roleUpper,
+      national_id_fan: data.national_id_fan ? data.national_id_fan.trim() : null,
     };
 
     if (roleUpper === 'STUDENT') {
@@ -134,6 +136,11 @@ export const adminService = {
     await api.delete(API_ENDPOINTS.USERS.BY_ID(id));
   },
 
+  // ─── Universities ───────────────────────────────────────────────────────────
+  async getUniversities(): Promise<Array<{ id: string; name: string; code: string }>> {
+    return academicService.getUniversities();
+  },
+
   // ─── Colleges ───────────────────────────────────────────────────────────────
   async getColleges(): Promise<College[]> {
     return academicService.getColleges();
@@ -143,7 +150,7 @@ export const adminService = {
     return academicService.createCollege(data);
   },
 
-  async updateCollege(id: string, data: Partial<{ name: string; code: string }>): Promise<College> {
+  async updateCollege(id: string, data: Partial<{ name: string; code: string; university?: string }>): Promise<College> {
     return academicService.updateCollege(id, data);
   },
 
@@ -212,7 +219,7 @@ export const adminService = {
     return academicService.getSemesters();
   },
 
-  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }): Promise<Semester> {
+  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }): Promise<Semester> {
     let yearId = data.academic_year;
     let displayLabel = data.academic_year;
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.academic_year);
@@ -271,7 +278,7 @@ export const adminService = {
     return createdSem;
   },
 
-  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>): Promise<Semester> {
+  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }>): Promise<Semester> {
     return academicService.updateSemester(id, data);
   },
 
@@ -425,7 +432,7 @@ export const adminService = {
     return [];
   },
 
-  async markNotificationRead(_id: string): Promise<void> {},
+  async markNotificationRead(_id: string): Promise<void> { },
 
   async getDashboardStats(): Promise<AdminDashboardStats> {
     const [departments, courses, exams, students, lecturers, users] = await Promise.all([

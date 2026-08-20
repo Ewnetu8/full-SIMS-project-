@@ -128,7 +128,7 @@ export interface Semester {
   id: string;
   academicYear: string;
   academicYearDetail?: AcademicYear;
-  semesterIndex: 'FIRST' | 'SECOND';
+  semesterIndex: 'FIRST' | 'SECOND' | 'SUMMER';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -139,6 +139,8 @@ export interface Course {
   name: string; // e.g. "Data Structures & Algorithms"
   creditHours: number;
   department: string;
+  program?: string | null;
+  intendedClassStanding?: string;
   assignedLecturer: {
     id: string;
     name: string;

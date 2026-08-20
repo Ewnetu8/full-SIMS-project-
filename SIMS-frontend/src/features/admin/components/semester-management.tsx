@@ -85,7 +85,7 @@ export function SemesterManagement() {
     setFieldErrors({});
     setEditingSemester(sem);
     setFormData({
-      academicYear: sem.academicYearDetail?.displayLabel || sem.academicYear || '',
+      academicYear: sem.academicYearDetail?.id || sem.academicYear || '',
       semesterIndex: sem.semesterIndex,
     });
   };
@@ -93,7 +93,7 @@ export function SemesterManagement() {
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!formData.academicYear.trim()) {
-      errors.academic_year = 'Academic Year is required (e.g., 2025/2026).';
+      errors.academic_year = 'Academic Year is required.';
     }
 
     if (!formData.semesterIndex) {
@@ -272,14 +272,20 @@ export function SemesterManagement() {
                 <Label htmlFor="academicYear" required>
                   Academic Year
                 </Label>
-                <Input
+                <select
                   id="academicYear"
-                  placeholder="e.g. 2025/2026"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm text-foreground"
                   value={formData.academicYear}
                   onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
                   disabled={!!editingSemester}
-                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
-                />
+                >
+                  <option value="">-- Select Academic Year --</option>
+                  {academicYears.map((y) => (
+                    <option key={y.id} value={y.id}>
+                      {y.displayLabel}
+                    </option>
+                  ))}
+                </select>
                 {fieldErrors.academic_year && <p className="text-xs text-destructive mt-1">{fieldErrors.academic_year}</p>}
               </div>
 
@@ -297,6 +303,7 @@ export function SemesterManagement() {
                   <SelectContent>
                     <SelectItem value="FIRST">First Semester</SelectItem>
                     <SelectItem value="SECOND">Second Semester</SelectItem>
+                    <SelectItem value="SUMMER">Summer Semester</SelectItem>
                   </SelectContent>
                 </Select>
                 {fieldErrors.semester_index && <p className="text-xs text-destructive mt-1">{fieldErrors.semester_index}</p>}

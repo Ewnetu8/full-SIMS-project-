@@ -202,6 +202,7 @@ export function UserManagement() {
           student_identifier: formData.role === 'student' ? formData.studentIdentifier : undefined,
           faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
           department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : null,
+          national_id_fan: formData.nationalId ? formData.nationalId.trim() : undefined,
         });
         toast.success('User created successfully.');
         setIsAddModalOpen(false);

@@ -70,8 +70,7 @@ export function CollegeManagement() {
 
   const handleOpenAddModal = () => {
     setFieldErrors({});
-    const defaultUni = universities[0]?.id || '';
-    setFormData({ name: '', code: '', university: defaultUni });
+    setFormData({ name: '', code: '', university: '' });
     setIsAddModalOpen(true);
   };
 
@@ -81,7 +80,7 @@ export function CollegeManagement() {
     setFormData({
       name: college.name,
       code: college.code,
-      university: college.university || universities[0]?.id || '',
+      university: college.university || '',
     });
   };
 
@@ -99,6 +98,10 @@ export function CollegeManagement() {
       errors.name = 'College name must not exceed 255 characters.';
     }
 
+    if (!formData.university) {
+      errors.university = 'University is required.';
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -110,16 +113,17 @@ export function CollegeManagement() {
     try {
       if (editingCollege) {
         await updateCollege(editingCollege.id, {
-          name: formData.name,
-          code: formData.code.toUpperCase(),
+          name: formData.name.trim(),
+          code: formData.code.trim().toUpperCase(),
+          ...(formData.university ? { university: formData.university } : {}),
         });
         toast.success('College updated successfully.');
         setEditingCollege(null);
       } else {
         await addCollege({
-          name: formData.name,
-          code: formData.code.toUpperCase(),
-          university: formData.university || undefined,
+          name: formData.name.trim(),
+          code: formData.code.trim().toUpperCase(),
+          university: formData.university,
         });
         toast.success('College created successfully.');
         setIsAddModalOpen(false);
@@ -312,17 +316,12 @@ export function CollegeManagement() {
                 onChange={(e) => setFormData({ ...formData, university: e.target.value })}
                 disabled={isLoadingUniversities}
               >
-                {isLoadingUniversities ? (
-                  <option value="">Loading universities...</option>
-                ) : universities.length === 0 ? (
-                  <option value="">Addis Ababa Science and Technology University (Default)</option>
-                ) : (
-                  universities.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.code})
-                    </option>
-                  ))
-                )}
+                <option value="">-- Select University --</option>
+                {universities.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.code})
+                  </option>
+                ))}
               </select>
               {fieldErrors.university && <p className="text-xs text-destructive mt-1">{fieldErrors.university}</p>}
             </div>

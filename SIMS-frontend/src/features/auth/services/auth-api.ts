@@ -124,22 +124,6 @@ export const authApi = {
       expiresAt,
     };
 
-    // Synchronize Next.js edge middleware session cookie and AWAIT completion
-    try {
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: formattedUser.id,
-          role: formattedUser.role,
-          exp: expiresAt,
-          rememberMe: credentials.rememberMe,
-        }),
-      });
-    } catch (e) {
-      console.error('Failed to sync session cookie:', e);
-    }
-
     return {
       user: formattedUser,
       tokens: formattedTokens,
@@ -156,12 +140,6 @@ export const authApi = {
       await apiClient.post<void>(API_ENDPOINTS.AUTH.LOGOUT, {});
     } catch (e) {
       console.error('Logout request error:', e);
-    } finally {
-      try {
-        await fetch('/api/auth/session', { method: 'DELETE' });
-      } catch (e) {
-        console.error('Failed to clear session cookie:', e);
-      }
     }
   },
 
