@@ -132,7 +132,7 @@ export interface Semester {
   id: string;
   academicYear: string;
   academicYearDetail?: AcademicYear;
-  semesterIndex: 'FIRST' | 'SECOND' | 'SUMMER';
+  semesterIndex: 'FIRST' | 'SECOND';
   createdAt?: string;
   updatedAt?: string;
 }

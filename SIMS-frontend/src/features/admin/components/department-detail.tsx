@@ -16,7 +16,7 @@ import { Badge, Button, Card } from '@/components/ui';
 import { ROUTES } from '@/constants';
 import { getUserFriendlyErrorMessage } from '@/lib/errors';
 
-import { adminService } from '../services';
+import { adminService } from '../services/admin-service';
 import { useAdminStore } from '../store';
 
 import type { Department } from '../types';

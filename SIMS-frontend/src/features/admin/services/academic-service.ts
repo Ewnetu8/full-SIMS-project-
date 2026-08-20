@@ -60,7 +60,7 @@ export interface ApiSemester {
   id: string;
   academic_year: string;
   academic_year_detail?: ApiAcademicYear;
-  semester_index: 'FIRST' | 'SECOND' | 'SUMMER';
+  semester_index: 'FIRST' | 'SECOND';
   created_at?: string;
   updated_at?: string;
 }
@@ -411,7 +411,7 @@ export const academicService = {
     }));
   },
 
-  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }): Promise<Semester> {
+  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }): Promise<Semester> {
     const res = await api.post<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTERS, data);
     return {
       id: res.id,
@@ -430,7 +430,7 @@ export const academicService = {
     };
   },
 
-  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }>): Promise<Semester> {
+  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>): Promise<Semester> {
     const res = await api.patch<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTER_BY_ID(id), data);
     return {
       id: res.id,

@@ -127,8 +127,8 @@ interface AdminStoreState {
 
   // Actions - Semesters
   setSemesterSearchQuery: (q: string) => void;
-  addSemester: (data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }) => Promise<Semester>;
-  updateSemester: (id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' | 'SUMMER' }>) => Promise<Semester>;
+  addSemester: (data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }) => Promise<Semester>;
+  updateSemester: (id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>) => Promise<Semester>;
   deleteSemester: (id: string) => Promise<void>;
 
   // Actions - Courses

@@ -157,7 +157,7 @@ export function SemesterManagement() {
             Academic Semesters
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage academic semester periods (First, Second, Summer).
+            Manage academic semester periods (First, Second).
           </p>
         </div>
         <Button onClick={handleOpenAddModal} leftIcon={<Plus className="h-4 w-4" />}>
@@ -294,16 +294,16 @@ export function SemesterManagement() {
                   Semester Term
                 </Label>
                 <Select
-                  value={formData.semesterIndex}
+                  value={formData.semesterIndex || 'FIRST'}
+                  defaultValue="FIRST"
                   onValueChange={(val: any) => setFormData({ ...formData, semesterIndex: val })}
                 >
                   <SelectTrigger id="semesterIndex" className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
-                    <SelectValue />
+                    <SelectValue placeholder="First Semester" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="FIRST">First Semester</SelectItem>
                     <SelectItem value="SECOND">Second Semester</SelectItem>
-                    <SelectItem value="SUMMER">Summer Semester</SelectItem>
                   </SelectContent>
                 </Select>
                 {fieldErrors.semester_index && <p className="text-xs text-destructive mt-1">{fieldErrors.semester_index}</p>}

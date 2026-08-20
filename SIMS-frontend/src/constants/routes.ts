@@ -67,7 +67,6 @@ export const ROUTES = {
     REPORTS: '/admin/reports',
     PROFILE: '/admin/profile',
     SETTINGS: '/admin/settings',
-    ACADEMIC_STRUCTURE: '/admin/academic-structure',
     AUDIT_LOGS: '/admin/audit-logs',
     NOTIFICATIONS: '/admin/notifications',
   },
