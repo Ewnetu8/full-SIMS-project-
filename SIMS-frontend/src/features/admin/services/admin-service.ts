@@ -36,45 +36,17 @@ export interface RegisterUserPayload {
 
 export const adminService = {
   // ─── Users ─────────────────────────────────────────────────────────────────
+  /**
+   * Returns user accounts.
+   * Note: The backend SIMS REST API specification does not currently provide a user listing endpoint (GET /api/v1/users).
+   * Returns an empty array to prevent 404 errors, repeated network requests, and displaying fabricated mock data.
+   */
   async getUsers(): Promise<AdminUser[]> {
-    const raw = await api.get<any>(API_ENDPOINTS.USERS.ROOT);
-    const list: any[] = Array.isArray(raw) ? raw : raw?.results || (raw?.users ? raw.users : []);
-    return list.map((u: any) => ({
-      id: u.id || '',
-      userId: u.student_identifier || u.faculty_identifier || u.studentIdentifier || u.facultyIdentifier || u.userId || u.id,
-      firstName: u.first_name || u.firstName || '',
-      lastName: u.last_name || u.lastName || '',
-      email: u.email || '',
-      role: (u.role ? String(u.role).toLowerCase() : 'student') as any,
-      department: u.department_name || u.department?.name || u.department || 'Not assigned',
-      status: u.is_active === false || u.status === 'inactive' ? 'inactive' : 'active',
-      lastLogin: u.last_login ? new Date(u.last_login).toLocaleString() : 'Never',
-      studentIdentifier: u.student_identifier || u.studentIdentifier,
-      facultyIdentifier: u.faculty_identifier || u.facultyIdentifier,
-      createdAt: u.created_at || u.createdAt || new Date().toISOString(),
-    }));
+    return [];
   },
 
-  async getUserById(id: string): Promise<AdminUser | null> {
-    try {
-      const u = await api.get<any>(API_ENDPOINTS.USERS.BY_ID(id));
-      return {
-        id: u.id || id,
-        userId: u.student_identifier || u.faculty_identifier || u.studentIdentifier || u.facultyIdentifier || u.userId || u.id,
-        firstName: u.first_name || u.firstName || '',
-        lastName: u.last_name || u.lastName || '',
-        email: u.email || '',
-        role: (u.role ? String(u.role).toLowerCase() : 'student') as any,
-        department: u.department_name || u.department?.name || u.department || 'Not assigned',
-        status: u.is_active === false || u.status === 'inactive' ? 'inactive' : 'active',
-        lastLogin: u.last_login ? new Date(u.last_login).toLocaleString() : 'Never',
-        studentIdentifier: u.student_identifier || u.studentIdentifier,
-        facultyIdentifier: u.faculty_identifier || u.facultyIdentifier,
-        createdAt: u.created_at || u.createdAt || new Date().toISOString(),
-      };
-    } catch {
-      return null;
-    }
+  async getUserById(_id: string): Promise<AdminUser | null> {
+    return null;
   },
 
   async createUser(data: RegisterUserPayload): Promise<AdminUser> {

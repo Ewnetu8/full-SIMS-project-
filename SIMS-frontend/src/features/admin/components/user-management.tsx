@@ -59,6 +59,7 @@ export function UserManagement() {
     userStatusFilter,
     fetchUsers,
     fetchDepartments,
+    fetchColleges,
     addUser,
     updateUser,
     deleteUser,
@@ -66,7 +67,6 @@ export function UserManagement() {
     setUserRoleFilter,
     setUserDeptFilter,
     setUserStatusFilter,
-    fetchAdminData,
   } = useAdminStore();
 
   // Modals & Drawers state
@@ -90,8 +90,8 @@ export function UserManagement() {
   React.useEffect(() => {
     fetchUsers();
     fetchDepartments();
-    void fetchAdminData();
-  }, [fetchUsers, fetchDepartments, fetchAdminData]);
+    fetchColleges();
+  }, [fetchUsers, fetchDepartments, fetchColleges]);
 
   // Form State matching UserRegisterRequest
   const [formData, setFormData] = React.useState({
@@ -203,9 +203,8 @@ export function UserManagement() {
           faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
           department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : null,
         });
-        toast.success('User account created successfully.');
+        toast.success('User created successfully.');
         setIsAddModalOpen(false);
-        fetchUsers();
       }
     } catch (error: any) {
       const parsedFields = parseFieldErrors(error);
@@ -351,8 +350,8 @@ export function UserManagement() {
       {usersError && (
         <Card className="p-4 border-destructive/40 bg-destructive/10 flex items-center justify-between">
           <div className="flex items-center gap-3 text-destructive">
-            <XCircle className="h-5 w-5" />
-            <p className="text-sm font-medium">Unable to load users. Please try again.</p>
+            <XCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">{usersError}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => fetchUsers()}>
             Retry
@@ -387,8 +386,27 @@ export function UserManagement() {
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                    No users have been created yet.
+                  <td colSpan={7} className="px-4 py-16 text-center">
+                    <div className="mx-auto flex max-w-md flex-col items-center justify-center text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+                        <Users className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">User Management Data Unavailable</h3>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        User management data is currently unavailable because the backend does not provide a user list endpoint.
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground/80">
+                        You can still provision new student, lecturer, and administrator accounts using the button below.
+                      </p>
+                      <Button
+                        className="mt-5"
+                        size="sm"
+                        leftIcon={<Plus className="h-4 w-4" />}
+                        onClick={handleOpenAddModal}
+                      >
+                        Add New User
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
@@ -425,8 +443,8 @@ export function UserManagement() {
                           user.role === 'admin'
                             ? 'default'
                             : user.role === 'lecturer'
-                            ? 'secondary'
-                            : 'outline'
+                              ? 'secondary'
+                              : 'outline'
                         }
                         className="capitalize gap-1"
                       >
@@ -447,8 +465,8 @@ export function UserManagement() {
                           user.status === 'active'
                             ? 'success'
                             : user.status === 'inactive'
-                            ? 'secondary'
-                            : 'destructive'
+                              ? 'secondary'
+                              : 'destructive'
                         }
                         className="capitalize"
                       >

@@ -377,19 +377,16 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   setUsers: (users) => set({ users }),
   addUser: async (payload) => {
     const newUser = await adminService.createUser(payload);
-    await get().fetchUsers();
     return newUser;
   },
 
   updateUser: async (id, data) => {
     const updated = await adminService.updateUser(id, data);
-    await get().fetchUsers();
     return updated;
   },
 
   deleteUser: async (id) => {
     await adminService.deleteUser(id);
-    await get().fetchUsers();
   },
 
   setUserSearchQuery: (userSearchQuery) => set({ userSearchQuery }),
