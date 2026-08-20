@@ -5,21 +5,17 @@ import {
   Plus,
   Edit2,
   Trash2,
-  UserCheck,
   BookOpen,
   GraduationCap,
   ArrowRight,
   MoreHorizontal,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
-import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import {
-  Badge,
   Button,
   Card,
   Dialog,
@@ -33,12 +29,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  FormSelect,
   Input,
   SearchInput,
-  Textarea,
 } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 
 import { useAdminStore } from '../store';
 
@@ -48,7 +43,6 @@ export function DepartmentManagement() {
   const router = useRouter();
   const {
     departments,
-    lecturers,
     colleges,
     programs,
     courses,
@@ -63,17 +57,10 @@ export function DepartmentManagement() {
     updateDepartment,
     deleteDepartment,
     setDepartmentSearchQuery,
-    fetchAdminData,
-    isLoadingData,
   } = useAdminStore();
-
-  React.useEffect(() => {
-    void fetchAdminData();
-  }, [fetchAdminData]);
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingDept, setEditingDept] = React.useState<Department | null>(null);
-  const [assigningHODDept, setAssigningHODDept] = React.useState<Department | null>(null);
   const [deletingDept, setDeletingDept] = React.useState<Department | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -146,7 +133,7 @@ export function DepartmentManagement() {
         await updateDepartment(editingDept.id, {
           code: formData.code.trim().toUpperCase(),
           name: formData.name.trim(),
-          college: formData.collegeId ? formData.collegeId : undefined,
+          college: formData.collegeId ? formData.collegeId : null,
         });
         toast.success('Department updated successfully.');
         setEditingDept(null);
@@ -154,29 +141,17 @@ export function DepartmentManagement() {
         await addDepartment({
           code: formData.code.trim().toUpperCase(),
           name: formData.name.trim(),
-          college: formData.collegeId ? formData.collegeId : undefined,
+          college: formData.collegeId ? formData.collegeId : null,
         });
         toast.success('Department created successfully.');
         setIsAddModalOpen(false);
       }
       await fetchDepartments();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFieldErrors(parseFieldErrors(err));
       toast.error(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const [selectedHodId, setSelectedHodId] = React.useState('');
-
-  const handleAssignHOD = () => {
-    if (assigningHODDept) {
-      const selectedLecturer = lecturers.find((l) => l.id === selectedHodId);
-      if (selectedLecturer) {
-        toast.success(`Dr. ${selectedLecturer.firstName} ${selectedLecturer.lastName} assigned as HOD for ${assigningHODDept.name}.`);
-      }
-      setAssigningHODDept(null);
     }
   };
 
@@ -187,7 +162,7 @@ export function DepartmentManagement() {
         toast.success('Department deleted successfully.');
         setDeletingDept(null);
         await fetchDepartments();
-      } catch (err: any) {
+      } catch (err: unknown) {
         toast.error(getUserFriendlyErrorMessage(err));
       }
     }
@@ -479,49 +454,6 @@ export function DepartmentManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Assign HOD Modal */}
-      {assigningHODDept && (
-        <Dialog open={!!assigningHODDept} onOpenChange={() => setAssigningHODDept(null)}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-primary" /> Assign Head of Department
-              </DialogTitle>
-              <DialogDescription>
-                Select a senior faculty member to serve as HOD for {assigningHODDept.name}.
-              </DialogDescription>
-            </DialogHeader>
-
-            <DialogBody className="space-y-4 py-3">
-              <div>
-                <Label htmlFor="hodSelect" className="text-xs font-medium mb-1.5 block">
-                  Designated HOD
-                </Label>
-                <FormSelect
-                  id="hodSelect"
-                  value={selectedHodId}
-                  onChange={(e) => setSelectedHodId(e.target.value)}
-                >
-                  <option value="">-- Select Faculty Member --</option>
-                  {lecturers.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      Dr. {l.firstName} {l.lastName} — {l.department}
-                    </option>
-                  ))}
-                </FormSelect>
-              </div>
-            </DialogBody>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAssigningHODDept(null)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAssignHOD}>Confirm Assignment</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Delete Confirmation */}
       {deletingDept && (

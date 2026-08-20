@@ -12,5 +12,6 @@ export * from './reports-analytics';
 export * from './system-settings';
 export * from './audit-logs';
 export * from './academic-structure-management';
+export * from './college-management';
 export * from './admin-notifications';
 export * from './profile';

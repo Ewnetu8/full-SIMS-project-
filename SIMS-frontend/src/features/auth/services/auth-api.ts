@@ -166,12 +166,14 @@ export const authApi = {
    * and includes the Django CSRF token from the browser cookie in the
    * X-CSRFToken header, which is required by enforce_csrf() on the backend.
    */
-  refreshToken: async (): Promise<RefreshTokenResponse> => {
+  refreshToken: async (token?: string): Promise<RefreshTokenResponse> => {
     const csrfToken = getCsrfToken();
+    const storedRefresh = token || (typeof window !== 'undefined' ? (window as any).__EXAMSPHERE_REFRESH__ : undefined);
+    const payload = storedRefresh ? { refresh: storedRefresh } : {};
 
     const response = await axios.post<any>(
       `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
-      {},
+      payload,
       {
         withCredentials: true,
         headers: {
@@ -188,7 +190,7 @@ export const authApi = {
     return {
       tokens: {
         accessToken,
-        refreshToken: data.refresh || data.tokens?.refreshToken || '',
+        refreshToken: data.refresh || data.tokens?.refreshToken || storedRefresh || '',
         expiresAt: Date.now() + 15 * 60 * 1000,
       },
     } as any;

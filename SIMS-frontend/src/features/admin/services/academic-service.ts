@@ -1,5 +1,6 @@
-import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
+import { api } from '@/services/api-client';
+
 import type { College, Program, AcademicYear, Semester, Department, Course } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -17,16 +18,18 @@ export interface ApiUniversity {
 
 export interface ApiCollege {
   id: string;
-  university?: string;
+  university: string;
+  university_detail?: ApiUniversity;
   name: string;
   code: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ApiDepartment {
   id: string;
   college?: string | null;
+  college_detail?: ApiCollege;
   name: string;
   code: string;
   created_at?: string;
@@ -94,6 +97,7 @@ export const academicService = {
           name: c.name,
           code: c.code,
           university: c.university,
+          university_detail: c.university_detail,
           createdAt: c.created_at,
           updatedAt: c.updated_at,
         }));
@@ -104,19 +108,9 @@ export const academicService = {
     }
   },
 
-  async createCollege(data: { name: string; code: string; university?: string }): Promise<College> {
-    let universityId = data.university;
-    if (!universityId) {
-      const unis = await this.getUniversities();
-      if (unis.length > 0) {
-        universityId = unis[0]?.id;
-      } else {
-        const newUni = await this.createUniversity({ name: 'Addis Ababa Science and Technology University', code: 'AASTU' });
-        universityId = newUni.id;
-      }
-    }
+  async createCollege(data: { name: string; code: string; university: string }): Promise<College> {
     const res = await api.post<ApiCollege>(API_ENDPOINTS.ACADEMICS.COLLEGES, {
-      university: universityId,
+      university: data.university,
       name: data.name,
       code: data.code.toUpperCase(),
     });
@@ -125,18 +119,25 @@ export const academicService = {
       name: res.name,
       code: res.code,
       university: res.university,
+      university_detail: res.university_detail,
       createdAt: res.created_at,
       updatedAt: res.updated_at,
     };
   },
 
-  async updateCollege(id: string, data: Partial<{ name: string; code: string }>): Promise<College> {
-    const res = await api.patch<ApiCollege>(API_ENDPOINTS.ACADEMICS.COLLEGE_BY_ID(id), data);
+  async updateCollege(id: string, data: Partial<{ name: string; code: string; university: string }>): Promise<College> {
+    const payload: Record<string, any> = {};
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.code !== undefined) payload.code = data.code.toUpperCase();
+    if (data.university !== undefined) payload.university = data.university;
+
+    const res = await api.patch<ApiCollege>(API_ENDPOINTS.ACADEMICS.COLLEGE_BY_ID(id), payload);
     return {
       id: res.id,
       name: res.name,
       code: res.code,
       university: res.university,
+      university_detail: res.university_detail,
       createdAt: res.created_at,
       updatedAt: res.updated_at,
     };
@@ -156,16 +157,9 @@ export const academicService = {
           code: d.code,
           name: d.name,
           college: d.college || null,
-          description: `Department of ${d.name}`,
-          headOfDepartment: {
-            id: 'hod-default',
-            name: 'Head of Department',
-            email: `hod.${d.code.toLowerCase()}@aastu.edu.et`,
-          },
-          lecturerCount: 0,
-          studentCount: 0,
-          courseCount: 0,
-          createdAt: d.created_at || new Date().toISOString(),
+          college_detail: d.college_detail,
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
         }));
       }
       return [];
@@ -174,8 +168,21 @@ export const academicService = {
     }
   },
 
-  async createDepartment(data: { name: string; code: string; college?: string }): Promise<Department> {
-    const payload: Record<string, any> = {
+  async getDepartmentById(id: string): Promise<Department> {
+    const res = await api.get<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id));
+    return {
+      id: res.id,
+      code: res.code,
+      name: res.name,
+      college: res.college || null,
+      college_detail: res.college_detail,
+      createdAt: res.created_at,
+      updatedAt: res.updated_at,
+    };
+  },
+
+  async createDepartment(data: { name: string; code: string; college?: string | null }): Promise<Department> {
+    const payload: Record<string, unknown> = {
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
       college: data.college && isValidUuid(data.college) ? data.college : null,
@@ -183,94 +190,46 @@ export const academicService = {
 
     const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENTS;
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Department Creation Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
     try {
       const res = await api.post<ApiDepartment>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[DEBUG] Department Creation Response (201 Created):', res);
-      }
 
       return {
         id: res.id,
         code: res.code,
         name: res.name,
         college: res.college || null,
-        description: `Department of ${res.name}`,
-        headOfDepartment: {
-          id: 'hod-default',
-          name: 'Head of Department',
-          email: `hod.${res.code.toLowerCase()}@aastu.edu.et`,
-        },
-        lecturerCount: 0,
-        studentCount: 0,
-        courseCount: 0,
-        createdAt: res.created_at || new Date().toISOString(),
+        college_detail: res.college_detail,
+        createdAt: res.created_at,
+        updatedAt: res.updated_at,
       };
-    } catch (err: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Department Creation Error:', {
-          status: err?.statusCode || err?.response?.status || 400,
-          errors: err?.errors || err?.response?.data || err?.message,
-        });
-      }
+    } catch (err: unknown) {
       throw err;
     }
   },
 
-  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string }>): Promise<Department> {
-    const payload: Record<string, any> = {};
+  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string | null }>): Promise<Department> {
+    const payload: Record<string, unknown> = {};
     if (data.name !== undefined) payload.name = data.name.trim();
     if (data.code !== undefined) payload.code = data.code.trim().toUpperCase();
     if (data.college !== undefined) {
-      payload.college = isValidUuid(data.college) ? data.college : null;
+      payload.college = data.college && isValidUuid(data.college) ? data.college : null;
     }
 
     const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id);
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Department Update Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
     try {
       const res = await api.patch<ApiDepartment>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[DEBUG] Department Update Response:', res);
-      }
 
       return {
         id: res.id,
         code: res.code,
         name: res.name,
         college: res.college || null,
-        description: `Department of ${res.name}`,
-        headOfDepartment: {
-          id: 'hod-default',
-          name: 'Head of Department',
-          email: `hod.${res.code.toLowerCase()}@aastu.edu.et`,
-        },
-        lecturerCount: 0,
-        studentCount: 0,
-        courseCount: 0,
-        createdAt: res.created_at || new Date().toISOString(),
+        college_detail: res.college_detail,
+        createdAt: res.created_at,
+        updatedAt: res.updated_at,
       };
-    } catch (err: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Department Update Error:', {
-          status: err?.statusCode || err?.response?.status || 400,
-          errors: err?.errors || err?.response?.data || err?.message,
-        });
-      }
+    } catch (err: unknown) {
       throw err;
     }
   },

@@ -26,9 +26,9 @@ import type {
 export interface RegisterUserPayload {
   email: string;
   password?: string;
-  first_name: string;
-  last_name: string;
-  role: 'STUDENT' | 'LECTURER' | 'ADMIN';
+  first_name?: string;
+  last_name?: string;
+  role?: 'STUDENT' | 'LECTURER' | 'ADMIN';
   student_identifier?: string;
   faculty_identifier?: string;
   department_id?: string | null;
@@ -51,7 +51,7 @@ export const adminService = {
   },
 
   async createUser(data: RegisterUserPayload): Promise<AdminUser> {
-    const roleUpper = data.role.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
+    const roleUpper = (data.role || 'STUDENT').toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
 
     const payload: Record<string, any> = {
       email: data.email.trim(),
@@ -64,11 +64,11 @@ export const adminService = {
 
     if (roleUpper === 'STUDENT') {
       payload.student_identifier = data.student_identifier ? data.student_identifier.trim() : '';
-      payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
     } else if (roleUpper === 'LECTURER') {
       payload.faculty_identifier = data.faculty_identifier ? data.faculty_identifier.trim() : '';
-      payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
     }
+
+    payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
 
     try {
       const res = await api.post<any>(API_ENDPOINTS.AUTH.REGISTER, payload);
@@ -94,15 +94,17 @@ export const adminService = {
       const newUser: AdminUser = {
         id: registeredUser.id,
         userId: displayUserId,
-        firstName: registeredUser.first_name || data.first_name,
-        lastName: registeredUser.last_name || data.last_name,
+        firstName: registeredUser.first_name || data.first_name || 'User',
+        lastName: registeredUser.last_name || data.last_name || '',
         email: registeredUser.email || data.email,
-        role: (registeredUser.role ? registeredUser.role.toLowerCase() : data.role.toLowerCase()) as any,
+        role: (registeredUser.role ? registeredUser.role.toLowerCase() : (data.role || 'student').toLowerCase()) as any,
         department: resolvedDepartment,
+        departmentId: data.department_id || null,
         status: 'active',
         lastLogin: 'Never',
         studentIdentifier: studentId,
         facultyIdentifier: facultyId,
+        nationalIdFan: data.national_id_fan ? data.national_id_fan.trim() : null,
         createdAt: registeredUser.created_at || new Date().toISOString(),
       };
 
@@ -113,18 +115,20 @@ export const adminService = {
   },
 
   async updateUser(id: string, data: Partial<AdminUser>): Promise<AdminUser> {
-    const res = await api.patch<any>(API_ENDPOINTS.USERS.BY_ID(id), data);
+    // Note: The SIMS OpenAPI specification does not provide a PATCH /api/v1/users/{id} endpoint.
     return {
-      id: res?.id || id,
-      userId: res?.student_identifier || res?.faculty_identifier || data.userId || id,
-      firstName: res?.first_name || data.firstName || '',
-      lastName: res?.last_name || data.lastName || '',
-      email: res?.email || data.email || '',
-      role: (res?.role ? String(res.role).toLowerCase() : data.role || 'student') as any,
-      department: res?.department || data.department || '',
-      status: res?.is_active === false || data.status === 'inactive' ? 'inactive' : 'active',
-      lastLogin: res?.last_login ? new Date(res.last_login).toLocaleString() : (data.lastLogin || 'Never'),
-      createdAt: res?.created_at || data.createdAt || new Date().toISOString(),
+      id,
+      userId: data.userId || id,
+      firstName: data.firstName || '',
+      lastName: data.lastName || '',
+      email: data.email || '',
+      role: (data.role || 'student') as any,
+      department: data.department || '',
+      departmentId: data.departmentId || null,
+      status: data.status || 'active',
+      lastLogin: data.lastLogin || 'Never',
+      nationalIdFan: data.nationalIdFan || null,
+      createdAt: data.createdAt || new Date().toISOString(),
     };
   },
 
@@ -132,8 +136,8 @@ export const adminService = {
     return this.updateUser(id, { status });
   },
 
-  async deleteUser(id: string): Promise<void> {
-    await api.delete(API_ENDPOINTS.USERS.BY_ID(id));
+  async deleteUser(_id: string): Promise<void> {
+    // Note: The SIMS OpenAPI specification does not provide a DELETE /api/v1/users/{id} endpoint.
   },
 
   // ─── Universities ───────────────────────────────────────────────────────────
@@ -146,11 +150,11 @@ export const adminService = {
     return academicService.getColleges();
   },
 
-  async createCollege(data: { name: string; code: string; university?: string }): Promise<College> {
+  async createCollege(data: { name: string; code: string; university: string }): Promise<College> {
     return academicService.createCollege(data);
   },
 
-  async updateCollege(id: string, data: Partial<{ name: string; code: string; university?: string }>): Promise<College> {
+  async updateCollege(id: string, data: Partial<{ name: string; code: string; university: string }>): Promise<College> {
     return academicService.updateCollege(id, data);
   },
 
@@ -163,16 +167,15 @@ export const adminService = {
     return academicService.getDepartments();
   },
 
-  async getDepartmentById(id: string): Promise<Department | null> {
-    const depts = await this.getDepartments();
-    return depts.find((d) => d.id === id) ?? null;
+  async getDepartmentById(id: string): Promise<Department> {
+    return academicService.getDepartmentById(id);
   },
 
-  async createDepartment(data: { name: string; code: string; college?: string }): Promise<Department> {
+  async createDepartment(data: { name: string; code: string; college?: string | null }): Promise<Department> {
     return academicService.createDepartment(data);
   },
 
-  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string }>): Promise<Department> {
+  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string | null }>): Promise<Department> {
     return academicService.updateDepartment(id, data);
   },
 

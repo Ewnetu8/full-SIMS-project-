@@ -11,12 +11,14 @@ export interface AdminUser {
   email: string;
   role: UserRole;
   department: string;
+  departmentId?: string | null;
   status: UserStatus;
   lastLogin: string;
   avatarUrl?: string;
   phone?: string;
   studentIdentifier?: string;
   facultyIdentifier?: string;
+  nationalIdFan?: string | null;
   createdAt: string;
 }
 
@@ -48,11 +50,20 @@ export interface LecturerProfile {
   avatarUrl?: string;
 }
 
+export interface University {
+  id: string;
+  name: string;
+  code: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface College {
   id: string;
   name: string;
   code: string;
-  university?: string;
+  university: string;
+  university_detail?: University;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -98,19 +109,12 @@ export interface AdminCourseOffering {
 
 export interface Department {
   id: string;
-  code: string; // e.g. "CS"
   name: string; // e.g. "Computer Science & Software Engineering"
+  code: string; // e.g. "CS"
   college?: string | null;
-  description: string;
-  headOfDepartment: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  lecturerCount: number;
-  studentCount: number;
-  courseCount: number;
-  createdAt: string;
+  college_detail?: College;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 

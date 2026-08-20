@@ -1,6 +1,6 @@
 'use client';
 
-import { Landmark, Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Landmark, Plus, Edit2, Trash2, Search, XCircle } from 'lucide-react';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
@@ -28,6 +28,7 @@ export function CollegeManagement() {
   const {
     colleges,
     isLoadingColleges,
+    collegesError,
     collegeSearchQuery,
     fetchColleges,
     addCollege,
@@ -56,13 +57,26 @@ export function CollegeManagement() {
     loadUniversities();
   }, [fetchColleges]);
 
+  const getAastuUniversity = React.useCallback(
+    (unis: Array<{ id: string; name: string; code: string }>) => {
+      return (
+        unis.find(
+          (u) =>
+            u.code?.toUpperCase() === 'AASTU' ||
+            u.name?.toLowerCase().includes('addis ababa science and technology')
+        ) || (unis.length === 1 ? unis[0] : null)
+      );
+    },
+    [],
+  );
+
   const loadUniversities = async () => {
     setIsLoadingUniversities(true);
     try {
       const unis = await academicService.getUniversities();
       setUniversities(unis);
     } catch {
-      // fallback
+      setUniversities([]);
     } finally {
       setIsLoadingUniversities(false);
     }
@@ -70,31 +84,40 @@ export function CollegeManagement() {
 
   const handleOpenAddModal = () => {
     setFieldErrors({});
-    setFormData({ name: '', code: '', university: '' });
+    const defaultUni = getAastuUniversity(universities);
+    setFormData({
+      name: '',
+      code: '',
+      university: defaultUni ? defaultUni.id : '',
+    });
     setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (college: College) => {
     setFieldErrors({});
     setEditingCollege(college);
+    const defaultUni = getAastuUniversity(universities);
     setFormData({
       name: college.name,
       code: college.code,
-      university: college.university || '',
+      university: college.university || (defaultUni ? defaultUni.id : ''),
     });
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!formData.code.trim()) {
+    const trimmedCode = formData.code.trim();
+    const trimmedName = formData.name.trim();
+
+    if (!trimmedCode) {
       errors.code = 'College code is required.';
-    } else if (formData.code.length > 10) {
+    } else if (trimmedCode.length > 10) {
       errors.code = 'College code must not exceed 10 characters.';
     }
 
-    if (!formData.name.trim()) {
+    if (!trimmedName) {
       errors.name = 'College name is required.';
-    } else if (formData.name.length > 255) {
+    } else if (trimmedName.length > 255) {
       errors.name = 'College name must not exceed 255 characters.';
     }
 
@@ -115,7 +138,7 @@ export function CollegeManagement() {
         await updateCollege(editingCollege.id, {
           name: formData.name.trim(),
           code: formData.code.trim().toUpperCase(),
-          ...(formData.university ? { university: formData.university } : {}),
+          university: formData.university,
         });
         toast.success('College updated successfully.');
         setEditingCollege(null);
@@ -173,6 +196,19 @@ export function CollegeManagement() {
         </Button>
       </div>
 
+      {/* Error State Banner */}
+      {collegesError && (
+        <Card className="p-4 border-destructive/40 bg-destructive/10 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-destructive">
+            <XCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">{collegesError}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => fetchColleges()}>
+            Retry
+          </Button>
+        </Card>
+      )}
+
       {/* Filter / Search Bar */}
       <Card className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -209,39 +245,47 @@ export function CollegeManagement() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredColleges.map((college) => (
-            <Card key={college.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-all">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold font-mono text-[#102A7A] dark:text-blue-400">
-                    {college.code}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => handleOpenEditModal(college)}
-                      aria-label="Edit college"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={() => setDeletingCollege(college)}
-                      aria-label="Delete college"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+          {filteredColleges.map((college) => {
+            const uniName = college.university_detail?.name || universities.find((u) => u.id === college.university)?.name;
+            return (
+              <Card key={college.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-all">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold font-mono text-[#102A7A] dark:text-blue-400">
+                      {college.code}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => handleOpenEditModal(college)}
+                        aria-label="Edit college"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeletingCollege(college)}
+                        aria-label="Delete college"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
+                  <h3 className="font-semibold text-lg text-[#102A7A] dark:text-foreground mb-1">
+                    {college.name}
+                  </h3>
+                  {uniName && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {uniName}
+                    </p>
+                  )}
                 </div>
-                <h3 className="font-semibold text-lg text-[#102A7A] dark:text-foreground mb-1">
-                  {college.name}
-                </h3>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 

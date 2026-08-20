@@ -42,6 +42,7 @@ interface AdminStoreState {
   isLoadingUsers: boolean;
   usersError: string | null;
   isLoadingColleges: boolean;
+  collegesError: string | null;
   isLoadingDepartments: boolean;
   departmentsError: string | null;
   isLoadingPrograms: boolean;
@@ -102,14 +103,14 @@ interface AdminStoreState {
 
   // Actions - Colleges
   setCollegeSearchQuery: (q: string) => void;
-  addCollege: (data: { name: string; code: string; university?: string }) => Promise<College>;
-  updateCollege: (id: string, data: Partial<{ name: string; code: string }>) => Promise<College>;
+  addCollege: (data: { name: string; code: string; university: string }) => Promise<College>;
+  updateCollege: (id: string, data: Partial<{ name: string; code: string; university: string }>) => Promise<College>;
   deleteCollege: (id: string) => Promise<void>;
 
   // Actions - Departments
   setDepartmentSearchQuery: (q: string) => void;
-  addDepartment: (data: { name: string; code: string; college?: string }) => Promise<Department>;
-  updateDepartment: (id: string, data: Partial<{ name: string; code: string; college?: string }>) => Promise<Department>;
+  addDepartment: (data: { name: string; code: string; college?: string | null }) => Promise<Department>;
+  updateDepartment: (id: string, data: Partial<{ name: string; code: string; college?: string | null }>) => Promise<Department>;
   deleteDepartment: (id: string) => Promise<void>;
 
   // Actions - Programs
@@ -211,6 +212,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   isLoadingUsers: false,
   usersError: null,
   isLoadingColleges: false,
+  collegesError: null,
   isLoadingDepartments: false,
   departmentsError: null,
   isLoadingPrograms: false,
@@ -304,12 +306,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   fetchColleges: async () => {
-    set({ isLoadingColleges: true });
+    set({ isLoadingColleges: true, collegesError: null });
     try {
       const colleges = await adminService.getColleges();
-      set({ colleges, isLoadingColleges: false });
-    } catch {
-      set({ isLoadingColleges: false });
+      set({ colleges, isLoadingColleges: false, collegesError: null });
+    } catch (err: unknown) {
+      set({ colleges: [], isLoadingColleges: false, collegesError: getUserFriendlyErrorMessage(err) });
     }
   },
 

@@ -104,7 +104,6 @@ export function UserManagement() {
     facultyIdentifier: '',
     departmentId: '',
     nationalId: '',
-    phone: '',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -119,9 +118,8 @@ export function UserManagement() {
       role: 'student',
       studentIdentifier: '',
       facultyIdentifier: '',
-      departmentId: departments[0]?.id || '',
+      departmentId: '',
       nationalId: '',
-      phone: '',
     });
     setIsAddModalOpen(true);
   };
@@ -140,25 +138,35 @@ export function UserManagement() {
       facultyIdentifier: user.facultyIdentifier || '',
       departmentId: userDept?.id || '',
       nationalId: '',
-      phone: user.phone || '',
     });
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
-    if (!formData.email.trim()) {
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
       errors.email = 'Email address is required.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    } else if (trimmedEmail.length > 254) {
+      errors.email = 'Email address must not exceed 254 characters.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       errors.email = 'Please enter a valid email address.';
     }
 
     if (!editingUser) {
       if (!formData.password) {
         errors.password = 'Password is required.';
-      } else if (formData.password.length < 8) {
-        errors.password = 'Password must be at least 8 characters long.';
+      } else if (formData.password.length < 1) {
+        errors.password = 'Password is required.';
       }
+    }
+
+    if (formData.firstName.trim().length > 150) {
+      errors.first_name = 'First name must not exceed 150 characters.';
+    }
+
+    if (formData.lastName.trim().length > 150) {
+      errors.last_name = 'Last name must not exceed 150 characters.';
     }
 
     if (formData.role === 'student' && !formData.studentIdentifier.trim()) {
@@ -183,26 +191,25 @@ export function UserManagement() {
       if (editingUser) {
         const selectedDept = departments.find((d) => d.id === formData.departmentId);
         await updateUser(editingUser.id, {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          email: formData.email.trim(),
           role: formData.role,
           department: selectedDept?.name || editingUser.department,
-          phone: formData.phone || editingUser.phone,
         });
         toast.success('User account updated successfully.');
         setEditingUser(null);
       } else {
         await addUser({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
+          first_name: formData.firstName.trim() || undefined,
+          last_name: formData.lastName.trim() || undefined,
+          national_id_fan: formData.nationalId.trim() || null,
           role: formData.role.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN',
-          student_identifier: formData.role === 'student' ? formData.studentIdentifier : undefined,
-          faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
-          department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : null,
-          national_id_fan: formData.nationalId ? formData.nationalId.trim() : undefined,
+          student_identifier: formData.role === 'student' ? formData.studentIdentifier.trim() : undefined,
+          faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier.trim() : undefined,
+          department_id: formData.departmentId ? formData.departmentId : null,
         });
         toast.success('User created successfully.');
         setIsAddModalOpen(false);
@@ -544,7 +551,7 @@ export function UserManagement() {
           <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="firstName" required>
+                <Label htmlFor="firstName">
                   First Name
                 </Label>
                 <Input
@@ -558,7 +565,7 @@ export function UserManagement() {
               </div>
 
               <div>
-                <Label htmlFor="lastName" required>
+                <Label htmlFor="lastName">
                   Last Name
                 </Label>
                 <Input
@@ -619,6 +626,20 @@ export function UserManagement() {
                 </select>
                 {fieldErrors.role && <p className="text-xs text-destructive mt-1">{fieldErrors.role}</p>}
               </div>
+
+              <div>
+                <Label htmlFor="nationalId">
+                  National ID (FAN)
+                </Label>
+                <Input
+                  id="nationalId"
+                  value={formData.nationalId}
+                  onChange={(e) => setFormData({ ...formData, nationalId: e.target.value })}
+                  placeholder="e.g. FAN-12345678"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                />
+                {fieldErrors.national_id_fan && <p className="text-xs text-destructive mt-1">{fieldErrors.national_id_fan}</p>}
+              </div>
             </div>
 
             {/* Dynamic Role-Specific Fields */}
@@ -640,7 +661,7 @@ export function UserManagement() {
                 </div>
 
                 <div>
-                  <Label htmlFor="studentDepartment">Department</Label>
+                  <Label htmlFor="studentDepartment">Department (Optional)</Label>
                   <select
                     id="studentDepartment"
                     className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
@@ -678,9 +699,32 @@ export function UserManagement() {
                 </div>
 
                 <div>
-                  <Label htmlFor="lecturerDepartment">Department</Label>
+                  <Label htmlFor="lecturerDepartment">Department (Optional)</Label>
                   <select
                     id="lecturerDepartment"
+                    className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                    value={formData.departmentId}
+                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.departmentId && <p className="text-xs text-destructive mt-1">{fieldErrors.departmentId}</p>}
+                  {fieldErrors.department_id && <p className="text-xs text-destructive mt-1">{fieldErrors.department_id}</p>}
+                </div>
+              </div>
+            )}
+
+            {formData.role === 'admin' && (
+              <div className="space-y-4 p-4 rounded-xl border border-[#102A7A]/15 bg-accent/15">
+                <div>
+                  <Label htmlFor="adminDepartment">Department (Optional)</Label>
+                  <select
+                    id="adminDepartment"
                     className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                     value={formData.departmentId}
                     onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
@@ -786,9 +830,9 @@ export function UserManagement() {
 
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5" /> Phone Number:
+                    <Shield className="h-3.5 w-3.5" /> National ID (FAN):
                   </span>
-                  <span className="font-medium">{viewingUser.phone || 'N/A'}</span>
+                  <span className="font-medium font-mono">{viewingUser.nationalIdFan || 'N/A'}</span>
                 </div>
               </div>
             </div>
