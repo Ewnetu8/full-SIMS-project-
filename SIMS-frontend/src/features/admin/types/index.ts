@@ -137,21 +137,18 @@ export interface Semester {
   updatedAt?: string;
 }
 
+export type ClassStanding = 'FRESHMAN' | 'SOPHOMORE' | 'JUNIOR' | 'SENIOR' | 'GRADUATE';
+
 export interface Course {
   id: string;
   code: string; // e.g. "CS301"
   name: string; // e.g. "Data Structures & Algorithms"
   creditHours: number;
-  department: string;
   program?: string | null;
-  intendedClassStanding?: string;
-  assignedLecturer: {
-    id: string;
-    name: string;
-  };
-  studentCount: number;
-  status: 'active' | 'archived';
-  semester: string;
+  programDetail?: Program | null;
+  intendedClassStanding?: ClassStanding;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type AdminExamStatus = 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';

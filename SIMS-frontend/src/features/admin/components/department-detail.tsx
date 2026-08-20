@@ -91,7 +91,10 @@ export function DepartmentDetail({ departmentId }: DepartmentDetailProps = {}) {
     : [];
 
   const deptCourses = courses
-    ? courses.filter((c) => c.department === department?.name || c.department === department?.code)
+    ? courses.filter((c) => {
+        const prog = programs.find((p) => p.id === c.program) || c.programDetail;
+        return prog && (prog.department === department?.id || prog.department === department?.name);
+      })
     : [];
 
   // ─── Loading State ──────────────────────────────────────────────────────────
@@ -276,7 +279,7 @@ export function DepartmentDetail({ departmentId }: DepartmentDetailProps = {}) {
                     </p>
                   </div>
                   <Badge variant="outline" className="text-[10px]">
-                    {crs.studentCount} Students
+                    {crs.intendedClassStanding || `${crs.creditHours} Cr.`}
                   </Badge>
                 </div>
               ))

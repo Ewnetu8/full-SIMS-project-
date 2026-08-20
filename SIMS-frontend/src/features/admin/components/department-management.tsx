@@ -277,7 +277,12 @@ export function DepartmentManagement() {
           {filteredDepartments.map((dept) => {
             const parentCollege = colleges.find((c) => c.id === dept.college || c.code === dept.college);
             const deptProgramsCount = programs ? programs.filter((p) => p.department === dept.id || p.department === dept.name).length : 0;
-            const deptCoursesCount = courses ? courses.filter((c) => c.department === dept.name || c.department === dept.code).length : 0;
+            const deptCoursesCount = courses
+              ? courses.filter((c) => {
+                  const prog = programs.find((p) => p.id === c.program) || c.programDetail;
+                  return prog && (prog.department === dept.id || prog.department === dept.name);
+                }).length
+              : 0;
 
             return (
               <Card key={dept.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-shadow border-border">

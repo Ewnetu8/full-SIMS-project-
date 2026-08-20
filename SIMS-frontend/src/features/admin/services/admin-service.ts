@@ -11,6 +11,7 @@ import type {
   LecturerProfile,
   Department,
   Course,
+  ClassStanding,
   College,
   Program,
   AcademicYear,
@@ -294,24 +295,16 @@ export const adminService = {
     return academicService.getCourses();
   },
 
-  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string; intended_class_standing?: string }): Promise<Course> {
+  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }): Promise<Course> {
     return academicService.createCourse(data);
   },
 
-  async updateCourse(id: string, data: Partial<{ title: string; course_code: string; credit_hours: number }>): Promise<Course> {
+  async updateCourse(id: string, data: Partial<{ title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }>): Promise<Course> {
     return academicService.updateCourse(id, data);
   },
 
   async deleteCourse(id: string): Promise<void> {
     return academicService.deleteCourse(id);
-  },
-
-  async toggleCourseArchive(id: string): Promise<Course> {
-    const courses = await this.getCourses();
-    const course = courses.find((c) => c.id === id);
-    if (!course) throw new Error('Course not found');
-    course.status = course.status === 'active' ? 'archived' : 'active';
-    return course;
   },
 
   // ─── Exams ─────────────────────────────────────────────────────────────────

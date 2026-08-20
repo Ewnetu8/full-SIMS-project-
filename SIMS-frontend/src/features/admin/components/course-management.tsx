@@ -4,8 +4,8 @@ import {
   BookOpen,
   Plus,
   Edit2,
-  Archive,
-  RotateCcw,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -23,78 +23,81 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  FormSelect,
   Input,
   SearchInput,
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
 
-import type { Course } from '../types';
+import type { Course, ClassStanding } from '../types';
+
+const CLASS_STANDING_LABELS: Record<ClassStanding, string> = {
+  FRESHMAN: 'Freshman',
+  SOPHOMORE: 'Sophomore',
+  JUNIOR: 'Junior',
+  SENIOR: 'Senior',
+  GRADUATE: 'Graduate',
+};
 
 export function CourseManagement() {
   const {
     courses,
-    departments,
-    lecturers,
     programs,
-    colleges,
     isLoadingCourses,
     courseSearchQuery,
-    courseDeptFilter,
+    courseProgramFilter,
+    courseStandingFilter,
     fetchCourses,
     fetchPrograms,
-    fetchColleges,
-    fetchDepartments,
     addCourse,
     updateCourse,
-    toggleCourseArchive,
+    deleteCourse,
     setCourseSearchQuery,
-    setCourseDeptFilter,
-    fetchAdminData,
-    isLoadingData,
+    setCourseProgramFilter,
+    setCourseStandingFilter,
   } = useAdminStore();
-
-  React.useEffect(() => {
-    void fetchAdminData();
-  }, [fetchAdminData]);
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingCourse, setEditingCourse] = React.useState<Course | null>(null);
+  const [deletingCourse, setDeletingCourse] = React.useState<Course | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [courseCollegeFilter, setCourseCollegeFilter] = React.useState<string>('ALL');
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
-  const filteredDepartments = React.useMemo(() => {
-    if (!courseCollegeFilter || courseCollegeFilter === 'ALL') return departments;
-    return departments.filter(
-      (d) =>
-        d.college === courseCollegeFilter ||
-        (colleges.find((c) => c.name === courseCollegeFilter || c.code === courseCollegeFilter)?.id === d.college)
-    );
-  }, [departments, colleges, courseCollegeFilter]);
-
-  const formAvailableDepartments = React.useMemo(() => {
-    if (!courseCollegeFilter) return departments;
-    return departments;
-  }, [departments, courseCollegeFilter]);
-
-  const [formData, setFormData] = React.useState({
+  const [formData, setFormData] = React.useState<{
+    code: string;
+    title: string;
+    creditHours: number;
+    programId: string;
+    intendedClassStanding: ClassStanding | '';
+  }>({
     code: '',
     title: '',
     creditHours: 3,
-    departmentId: '',
     programId: '',
-    intendedClassStanding: '',
+    intendedClassStanding: 'FRESHMAN',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
-    fetchCourses();
-    fetchPrograms();
-    fetchColleges();
-    fetchDepartments();
-  }, [fetchCourses, fetchPrograms, fetchColleges, fetchDepartments]);
+    void fetchCourses();
+    void fetchPrograms();
+  }, [fetchCourses, fetchPrograms]);
+
+  // Helper to resolve Program Name
+  const getProgramName = React.useCallback(
+    (course: Course): string => {
+      if (course.programDetail?.name) {
+        return course.programDetail.name;
+      }
+      if (course.program) {
+        const matched = programs.find((p) => p.id === course.program);
+        if (matched?.name) return matched.name;
+      }
+      return 'Unassigned';
+    },
+    [programs]
+  );
 
   const handleOpenAddModal = () => {
     setFieldErrors({});
@@ -102,25 +105,24 @@ export function CourseManagement() {
       code: '',
       title: '',
       creditHours: 3,
-      departmentId: '',
       programId: '',
-      intendedClassStanding: '',
+      intendedClassStanding: 'FRESHMAN',
     });
+    setEditingCourse(null);
     setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (course: Course) => {
     setFieldErrors({});
     setEditingCourse(course);
-    const courseProgram = programs.find((p) => p.id === course.program);
     setFormData({
       code: course.code,
       title: course.name,
       creditHours: course.creditHours,
-      departmentId: courseProgram?.department || '',
-      programId: course.program || '',
+      programId: course.program || course.programDetail?.id || '',
       intendedClassStanding: course.intendedClassStanding || '',
     });
+    setIsAddModalOpen(true);
   };
 
   const validateForm = () => {
@@ -137,8 +139,8 @@ export function CourseManagement() {
       errors.title = 'Course title must not exceed 255 characters.';
     }
 
-    if (formData.creditHours < 0) {
-      errors.credit_hours = 'Credit hours must be non-negative.';
+    if (Number(formData.creditHours) < 0 || isNaN(Number(formData.creditHours))) {
+      errors.credit_hours = 'Credit hours must be a non-negative number.';
     }
 
     setFieldErrors(errors);
@@ -156,22 +158,24 @@ export function CourseManagement() {
           title: formData.title.trim(),
           credit_hours: Number(formData.creditHours),
           program: formData.programId ? formData.programId : null,
-          intended_class_standing: formData.intendedClassStanding || undefined,
+          intended_class_standing: formData.intendedClassStanding ? (formData.intendedClassStanding as ClassStanding) : undefined,
         });
         toast.success('Course updated successfully.');
         setEditingCourse(null);
+        setIsAddModalOpen(false);
       } else {
         await addCourse({
           course_code: formData.code.trim().toUpperCase(),
           title: formData.title.trim(),
           credit_hours: Number(formData.creditHours),
-          program: formData.programId ? formData.programId : undefined,
-          intended_class_standing: formData.intendedClassStanding || undefined,
+          program: formData.programId ? formData.programId : null,
+          intended_class_standing: formData.intendedClassStanding ? (formData.intendedClassStanding as ClassStanding) : undefined,
         });
         toast.success('Course created successfully.');
         setIsAddModalOpen(false);
       }
-    } catch (err: any) {
+      void fetchCourses();
+    } catch (err: unknown) {
       setFieldErrors(parseFieldErrors(err));
       toast.error(getUserFriendlyErrorMessage(err));
     } finally {
@@ -179,23 +183,44 @@ export function CourseManagement() {
     }
   };
 
-  const handleToggleArchive = (course: Course) => {
+  const handleDeleteCourse = async () => {
+    if (!deletingCourse) return;
+    setIsDeleting(true);
     try {
-      toggleCourseArchive(course.id);
-      const isArchived = course.status === 'active';
-      toast.success(`Course ${isArchived ? 'archived' : 'restored'} successfully.`);
-    } catch (err: any) {
+      await deleteCourse(deletingCourse.id);
+      toast.success('Course deleted successfully.');
+      setDeletingCourse(null);
+      void fetchCourses();
+    } catch (err: unknown) {
       toast.error(getUserFriendlyErrorMessage(err));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const filteredCourses = courses.filter((c) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(courseSearchQuery.toLowerCase()) ||
-      c.code.toLowerCase().includes(courseSearchQuery.toLowerCase());
-    const matchesDept = courseDeptFilter === 'ALL' || c.department === courseDeptFilter;
-    return matchesSearch && matchesDept;
-  });
+  const filteredCourses = React.useMemo(() => {
+    return courses.filter((c) => {
+      const matchesSearch =
+        c.name.toLowerCase().includes(courseSearchQuery.toLowerCase()) ||
+        c.code.toLowerCase().includes(courseSearchQuery.toLowerCase());
+
+      const matchesProgram =
+        courseProgramFilter === 'ALL' ||
+        c.program === courseProgramFilter ||
+        c.programDetail?.id === courseProgramFilter;
+
+      const matchesStanding =
+        courseStandingFilter === 'ALL' ||
+        c.intendedClassStanding === courseStandingFilter;
+
+      return matchesSearch && matchesProgram && matchesStanding;
+    });
+  }, [
+    courses,
+    courseSearchQuery,
+    courseProgramFilter,
+    courseStandingFilter,
+  ]);
 
   const selectClass =
     'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground';
@@ -209,11 +234,11 @@ export function CourseManagement() {
             <BookOpen className="h-6 w-6 text-success" /> Course Catalogue & Management
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create, configure, and assign faculty lecturers to academic courses across all departments.
+            Create, configure, and manage academic courses across curriculum programs.
           </p>
         </div>
         <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenAddModal}>
-          Create New Course
+          Register New Course
         </Button>
       </div>
 
@@ -232,16 +257,13 @@ export function CourseManagement() {
           <div>
             <select
               className={selectClass}
-              value={courseCollegeFilter}
-              onChange={(e) => {
-                setCourseCollegeFilter(e.target.value);
-                setCourseDeptFilter('ALL');
-              }}
+              value={courseProgramFilter}
+              onChange={(e) => setCourseProgramFilter(e.target.value)}
             >
-              <option value="ALL">All Colleges</option>
-              {colleges.map((col) => (
-                <option key={col.id} value={col.id}>
-                  {col.name} ({col.code})
+              <option value="ALL">All Programs</option>
+              {programs.map((prog) => (
+                <option key={prog.id} value={prog.id}>
+                  {prog.name} ({prog.code})
                 </option>
               ))}
             </select>
@@ -250,15 +272,15 @@ export function CourseManagement() {
           <div>
             <select
               className={selectClass}
-              value={courseDeptFilter}
-              onChange={(e) => setCourseDeptFilter(e.target.value)}
+              value={courseStandingFilter}
+              onChange={(e) => setCourseStandingFilter(e.target.value)}
             >
-              <option value="ALL">All Academic Departments</option>
-              {filteredDepartments.map((d) => (
-                <option key={d.id} value={d.name}>
-                  {d.name} ({d.code})
-                </option>
-              ))}
+              <option value="ALL">All Class Standings</option>
+              <option value="FRESHMAN">Freshman</option>
+              <option value="SOPHOMORE">Sophomore</option>
+              <option value="JUNIOR">Junior</option>
+              <option value="SENIOR">Senior</option>
+              <option value="GRADUATE">Graduate</option>
             </select>
           </div>
         </div>
@@ -273,54 +295,80 @@ export function CourseManagement() {
                 <th className="px-4 py-3.5">Course Code</th>
                 <th className="px-4 py-3.5">Course Title</th>
                 <th className="px-4 py-3.5">Credits</th>
-                <th className="px-4 py-3.5">Department</th>
-                <th className="px-4 py-3.5">Assigned Lecturer</th>
-                <th className="px-4 py-3.5">Status</th>
+                <th className="px-4 py-3.5">Program</th>
+                <th className="px-4 py-3.5">Intended Class Standing</th>
                 <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredCourses.length === 0 ? (
+              {isLoadingCourses ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No courses match the current filters.
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      <span>Loading courses...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredCourses.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    {courses.length === 0 ? 'No courses found.' : 'No courses match the current filters.'}
                   </td>
                 </tr>
               ) : (
-                filteredCourses.map((crs) => (
-                  <tr key={crs.id} className="hover:bg-accent/40 transition-colors">
-                    <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">{crs.code}</td>
-                    <td className="px-4 py-3.5 text-xs font-medium text-foreground">{crs.name}</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground font-mono">{crs.creditHours} Cr.</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{crs.department}</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{crs.assignedLecturer?.name || '—'}</td>
-                    <td className="px-4 py-3.5">
-                      <Badge variant={crs.status === 'active' ? 'success' : 'secondary'} className="text-[11px]">
-                        {crs.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => handleOpenEditModal(crs)}
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`h-7 w-7 p-0 ${crs.status === 'active' ? 'text-destructive' : 'text-success'}`}
-                          onClick={() => handleToggleArchive(crs)}
-                        >
-                          <Archive className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredCourses.map((crs) => {
+                  const programDisplay = getProgramName(crs);
+                  const standingDisplay = crs.intendedClassStanding
+                    ? CLASS_STANDING_LABELS[crs.intendedClassStanding] || crs.intendedClassStanding
+                    : '—';
+
+                  return (
+                    <tr key={crs.id} className="hover:bg-accent/40 transition-colors">
+                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-primary">{crs.code}</td>
+                      <td className="px-4 py-3.5 text-xs font-medium text-foreground">{crs.name}</td>
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground font-mono">{crs.creditHours} Cr.</td>
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                        {programDisplay === 'Unassigned' ? (
+                          <span className="italic text-muted-foreground/60">Unassigned</span>
+                        ) : (
+                          programDisplay
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                        {crs.intendedClassStanding ? (
+                          <Badge variant="outline" className="text-[11px] font-normal">
+                            {standingDisplay}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground/60">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => handleOpenEditModal(crs)}
+                            aria-label="Edit course"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeletingCourse(crs)}
+                            aria-label="Delete course"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -340,12 +388,12 @@ export function CourseManagement() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl text-[#102A7A] dark:text-foreground font-bold">
-              {editingCourse ? 'Edit Course Offering' : 'Register New Course Offering'}
+              {editingCourse ? 'Edit Course' : 'Register New Course'}
             </DialogTitle>
             <DialogDescription>
               {editingCourse
-                ? 'Modify the course curriculum metadata, credits, and prerequisites.'
-                : 'Add a new academic course offering into the university curriculum registry.'}
+                ? 'Update academic course details, credits, program, and intended class standing.'
+                : 'Add a new academic course into the university curriculum registry.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -384,67 +432,30 @@ export function CourseManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="courseDepartment">
-                  Filter by Department (Optional)
-                </Label>
-                <select
-                  id="courseDepartment"
-                  className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
-                  value={formData.departmentId}
-                  onChange={(e) => {
-                    const deptId = e.target.value;
-                    setFormData({
-                      ...formData,
-                      departmentId: deptId,
-                    });
-                  }}
-                >
-                  <option value="">-- All Departments --</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name} ({dept.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
                 <Label htmlFor="programId">Program (Optional)</Label>
                 <select
                   id="programId"
                   className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                   value={formData.programId}
-                  onChange={(e) => {
-                    const progId = e.target.value;
-                    const prog = programs.find((p) => p.id === progId);
-                    setFormData({
-                      ...formData,
-                      programId: progId,
-                      ...(prog?.department ? { departmentId: prog.department } : {}),
-                    });
-                  }}
+                  onChange={(e) => setFormData({ ...formData, programId: e.target.value })}
                 >
                   <option value="">-- Unassigned Program --</option>
-                  {programs
-                    .filter((p) => !formData.departmentId || p.department === formData.departmentId)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.code})
-                      </option>
-                    ))}
+                  {programs.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.code})
+                    </option>
+                  ))}
                 </select>
                 {fieldErrors.program && <p className="text-xs text-destructive mt-1">{fieldErrors.program}</p>}
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <Label htmlFor="classStanding">Intended Class Standing</Label>
                 <select
                   id="classStanding"
                   className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                   value={formData.intendedClassStanding}
-                  onChange={(e) => setFormData({ ...formData, intendedClassStanding: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, intendedClassStanding: e.target.value as ClassStanding | '' })}
                 >
                   <option value="">-- Not Specified --</option>
                   <option value="FRESHMAN">Freshman</option>
@@ -453,22 +464,25 @@ export function CourseManagement() {
                   <option value="SENIOR">Senior</option>
                   <option value="GRADUATE">Graduate</option>
                 </select>
+                {fieldErrors.intended_class_standing && (
+                  <p className="text-xs text-destructive mt-1">{fieldErrors.intended_class_standing}</p>
+                )}
               </div>
+            </div>
 
-              <div>
-                <Label htmlFor="credits" required>
-                  Credit Hours
-                </Label>
-                <Input
-                  id="credits"
-                  type="number"
-                  min={0}
-                  value={formData.creditHours}
-                  onChange={(e) => setFormData({ ...formData, creditHours: parseInt(e.target.value) || 0 })}
-                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
-                />
-                {fieldErrors.credit_hours && <p className="text-xs text-destructive mt-1">{fieldErrors.credit_hours}</p>}
-              </div>
+            <div>
+              <Label htmlFor="credits" required>
+                Credit Hours
+              </Label>
+              <Input
+                id="credits"
+                type="number"
+                min={0}
+                value={formData.creditHours}
+                onChange={(e) => setFormData({ ...formData, creditHours: parseInt(e.target.value) || 0 })}
+                className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+              />
+              {fieldErrors.credit_hours && <p className="text-xs text-destructive mt-1">{fieldErrors.credit_hours}</p>}
             </div>
           </DialogBody>
 
@@ -496,8 +510,49 @@ export function CourseManagement() {
               ) : editingCourse ? (
                 'Save Changes'
               ) : (
-                'Create Course'
+                'Register Course'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Course Confirmation Dialog */}
+      <Dialog
+        open={!!deletingCourse}
+        onOpenChange={(open) => {
+          if (!open) setDeletingCourse(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              <DialogTitle className="text-lg font-bold">Delete Course</DialogTitle>
+            </div>
+            <DialogDescription className="pt-2">
+              Are you sure you want to delete course{' '}
+              <span className="font-semibold text-foreground">
+                {deletingCourse?.code} - {deletingCourse?.name}
+              </span>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button
+              variant="outline"
+              onClick={() => setDeletingCourse(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteCourse}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Course'}
             </Button>
           </DialogFooter>
         </DialogContent>

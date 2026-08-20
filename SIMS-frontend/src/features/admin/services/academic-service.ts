@@ -1,7 +1,7 @@
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
 import { api } from '@/services/api-client';
 
-import type { College, Program, AcademicYear, Semester, Department, Course } from '../types';
+import type { College, Program, AcademicYear, Semester, Department, Course, ClassStanding } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 function isValidUuid(id?: string | null): boolean {
@@ -39,6 +39,7 @@ export interface ApiDepartment {
 export interface ApiProgram {
   id: string;
   department: string;
+  department_detail?: ApiDepartment;
   name: string;
   code: string;
   degree_level: 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA' | 'CERTIFICATE';
@@ -68,11 +69,11 @@ export interface ApiSemester {
 export interface ApiCourse {
   id: string;
   program?: string | null;
-  program_detail?: ApiProgram;
+  program_detail?: ApiProgram | null;
   title: string;
   course_code: string;
   credit_hours: number;
-  intended_class_standing?: string;
+  intended_class_standing?: ClassStanding;
   created_at?: string;
   updated_at?: string;
 }
@@ -461,47 +462,112 @@ export const academicService = {
       code: c.course_code,
       name: c.title,
       creditHours: c.credit_hours,
-      department: 'Academic Department',
-      assignedLecturer: { id: '', name: 'Unassigned' },
-      studentCount: 0,
-      status: 'active',
-      semester: 'Current Semester',
+      program: c.program || c.program_detail?.id || null,
+      programDetail: c.program_detail
+        ? {
+            id: c.program_detail.id,
+            name: c.program_detail.name,
+            code: c.program_detail.code,
+            department: c.program_detail.department,
+            degreeLevel: c.program_detail.degree_level,
+            totalCreditHoursRequired: c.program_detail.total_credit_hours_required,
+          }
+        : null,
+      intendedClassStanding: c.intended_class_standing,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
     }));
   },
 
-  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: string }): Promise<Course> {
-    const res = await api.post<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSES, {
-      title: data.title,
-      course_code: data.course_code.toUpperCase(),
-      credit_hours: data.credit_hours,
+  async createCourse(data: {
+    title: string;
+    course_code: string;
+    credit_hours: number;
+    program?: string | null;
+    intended_class_standing?: ClassStanding;
+  }): Promise<Course> {
+    const payload: {
+      title: string;
+      course_code: string;
+      credit_hours: number;
+      program?: string | null;
+      intended_class_standing?: ClassStanding;
+    } = {
+      title: data.title.trim(),
+      course_code: data.course_code.trim().toUpperCase(),
+      credit_hours: Number(data.credit_hours),
       program: data.program || null,
-      ...(data.intended_class_standing ? { intended_class_standing: data.intended_class_standing } : {}),
-    });
+    };
+    if (data.intended_class_standing) {
+      payload.intended_class_standing = data.intended_class_standing;
+    }
+
+    const res = await api.post<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSES, payload);
     return {
       id: res.id,
       code: res.course_code,
       name: res.title,
       creditHours: res.credit_hours,
-      department: 'Academic Department',
-      assignedLecturer: { id: '', name: 'Unassigned' },
-      studentCount: 0,
-      status: 'active',
-      semester: 'Current Semester',
+      program: res.program || res.program_detail?.id || null,
+      programDetail: res.program_detail
+        ? {
+            id: res.program_detail.id,
+            name: res.program_detail.name,
+            code: res.program_detail.code,
+            department: res.program_detail.department,
+            degreeLevel: res.program_detail.degree_level,
+            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
+          }
+        : null,
+      intendedClassStanding: res.intended_class_standing,
+      createdAt: res.created_at,
+      updatedAt: res.updated_at,
     };
   },
 
-  async updateCourse(id: string, data: Partial<{ title: string; course_code: string; credit_hours: number }>): Promise<Course> {
-    const res = await api.patch<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id), data);
+  async updateCourse(
+    id: string,
+    data: Partial<{
+      title: string;
+      course_code: string;
+      credit_hours: number;
+      program?: string | null;
+      intended_class_standing?: ClassStanding;
+    }>
+  ): Promise<Course> {
+    const payload: Partial<{
+      title: string;
+      course_code: string;
+      credit_hours: number;
+      program: string | null;
+      intended_class_standing: ClassStanding;
+    }> = {};
+    if (data.title !== undefined) payload.title = data.title.trim();
+    if (data.course_code !== undefined) payload.course_code = data.course_code.trim().toUpperCase();
+    if (data.credit_hours !== undefined) payload.credit_hours = Number(data.credit_hours);
+    if (data.program !== undefined) payload.program = data.program || null;
+    if (data.intended_class_standing !== undefined) payload.intended_class_standing = data.intended_class_standing;
+
+    const res = await api.patch<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id), payload);
     return {
       id: res.id,
       code: res.course_code,
       name: res.title,
       creditHours: res.credit_hours,
-      department: 'Academic Department',
-      assignedLecturer: { id: '', name: 'Unassigned' },
-      studentCount: 0,
-      status: 'active',
-      semester: 'Current Semester',
+      program: res.program || res.program_detail?.id || null,
+      programDetail: res.program_detail
+        ? {
+            id: res.program_detail.id,
+            name: res.program_detail.name,
+            code: res.program_detail.code,
+            department: res.program_detail.department,
+            degreeLevel: res.program_detail.degree_level,
+            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
+          }
+        : null,
+      intendedClassStanding: res.intended_class_standing,
+      createdAt: res.created_at,
+      updatedAt: res.updated_at,
     };
   },
 

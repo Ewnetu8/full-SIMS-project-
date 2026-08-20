@@ -9,6 +9,7 @@ import type {
   LecturerProfile,
   Department,
   Course,
+  ClassStanding,
   AdminExamOverview,
   AIGradingJob,
   AuditLog,
@@ -70,6 +71,8 @@ interface AdminStoreState {
   semesterSearchQuery: string;
 
   courseSearchQuery: string;
+  courseProgramFilter: string;
+  courseStandingFilter: string;
   courseDeptFilter: string;
 
   examSearchQuery: string;
@@ -133,9 +136,11 @@ interface AdminStoreState {
 
   // Actions - Courses
   setCourseSearchQuery: (q: string) => void;
+  setCourseProgramFilter: (progId: string) => void;
+  setCourseStandingFilter: (standing: string) => void;
   setCourseDeptFilter: (dept: string) => void;
-  addCourse: (data: { title: string; course_code: string; credit_hours: number; program?: string; intended_class_standing?: string }) => Promise<Course>;
-  updateCourse: (id: string, data: Partial<{ title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: string }>) => Promise<Course>;
+  addCourse: (data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }) => Promise<Course>;
+  updateCourse: (id: string, data: Partial<{ title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }>) => Promise<Course>;
   deleteCourse: (id: string) => Promise<void>;
   toggleCourseArchive: (id: string) => void;
 
@@ -239,6 +244,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   semesterSearchQuery: '',
 
   courseSearchQuery: '',
+  courseProgramFilter: 'ALL',
+  courseStandingFilter: 'ALL',
   courseDeptFilter: 'ALL',
 
   examSearchQuery: '',
@@ -483,6 +490,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   // Actions - Courses
   setCourseSearchQuery: (courseSearchQuery) => set({ courseSearchQuery }),
+  setCourseProgramFilter: (courseProgramFilter) => set({ courseProgramFilter }),
+  setCourseStandingFilter: (courseStandingFilter) => set({ courseStandingFilter }),
   setCourseDeptFilter: (courseDeptFilter) => set({ courseDeptFilter }),
   addCourse: async (data) => {
     const course = await adminService.createCourse(data);
@@ -498,12 +507,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     await adminService.deleteCourse(id);
     set((state) => ({ courses: state.courses.filter((c) => c.id !== id) }));
   },
-  toggleCourseArchive: (id) =>
-    set((state) => ({
-      courses: state.courses.map((c) =>
-        c.id === id ? { ...c, status: c.status === 'active' ? 'archived' : 'active' } : c
-      ),
-    })),
+  toggleCourseArchive: (_id) => {},
 
   // Actions - Exams
   setExamSearchQuery: (examSearchQuery) => set({ examSearchQuery }),
