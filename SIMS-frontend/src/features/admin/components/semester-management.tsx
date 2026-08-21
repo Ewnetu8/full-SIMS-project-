@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -84,7 +85,7 @@ export function SemesterManagement() {
     setFieldErrors({});
     setEditingSemester(sem);
     setFormData({
-      academicYear: sem.academicYearDetail?.displayLabel || sem.academicYear || '',
+      academicYear: sem.academicYearDetail?.id || sem.academicYear || '',
       semesterIndex: sem.semesterIndex,
     });
   };
@@ -92,7 +93,7 @@ export function SemesterManagement() {
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!formData.academicYear.trim()) {
-      errors.academic_year = 'Academic Year is required (e.g., 2025/2026).';
+      errors.academic_year = 'Academic Year is required.';
     }
 
     if (!formData.semesterIndex) {
@@ -156,7 +157,7 @@ export function SemesterManagement() {
             Academic Semesters
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage academic semester periods (First, Second, Summer).
+            Manage academic semester periods (First, Second).
           </p>
         </div>
         <Button onClick={handleOpenAddModal} leftIcon={<Plus className="h-4 w-4" />}>
@@ -259,28 +260,46 @@ export function SemesterManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
+              <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>Academic Year</Label>
-                <Input
-                  placeholder="e.g. 2025/2026"
+                <Label htmlFor="academicYear" required>
+                  Academic Year
+                </Label>
+                <select
+                  id="academicYear"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm text-foreground"
                   value={formData.academicYear}
                   onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
                   disabled={!!editingSemester}
-                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
-                />
+                >
+                  <option value="">-- Select Academic Year --</option>
+                  {academicYears.map((y) => (
+                    <option key={y.id} value={y.id}>
+                      {y.displayLabel}
+                    </option>
+                  ))}
+                </select>
                 {fieldErrors.academic_year && <p className="text-xs text-destructive mt-1">{fieldErrors.academic_year}</p>}
               </div>
 
               <div>
-                <Label required>Semester Term</Label>
+                <Label htmlFor="semesterIndex" required>
+                  Semester Term
+                </Label>
                 <Select
-                  value={formData.semesterIndex}
+                  value={formData.semesterIndex || 'FIRST'}
+                  defaultValue="FIRST"
                   onValueChange={(val: any) => setFormData({ ...formData, semesterIndex: val })}
                 >
-                  <SelectTrigger className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
-                    <SelectValue />
+                  <SelectTrigger id="semesterIndex" className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
+                    <SelectValue placeholder="First Semester" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="FIRST">First Semester</SelectItem>
@@ -290,7 +309,7 @@ export function SemesterManagement() {
                 {fieldErrors.semester_index && <p className="text-xs text-destructive mt-1">{fieldErrors.semester_index}</p>}
               </div>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button

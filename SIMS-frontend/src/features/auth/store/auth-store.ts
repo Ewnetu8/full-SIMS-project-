@@ -164,19 +164,7 @@ export const useAuthStore = create<AuthStore>()(
           // 1. Update the flag so the custom storage adapter knows where to write.
           setRememberFlag(rememberMe);
 
-          // 2. Sync session cookie with Next.js server/middleware
-          fetch('/api/auth/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: session.user.id,
-              role: session.user.role,
-              exp: session.tokens.expiresAt || (Date.now() + 8 * 60 * 60 * 1000),
-              rememberMe,
-            }),
-          }).catch(() => {});
-
-          // 3. Update the store state — persist middleware will call setItem
+          // 2. Update the store state — persist middleware will call setItem
           //    which now targets the correct storage.
           set(
             {
@@ -193,7 +181,7 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         /**
-         * Full logout — clears the session cookie via API, then resets the store.
+         * Full logout — clears authentication via backend API, then resets the store.
          */
         logout: async () => {
           set({ isLoading: true }, false, 'auth/logout/start');
@@ -202,7 +190,6 @@ export const useAuthStore = create<AuthStore>()(
             if (get().isAuthenticated) {
               await authApi.logout();
             }
-            await fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
           } finally {
             purgeAllStorages();
             set({ ...initialState }, false, 'auth/logout/complete');
@@ -210,12 +197,11 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         /**
-         * Clear local state only — used on 401 or when the session cookie is gone.
+         * Clear local state only — used on 401 or when credentials expire.
          * Does not call the server.
          */
         clearSession: () => {
           purgeAllStorages();
-          fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
           set({ ...initialState }, false, 'auth/clearSession');
         },
 
@@ -230,14 +216,12 @@ export const useAuthStore = create<AuthStore>()(
             'auth/refreshSession',
           ),
 
-        /**
-         * Restore session from HttpOnly refresh cookie during application startup.
-         */
         initializeAuth: async () => {
           set({ isLoading: true }, false, 'auth/initialize/start');
 
           const hasRehydratedToken = !!get().tokens?.accessToken;
           const hasRehydratedUser = !!get().user;
+          const storedRefreshToken = get().tokens?.refreshToken;
 
           if (process.env.NODE_ENV !== 'production') {
             console.log('[DEV LOG] App auth initialization started. Rehydrated session present:', {
@@ -246,14 +230,20 @@ export const useAuthStore = create<AuthStore>()(
             });
           }
 
+          // If no session exists, finish initialization immediately without making unauthenticated refresh request
+          if (!hasRehydratedToken && !hasRehydratedUser && !storedRefreshToken) {
+            set({ isAuthenticated: false, isLoading: false }, false, 'auth/initialize/anonymous');
+            return;
+          }
+
           try {
-            const res = await authApi.refreshToken();
+            const res = await authApi.refreshToken(storedRefreshToken);
             const newAccessToken = (res as any).access || (res as any).access_token || (res as any).accessToken || res.tokens?.accessToken || '';
 
             if (newAccessToken) {
               set(
                 {
-                  tokens: { accessToken: newAccessToken },
+                  tokens: { ...get().tokens, accessToken: newAccessToken },
                   isAuthenticated: true,
                   isLoading: false,
                 },

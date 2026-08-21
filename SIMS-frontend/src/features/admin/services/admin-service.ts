@@ -1,6 +1,7 @@
-import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
-import { useAuthStore } from '@/features/auth/store';
+import { isValidUuid } from '@/lib/user-identifier';
+import { api } from '@/services/api-client';
+
 import { academicService } from './academic-service';
 import { examApiService } from './exam-api-service';
 
@@ -10,6 +11,7 @@ import type {
   LecturerProfile,
   Department,
   Course,
+  ClassStanding,
   College,
   Program,
   AcademicYear,
@@ -25,57 +27,32 @@ import type {
 export interface RegisterUserPayload {
   email: string;
   password?: string;
-  first_name: string;
-  last_name: string;
-  role: 'STUDENT' | 'LECTURER' | 'ADMIN';
+  first_name?: string;
+  last_name?: string;
+  role?: 'STUDENT' | 'LECTURER' | 'ADMIN';
   student_identifier?: string;
   faculty_identifier?: string;
   department_id?: string | null;
-}
-
-// In-memory store for newly registered users during session
-const registeredUsersCache: AdminUser[] = [];
-
-const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-function isValidUuid(id?: string | null): boolean {
-  return typeof id === 'string' && UUID_REGEX.test(id);
+  national_id_fan?: string | null;
 }
 
 export const adminService = {
   // ─── Users ─────────────────────────────────────────────────────────────────
+  /**
+   * Returns user accounts.
+   * Note: The backend SIMS REST API specification does not currently provide a user listing endpoint (GET /api/v1/users).
+   * Returns an empty array to prevent 404 errors, repeated network requests, and displaying fabricated mock data.
+   */
   async getUsers(): Promise<AdminUser[]> {
-    const list: AdminUser[] = [];
-    const authUser = useAuthStore.getState().user;
-
-    if (authUser) {
-      const currentUser: AdminUser = {
-        id: authUser.id,
-        userId: authUser.id,
-        firstName: authUser.firstName || 'User',
-        lastName: authUser.lastName || '',
-        email: authUser.email,
-        role: (authUser.role ? authUser.role.toLowerCase() : 'admin') as any,
-        department: '—',
-        status: 'active',
-        lastLogin: 'Active session',
-        createdAt: authUser.createdAt || new Date().toISOString(),
-      };
-      list.push(currentUser);
-    }
-
-    list.push(...registeredUsersCache);
-
-    const unique = Array.from(new Map(list.map((u) => [u.id, u])).values());
-    return unique;
+    return [];
   },
 
-  async getUserById(id: string): Promise<AdminUser | null> {
-    const users = await this.getUsers();
-    return users.find((u) => u.id === id) || null;
+  async getUserById(_id: string): Promise<AdminUser | null> {
+    return null;
   },
 
   async createUser(data: RegisterUserPayload): Promise<AdminUser> {
-    const roleUpper = data.role.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
+    const roleUpper = (data.role || 'STUDENT').toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
 
     const payload: Record<string, any> = {
       email: data.email.trim(),
@@ -83,15 +60,16 @@ export const adminService = {
       first_name: data.first_name ? data.first_name.trim() : '',
       last_name: data.last_name ? data.last_name.trim() : '',
       role: roleUpper,
+      national_id_fan: data.national_id_fan ? data.national_id_fan.trim() : null,
     };
 
     if (roleUpper === 'STUDENT') {
       payload.student_identifier = data.student_identifier ? data.student_identifier.trim() : '';
-      payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
     } else if (roleUpper === 'LECTURER') {
       payload.faculty_identifier = data.faculty_identifier ? data.faculty_identifier.trim() : '';
-      payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
     }
+
+    payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
 
     try {
       const res = await api.post<any>(API_ENDPOINTS.AUTH.REGISTER, payload);
@@ -106,26 +84,31 @@ export const adminService = {
         }
       }
 
-      const studentId = data.student_identifier || registeredUser.student_identifier || undefined;
-      const facultyId = data.faculty_identifier || registeredUser.faculty_identifier || undefined;
+      const rawStudentId = data.student_identifier || registeredUser.student_identifier;
+      const studentId = rawStudentId && !isValidUuid(rawStudentId) ? String(rawStudentId).trim() : undefined;
+
+      const rawFacultyId = data.faculty_identifier || registeredUser.faculty_identifier;
+      const facultyId = rawFacultyId && !isValidUuid(rawFacultyId) ? String(rawFacultyId).trim() : undefined;
+
       const displayUserId = studentId || facultyId || registeredUser.id;
 
       const newUser: AdminUser = {
-        id: registeredUser.id || `usr-${Date.now()}`,
+        id: registeredUser.id,
         userId: displayUserId,
-        firstName: registeredUser.first_name || data.first_name,
-        lastName: registeredUser.last_name || data.last_name,
+        firstName: registeredUser.first_name || data.first_name || 'User',
+        lastName: registeredUser.last_name || data.last_name || '',
         email: registeredUser.email || data.email,
-        role: (registeredUser.role ? registeredUser.role.toLowerCase() : data.role.toLowerCase()) as any,
+        role: (registeredUser.role ? registeredUser.role.toLowerCase() : (data.role || 'student').toLowerCase()) as any,
         department: resolvedDepartment,
+        departmentId: data.department_id || null,
         status: 'active',
         lastLogin: 'Never',
         studentIdentifier: studentId,
         facultyIdentifier: facultyId,
+        nationalIdFan: data.national_id_fan ? data.national_id_fan.trim() : null,
         createdAt: registeredUser.created_at || new Date().toISOString(),
       };
 
-      registeredUsersCache.unshift(newUser);
       return newUser;
     } catch (error: any) {
       throw error;
@@ -133,22 +116,20 @@ export const adminService = {
   },
 
   async updateUser(id: string, data: Partial<AdminUser>): Promise<AdminUser> {
-    const index = registeredUsersCache.findIndex((u) => u.id === id);
-    if (index !== -1) {
-      registeredUsersCache[index] = { ...registeredUsersCache[index]!, ...data };
-      return registeredUsersCache[index]!;
-    }
+    // Note: The SIMS OpenAPI specification does not provide a PATCH /api/v1/users/{id} endpoint.
     return {
       id,
       userId: data.userId || id,
       firstName: data.firstName || '',
       lastName: data.lastName || '',
       email: data.email || '',
-      role: data.role || 'student',
+      role: (data.role || 'student') as any,
       department: data.department || '',
+      departmentId: data.departmentId || null,
       status: data.status || 'active',
-      lastLogin: 'Never',
-      createdAt: new Date().toISOString(),
+      lastLogin: data.lastLogin || 'Never',
+      nationalIdFan: data.nationalIdFan || null,
+      createdAt: data.createdAt || new Date().toISOString(),
     };
   },
 
@@ -156,9 +137,13 @@ export const adminService = {
     return this.updateUser(id, { status });
   },
 
-  async deleteUser(id: string): Promise<void> {
-    const index = registeredUsersCache.findIndex((u) => u.id === id);
-    if (index !== -1) registeredUsersCache.splice(index, 1);
+  async deleteUser(_id: string): Promise<void> {
+    // Note: The SIMS OpenAPI specification does not provide a DELETE /api/v1/users/{id} endpoint.
+  },
+
+  // ─── Universities ───────────────────────────────────────────────────────────
+  async getUniversities(): Promise<Array<{ id: string; name: string; code: string }>> {
+    return academicService.getUniversities();
   },
 
   // ─── Colleges ───────────────────────────────────────────────────────────────
@@ -166,11 +151,11 @@ export const adminService = {
     return academicService.getColleges();
   },
 
-  async createCollege(data: { name: string; code: string; university?: string }): Promise<College> {
+  async createCollege(data: { name: string; code: string; university: string }): Promise<College> {
     return academicService.createCollege(data);
   },
 
-  async updateCollege(id: string, data: Partial<{ name: string; code: string }>): Promise<College> {
+  async updateCollege(id: string, data: Partial<{ name: string; code: string; university: string }>): Promise<College> {
     return academicService.updateCollege(id, data);
   },
 
@@ -183,16 +168,15 @@ export const adminService = {
     return academicService.getDepartments();
   },
 
-  async getDepartmentById(id: string): Promise<Department | null> {
-    const depts = await this.getDepartments();
-    return depts.find((d) => d.id === id) ?? null;
+  async getDepartmentById(id: string): Promise<Department> {
+    return academicService.getDepartmentById(id);
   },
 
-  async createDepartment(data: { name: string; code: string; college?: string }): Promise<Department> {
+  async createDepartment(data: { name: string; code: string; college?: string | null }): Promise<Department> {
     return academicService.createDepartment(data);
   },
 
-  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string }>): Promise<Department> {
+  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string | null }>): Promise<Department> {
     return academicService.updateDepartment(id, data);
   },
 
@@ -311,24 +295,16 @@ export const adminService = {
     return academicService.getCourses();
   },
 
-  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string; intended_class_standing?: string }): Promise<Course> {
+  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }): Promise<Course> {
     return academicService.createCourse(data);
   },
 
-  async updateCourse(id: string, data: Partial<{ title: string; course_code: string; credit_hours: number }>): Promise<Course> {
+  async updateCourse(id: string, data: Partial<{ title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }>): Promise<Course> {
     return academicService.updateCourse(id, data);
   },
 
   async deleteCourse(id: string): Promise<void> {
     return academicService.deleteCourse(id);
-  },
-
-  async toggleCourseArchive(id: string): Promise<Course> {
-    const courses = await this.getCourses();
-    const course = courses.find((c) => c.id === id);
-    if (!course) throw new Error('Course not found');
-    course.status = course.status === 'active' ? 'archived' : 'active';
-    return course;
   },
 
   // ─── Exams ─────────────────────────────────────────────────────────────────
@@ -362,17 +338,17 @@ export const adminService = {
       const data = await api.get<any>(API_ENDPOINTS.ENROLLMENTS.ROOT).catch(() => []);
       const list = Array.isArray(data) ? data : data?.results || [];
       return list.map((e: any) => ({
-        id: e.id || String(Math.random()),
-        studentId: e.student_id || e.student_detail?.student_id || 'STD-000',
-        firstName: e.student_detail?.first_name || e.student_name?.split(' ')[0] || 'Student',
-        lastName: e.student_detail?.last_name || e.student_name?.split(' ')[1] || '',
-        email: e.student_detail?.email || e.email || 'student@aastu.edu.et',
-        department: e.course_offering_detail?.department || 'Engineering',
-        program: e.program || 'B.Sc.',
-        gpa: e.gpa || 3.5,
-        academicYear: e.academic_year || 'Year 2',
+        id: e.id,
+        studentId: e.student_id || e.student_detail?.student_id || e.student || 'Not assigned',
+        firstName: e.student_detail?.first_name || (e.student_name ? e.student_name.split(' ')[0] : 'Student'),
+        lastName: e.student_detail?.last_name || (e.student_name ? e.student_name.split(' ').slice(1).join(' ') : ''),
+        email: e.student_detail?.email || e.student_email || '—',
+        department: e.course_offering_detail?.course_detail?.program_detail?.department_detail?.name || e.course_offering_detail?.department || 'Not assigned',
+        program: e.course_offering_detail?.course_detail?.program_detail?.name || '—',
+        gpa: e.gpa ?? 0,
+        academicYear: e.course_offering_detail?.semester_detail?.academic_year_detail?.display_label || '—',
         enrolledCoursesCount: 1,
-        status: 'active',
+        status: e.status === 'ENROLLED' ? 'active' : (e.status ? e.status.toLowerCase() : 'active'),
       }));
     } catch {
       return [];
@@ -387,23 +363,13 @@ export const adminService = {
     });
   },
 
+  /**
+   * Returns lecturer profiles.
+   * Currently, the backend does not provide a dedicated lecturer directory endpoint.
+   * Returns empty array to prevent displaying fabricated mock data.
+   */
   async getLecturers(): Promise<LecturerProfile[]> {
-    try {
-      const raw = await api.get<any[]>(API_ENDPOINTS.ACADEMICS.COURSE_OFFERINGS).catch(() => []);
-      return raw.map((co) => ({
-        id: co.id,
-        lecturerId: `LEC-${co.id.slice(0, 6)}`,
-        firstName: 'Faculty',
-        lastName: 'Member',
-        email: `faculty.${co.id.slice(0, 4)}@aastu.edu.et`,
-        department: 'Academic Dept',
-        office: 'Block 201',
-        coursesAssigned: [co.course_detail?.course_code || 'Course'],
-        status: 'active',
-      }));
-    } catch {
-      return [];
-    }
+    return [];
   },
 
   // ─── AI Jobs, Settings, Reports, Notifications ────────────────────────────
@@ -411,18 +377,8 @@ export const adminService = {
     return [];
   },
 
-  async retryAIGradingJob(jobId: string): Promise<AIGradingJob> {
-    return {
-      id: jobId,
-      examId: 'exam-1',
-      examTitle: 'Examination',
-      courseName: 'Course',
-      department: 'Engineering',
-      status: 'processing',
-      totalSubmissions: 0,
-      processedSubmissions: 0,
-      startedAt: new Date().toLocaleString(),
-    };
+  async retryAIGradingJob(_jobId: string): Promise<AIGradingJob | null> {
+    return null;
   },
 
   async getAuditLogs(): Promise<AuditLog[]> {
@@ -472,7 +428,7 @@ export const adminService = {
     return [];
   },
 
-  async markNotificationRead(_id: string): Promise<void> {},
+  async markNotificationRead(_id: string): Promise<void> { },
 
   async getDashboardStats(): Promise<AdminDashboardStats> {
     const [departments, courses, exams, students, lecturers, users] = await Promise.all([
@@ -487,19 +443,19 @@ export const adminService = {
     return {
       totalStudents: students.length,
       totalLecturers: lecturers.length,
-      totalAdministrators: users.filter((u) => u.role === 'admin').length || (users.length > 0 ? users.length : 1),
+      totalAdministrators: users.filter((u) => u.role === 'admin').length,
       totalCourses: courses.length,
       totalDepartments: departments.length,
       totalExams: exams.length,
-      activeExams: exams.filter((e) => e.status === 'active').length,
+      activeExams: exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length,
       pendingAIGrading: 0,
       publishedResults: exams.filter((e) => e.status === 'published').length,
       systemHealth: {
         status: 'healthy',
-        cpuUsage: 12,
-        memoryUsage: 35,
-        activeDbConnections: 6,
-        apiLatencyMs: 28,
+        cpuUsage: 0,
+        memoryUsage: 0,
+        activeDbConnections: 0,
+        apiLatencyMs: 0,
         aiEngineStatus: 'online',
         lastBackupTimestamp: new Date().toISOString(),
       },

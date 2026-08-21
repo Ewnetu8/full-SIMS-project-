@@ -118,3 +118,13 @@ export interface ExamWizardData {
   showResultsAfterSubmission: boolean;
   questions: Question[];
 }
+
+export type {
+  ExamResults,
+  ExamResultRow,
+  ExamAnalytics,
+  ExamAnalyticsResponse,
+  ScoreBand,
+  ScoreSummary,
+  QuestionAnalytics,
+} from '@/types/api';

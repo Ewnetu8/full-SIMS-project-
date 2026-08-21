@@ -25,7 +25,6 @@ import {
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
-import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { LecturerProfile } from '../types';
 
@@ -33,6 +32,7 @@ export function LecturerManagement() {
   const {
     lecturers,
     departments,
+    colleges,
     lecturerSearchQuery,
     lecturerDeptFilter,
     fetchLecturers,
@@ -46,6 +46,15 @@ export function LecturerManagement() {
 
   const [selectedLecturer, setSelectedLecturer] = React.useState<LecturerProfile | null>(null);
   const [lecturerCollegeFilter, setLecturerCollegeFilter] = React.useState<string>('ALL');
+
+  const filteredDepartments = React.useMemo(() => {
+    if (!lecturerCollegeFilter || lecturerCollegeFilter === 'ALL') return departments;
+    return departments.filter(
+      (d) =>
+        d.college === lecturerCollegeFilter ||
+        (colleges.find((c) => c.name === lecturerCollegeFilter || c.code === lecturerCollegeFilter)?.id === d.college)
+    );
+  }, [departments, colleges, lecturerCollegeFilter]);
 
   const filteredLecturers = lecturers.filter((l) => {
     const fullName = `${l.firstName} ${l.lastName}`.toLowerCase();
@@ -96,9 +105,9 @@ export function LecturerManagement() {
               }}
             >
               <option value="ALL">All Colleges</option>
-              {COLLEGES.map((col) => (
-                <option key={col} value={col}>
-                  {col}
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
                 </option>
               ))}
             </select>
@@ -111,9 +120,9 @@ export function LecturerManagement() {
               onChange={(e) => setLecturerDeptFilter(e.target.value)}
             >
               <option value="ALL">All Departments</option>
-              {getDepartmentsByCollege(lecturerCollegeFilter).map((d) => (
+              {filteredDepartments.map((d) => (
                 <option key={d.id} value={d.name}>
-                  {d.name}
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>
@@ -140,7 +149,7 @@ export function LecturerManagement() {
               {filteredLecturers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No lecturer records found matching filters.
+                    No lecturer records found in the current backend database.
                   </td>
                 </tr>
               ) : (

@@ -1,6 +1,6 @@
 'use client';
 
-import { Landmark, Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Landmark, Plus, Edit2, Trash2, Search, XCircle } from 'lucide-react';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -27,6 +28,7 @@ export function CollegeManagement() {
   const {
     colleges,
     isLoadingColleges,
+    collegesError,
     collegeSearchQuery,
     fetchColleges,
     addCollege,
@@ -55,13 +57,26 @@ export function CollegeManagement() {
     loadUniversities();
   }, [fetchColleges]);
 
+  const getAastuUniversity = React.useCallback(
+    (unis: Array<{ id: string; name: string; code: string }>) => {
+      return (
+        unis.find(
+          (u) =>
+            u.code?.toUpperCase() === 'AASTU' ||
+            u.name?.toLowerCase().includes('addis ababa science and technology')
+        ) || (unis.length === 1 ? unis[0] : null)
+      );
+    },
+    [],
+  );
+
   const loadUniversities = async () => {
     setIsLoadingUniversities(true);
     try {
       const unis = await academicService.getUniversities();
       setUniversities(unis);
     } catch {
-      // fallback
+      setUniversities([]);
     } finally {
       setIsLoadingUniversities(false);
     }
@@ -69,33 +84,45 @@ export function CollegeManagement() {
 
   const handleOpenAddModal = () => {
     setFieldErrors({});
-    const defaultUni = universities[0]?.id || '';
-    setFormData({ name: '', code: '', university: defaultUni });
+    const defaultUni = getAastuUniversity(universities);
+    setFormData({
+      name: '',
+      code: '',
+      university: defaultUni ? defaultUni.id : '',
+    });
     setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (college: College) => {
     setFieldErrors({});
     setEditingCollege(college);
+    const defaultUni = getAastuUniversity(universities);
     setFormData({
       name: college.name,
       code: college.code,
-      university: college.university || universities[0]?.id || '',
+      university: college.university || (defaultUni ? defaultUni.id : ''),
     });
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!formData.code.trim()) {
+    const trimmedCode = formData.code.trim();
+    const trimmedName = formData.name.trim();
+
+    if (!trimmedCode) {
       errors.code = 'College code is required.';
-    } else if (formData.code.length > 10) {
+    } else if (trimmedCode.length > 10) {
       errors.code = 'College code must not exceed 10 characters.';
     }
 
-    if (!formData.name.trim()) {
+    if (!trimmedName) {
       errors.name = 'College name is required.';
-    } else if (formData.name.length > 255) {
+    } else if (trimmedName.length > 255) {
       errors.name = 'College name must not exceed 255 characters.';
+    }
+
+    if (!formData.university) {
+      errors.university = 'University is required.';
     }
 
     setFieldErrors(errors);
@@ -109,16 +136,17 @@ export function CollegeManagement() {
     try {
       if (editingCollege) {
         await updateCollege(editingCollege.id, {
-          name: formData.name,
-          code: formData.code.toUpperCase(),
+          name: formData.name.trim(),
+          code: formData.code.trim().toUpperCase(),
+          university: formData.university,
         });
         toast.success('College updated successfully.');
         setEditingCollege(null);
       } else {
         await addCollege({
-          name: formData.name,
-          code: formData.code.toUpperCase(),
-          university: formData.university || undefined,
+          name: formData.name.trim(),
+          code: formData.code.trim().toUpperCase(),
+          university: formData.university,
         });
         toast.success('College created successfully.');
         setIsAddModalOpen(false);
@@ -168,6 +196,19 @@ export function CollegeManagement() {
         </Button>
       </div>
 
+      {/* Error State Banner */}
+      {collegesError && (
+        <Card className="p-4 border-destructive/40 bg-destructive/10 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-destructive">
+            <XCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">{collegesError}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => fetchColleges()}>
+            Retry
+          </Button>
+        </Card>
+      )}
+
       {/* Filter / Search Bar */}
       <Card className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -204,39 +245,47 @@ export function CollegeManagement() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredColleges.map((college) => (
-            <Card key={college.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-all">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold font-mono text-[#102A7A] dark:text-blue-400">
-                    {college.code}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => handleOpenEditModal(college)}
-                      aria-label="Edit college"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={() => setDeletingCollege(college)}
-                      aria-label="Delete college"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+          {filteredColleges.map((college) => {
+            const uniName = college.university_detail?.name || universities.find((u) => u.id === college.university)?.name;
+            return (
+              <Card key={college.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-all">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold font-mono text-[#102A7A] dark:text-blue-400">
+                      {college.code}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => handleOpenEditModal(college)}
+                        aria-label="Edit college"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeletingCollege(college)}
+                        aria-label="Delete college"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
+                  <h3 className="font-semibold text-lg text-[#102A7A] dark:text-foreground mb-1">
+                    {college.name}
+                  </h3>
+                  {uniName && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {uniName}
+                    </p>
+                  )}
                 </div>
-                <h3 className="font-semibold text-lg text-[#102A7A] dark:text-foreground mb-1">
-                  {college.name}
-                </h3>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -262,11 +311,19 @@ export function CollegeManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
+            {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
+              <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+                {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>College Code</Label>
+                <Label htmlFor="code" required>
+                  College Code
+                </Label>
                 <Input
+                  id="code"
                   placeholder="e.g. COEE"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
@@ -277,8 +334,11 @@ export function CollegeManagement() {
               </div>
 
               <div>
-                <Label required>College Name</Label>
+                <Label htmlFor="name" required>
+                  College Name
+                </Label>
                 <Input
+                  id="name"
                   placeholder="e.g. College of Electrical & Mechanical Engineering"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -290,28 +350,26 @@ export function CollegeManagement() {
             </div>
 
             <div>
-              <Label required>University</Label>
+              <Label htmlFor="university" required>
+                University
+              </Label>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm"
+                id="university"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm text-foreground"
                 value={formData.university}
                 onChange={(e) => setFormData({ ...formData, university: e.target.value })}
                 disabled={isLoadingUniversities}
               >
-                {isLoadingUniversities ? (
-                  <option value="">Loading universities...</option>
-                ) : universities.length === 0 ? (
-                  <option value="">Addis Ababa Science and Technology University (Default)</option>
-                ) : (
-                  universities.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.code})
-                    </option>
-                  ))
-                )}
+                <option value="">-- Select University --</option>
+                {universities.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.code})
+                  </option>
+                ))}
               </select>
               {fieldErrors.university && <p className="text-xs text-destructive mt-1">{fieldErrors.university}</p>}
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button

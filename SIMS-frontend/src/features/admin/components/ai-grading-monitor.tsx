@@ -149,90 +149,100 @@ export function AIGradingMonitor() {
         </h2>
 
         <div className="space-y-4">
-          {aiJobs.map((job) => {
-            const pct = Math.round((job.processedSubmissions / job.totalSubmissions) * 100) || 0;
+          {aiJobs.length === 0 ? (
+            <div className="p-12 text-center bg-muted/20 border border-dashed rounded-xl space-y-3">
+              <Brain className="h-10 w-10 text-muted-foreground mx-auto" />
+              <h3 className="font-semibold text-foreground">No Active AI Grading Jobs</h3>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                No automated evaluation jobs are currently queued. AI grading jobs are triggered upon examination completion and submission certify workflows.
+              </p>
+            </div>
+          ) : (
+            aiJobs.map((job) => {
+              const pct = Math.round((job.processedSubmissions / job.totalSubmissions) * 100) || 0;
 
-            return (
-              <div
-                key={job.id}
-                className="p-4 rounded-xl border border-border bg-card/60 space-y-3 transition-all hover:border-ai-primary/30"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-ai-primary">{job.id}</span>
-                      <h3 className="text-sm font-semibold text-foreground">{job.examTitle}</h3>
+              return (
+                <div
+                  key={job.id}
+                  className="p-4 rounded-xl border border-border bg-card/60 space-y-3 transition-all hover:border-ai-primary/30"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-ai-primary">{job.id}</span>
+                        <h3 className="text-sm font-semibold text-foreground">{job.examTitle}</h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{job.courseName}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{job.courseName}</p>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        job.status === 'completed'
-                          ? 'success'
-                          : job.status === 'processing'
-                          ? 'warning'
-                          : job.status === 'failed'
-                          ? 'destructive'
-                          : 'secondary'
-                      }
-                      className="capitalize text-xs"
-                    >
-                      {job.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          job.status === 'completed'
+                            ? 'success'
+                            : job.status === 'processing'
+                            ? 'warning'
+                            : job.status === 'failed'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                        className="capitalize text-xs"
+                      >
+                        {job.status}
+                      </Badge>
 
-                    {job.status === 'failed' && (
+                      {job.status === 'failed' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+                          onClick={() => handleRetry(job.id, job.examTitle)}
+                        >
+                          Retry Job
+                        </Button>
+                      )}
+
                       <Button
                         size="sm"
-                        variant="outline"
-                        leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
-                        onClick={() => handleRetry(job.id, job.examTitle)}
+                        variant="ghost"
+                        leftIcon={<FileText className="h-3.5 w-3.5" />}
+                        onClick={() => setInspectingJob(job)}
                       >
-                        Retry Job
+                        Inspect Logs
                       </Button>
-                    )}
-
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      leftIcon={<FileText className="h-3.5 w-3.5" />}
-                      onClick={() => setInspectingJob(job)}
-                    >
-                      Inspect Logs
-                    </Button>
+                    </div>
                   </div>
+
+                  {/* Progress Bar & Submissions breakdown */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Submissions Processed</span>
+                      <span className="font-semibold text-foreground">
+                        {job.processedSubmissions} / {job.totalSubmissions} ({pct}%)
+                      </span>
+                    </div>
+                    <Progress value={pct} className="h-2" />
+                  </div>
+
+                  {job.confidenceAverage && (
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                      <span>Started: {job.startedAt}</span>
+                      <span className="font-medium text-success">
+                        Confidence Rating: {job.confidenceAverage}%
+                      </span>
+                    </div>
+                  )}
+
+                  {job.errorReason && (
+                    <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>{job.errorReason}</span>
+                    </div>
+                  )}
                 </div>
-
-                {/* Progress Bar & Submissions breakdown */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Submissions Processed</span>
-                    <span className="font-semibold text-foreground">
-                      {job.processedSubmissions} / {job.totalSubmissions} ({pct}%)
-                    </span>
-                  </div>
-                  <Progress value={pct} className="h-2" />
-                </div>
-
-                {job.confidenceAverage && (
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
-                    <span>Started: {job.startedAt}</span>
-                    <span className="font-medium text-success">
-                      Confidence Rating: {job.confidenceAverage}%
-                    </span>
-                  </div>
-                )}
-
-                {job.errorReason && (
-                  <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>{job.errorReason}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </Card>
 

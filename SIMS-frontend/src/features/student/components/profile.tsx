@@ -1,56 +1,90 @@
 'use client';
 
 import * as React from 'react';
-import { KeyRound, UserRound, Save } from 'lucide-react';
+import {
+  UserRound,
+  GraduationCap,
+  Building,
+  Building2,
+  BookOpen,
+  Calendar,
+  Award,
+  ShieldCheck,
+  Info,
+  Sun,
+  Moon,
+  Monitor,
+  RefreshCw,
+  CheckCircle2,
+} from 'lucide-react';
 import { useAuthStore } from '@/features/auth/store';
-import { SuccessState, toast } from '@/components/feedback';
-import { CollegeDepartmentSelect } from '@/components/forms';
+import { useTheme } from '@/providers/theme-provider';
 import { PageHeader } from '@/components/layout';
 import { Breadcrumb } from '@/components/navigation';
-import { Avatar, Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui';
+import { Skeleton } from '@/components/feedback';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { resolveStudentIdentifier } from '@/lib/user-identifier';
 import { studentService } from '../services';
-import type { StudentProfile } from '../types';
+import type { AcademicProfileDetails } from '../types';
 
 export function ProfilePage() {
   const user = useAuthStore((state) => state.user);
-  const [profile, setProfile] = React.useState<StudentProfile>(() => studentService.getProfile());
-  const [collegeId, setCollegeId] = React.useState('col-coe-001');
-  const [errors, setErrors] = React.useState<Partial<Record<keyof StudentProfile, string>>>({});
-  const [saved, setSaved] = React.useState(false);
+  const { theme, setTheme } = useTheme();
 
+  const [academicData, setAcademicData] = React.useState<AcademicProfileDetails | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchAcademicData = React.useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const details = await studentService.getAcademicProfileDetails();
+      setAcademicData(details);
+    } catch {
+      setError("We couldn't load your academic profile details. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchAcademicData();
+  }, [fetchAcademicData]);
+
+  // Derived user details from authenticated user session
   const fullName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
-    : profile.fullName || 'Authenticated Student';
+    : 'Authenticated Student';
 
   const initials = fullName
     .split(' ')
+    .filter(Boolean)
     .map((part: string) => part[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);
 
-  const update = (key: keyof StudentProfile, value: string) => {
-    setSaved(false);
-    setProfile((current: StudentProfile) => ({ ...current, [key]: value }));
-    setErrors((current) => ({ ...current, [key]: undefined }));
-  };
+  const formattedDate = user?.createdAt
+    ? new Date(user.createdAt).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Not provided';
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const next: Partial<Record<keyof StudentProfile, string>> = {};
-    if (!profile.fullName.trim()) next.fullName = 'Please enter your full name.';
-    if (!/^\S+@\S+\.\S+$/.test(profile.email)) next.email = 'Enter a valid email address.';
-    if (!profile.studentId.trim()) next.studentId = 'Please enter your student ID.';
-
-    setErrors(next);
-    if (Object.keys(next).length > 0) return;
-
-    setSaved(true);
-    toast.success('Profile changes saved', {
-      description: 'Your profile information has been successfully updated.',
-    });
-  };
+  // Resolve the authentic Student Identifier entered during registration (guaranteeing no UUID is displayed)
+  const resolvedStudentId = resolveStudentIdentifier(user, [academicData?.studentId]);
+  const displayedAccountId = resolvedStudentId || 'Not available';
 
   return (
     <div className="space-y-6">
@@ -63,147 +97,223 @@ export function ProfilePage() {
             ]}
           />
         }
-        title="My profile"
-        description="Manage your personal identity and academic profile information."
+        title="Student Profile"
+        description="View your verified personal identity and academic record details."
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Avatar & Summary Card */}
-        <Card className="lg:col-span-1 shadow-sm">
-          <CardContent className="flex flex-col items-center p-6 text-center">
-            <Avatar className="h-24 w-24" size="2xl" fallback={initials || 'ST'} alt={fullName} />
-            <h2 className="mt-4 text-lg font-semibold text-foreground">{fullName}</h2>
-            <p className="text-sm text-muted-foreground">{user?.email || profile.email}</p>
-            <div className="mt-3">
-              <Badge variant="default" className="uppercase">
-                Role: {user?.role || 'STUDENT'}
-              </Badge>
-            </div>
-            <Button
-              variant="outline"
-              className="mt-6 w-full"
-              leftIcon={<KeyRound className="h-4 w-4" />}
-              onClick={() =>
-                toast.info('Account Security Notice', {
-                  description: 'To update your password, please contact the IT support desk or administrator.',
-                })
-              }
-            >
-              Account Security
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Left Column: Avatar & Theme Preferences */}
+        <div className="space-y-6 lg:col-span-1">
+          {/* Identity Card */}
+          <Card className="shadow-sm border-border">
+            <CardContent className="flex flex-col items-center p-6 text-center">
+              <Avatar className="h-24 w-24 ring-2 ring-primary/20" size="2xl" fallback={initials || 'ST'} alt={fullName} />
+              
+              <h2 className="mt-4 text-xl font-bold text-foreground">{fullName}</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">{user?.email || 'Not provided'}</p>
 
-        {/* Authenticated User Identity Details & Academic Form Card */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <Badge variant="default" className="uppercase px-3 py-1 font-semibold">
+                  {user?.role ? user.role.toUpperCase() : 'STUDENT'}
+                </Badge>
+                <Badge variant="secondary" className="px-3 py-1 font-medium flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                  Verified Record
+                </Badge>
+              </div>
+
+              <div className="w-full mt-6 pt-4 border-t border-border/80 text-xs text-muted-foreground flex justify-between items-center">
+                <span>Account Created</span>
+                <span className="font-medium text-foreground">{formattedDate}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Theme & Display Settings */}
+          <Card className="shadow-sm border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sun className="h-4 w-4 text-primary" />
+                Display Preferences
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Customize your visual interface appearance on this device.
+              </p>
+              
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <Button
+                  variant={theme === 'light' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex flex-col items-center gap-1 py-3 h-auto"
+                  onClick={() => setTheme('light')}
+                >
+                  <Sun className="h-4 w-4" />
+                  <span className="text-xs">Light</span>
+                </Button>
+
+                <Button
+                  variant={theme === 'dark' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex flex-col items-center gap-1 py-3 h-auto"
+                  onClick={() => setTheme('dark')}
+                >
+                  <Moon className="h-4 w-4" />
+                  <span className="text-xs">Dark</span>
+                </Button>
+
+                <Button
+                  variant={theme === 'system' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex flex-col items-center gap-1 py-3 h-auto"
+                  onClick={() => setTheme('system')}
+                >
+                  <Monitor className="h-4 w-4" />
+                  <span className="text-xs">System</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Read-Only Profile Details */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Error Banner */}
+          {error && (
+            <Card className="border-destructive/30 bg-destructive/5 text-destructive p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Info className="h-5 w-5 shrink-0" />
+                <span className="text-sm font-medium">{error}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={fetchAcademicData}
+                leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+              >
+                Retry
+              </Button>
+            </Card>
+          )}
+
+          {/* Account Identity Details */}
+          <Card className="shadow-sm border-border">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
                 <UserRound className="h-5 w-5 text-primary" />
                 Account Identity Details
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
-                <DetailField label="First Name" value={user?.firstName || 'N/A'} />
-                <DetailField label="Last Name" value={user?.lastName || 'N/A'} />
-                <DetailField label="Email Address" value={user?.email || 'N/A'} />
-                <DetailField label="Account ID" value={user?.id || 'N/A'} />
-                <DetailField label="Account Type" value={user?.role?.toUpperCase() || 'STUDENT'} />
+                <ReadOnlyField label="First Name" value={user?.firstName || 'Not provided'} icon={<UserRound className="h-4 w-4" />} />
+                <ReadOnlyField label="Last Name" value={user?.lastName || 'Not provided'} icon={<UserRound className="h-4 w-4" />} />
+                <ReadOnlyField label="Email Address" value={user?.email || 'Not provided'} icon={<UserRound className="h-4 w-4" />} />
+                <ReadOnlyField label="Account ID" value={displayedAccountId} icon={<ShieldCheck className="h-4 w-4" />} isMono />
+                <ReadOnlyField label="User Role" value={user?.role ? user.role.toUpperCase() : 'STUDENT'} icon={<Award className="h-4 w-4" />} />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserRound className="h-5 w-5 text-[#102A7A] dark:text-primary" />
-                Academic Profile Details
+          {/* Academic Information Card */}
+          <Card className="shadow-sm border-border">
+            <CardHeader className="pb-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-primary" />
+                Academic & Institutional Information
               </CardTitle>
+              <Badge variant="outline" className="text-xs font-normal">
+                Read-Only Record
+              </Badge>
             </CardHeader>
             <CardContent>
-              <form noValidate onSubmit={submit} className="space-y-5">
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <label>
-                    <span className="mb-1.5 block text-sm font-medium">Full name</span>
-                    <Input
-                      value={profile.fullName}
-                      onChange={(e) => update('fullName', e.target.value)}
-                      error={Boolean(errors.fullName)}
-                    />
-                    {errors.fullName && <span className="mt-1 block text-xs text-destructive">{errors.fullName}</span>}
-                  </label>
-
-                  <label>
-                    <span className="mb-1.5 block text-sm font-medium">Student ID</span>
-                    <Input
-                      value={profile.studentId}
-                      onChange={(e) => update('studentId', e.target.value)}
-                      error={Boolean(errors.studentId)}
-                    />
-                    {errors.studentId && <span className="mt-1 block text-xs text-destructive">{errors.studentId}</span>}
-                  </label>
-
-                  <label className="sm:col-span-2">
-                    <span className="mb-1.5 block text-sm font-medium">Email address</span>
-                    <Input
-                      type="email"
-                      value={profile.email}
-                      onChange={(e) => update('email', e.target.value)}
-                      error={Boolean(errors.email)}
-                    />
-                    {errors.email && <span className="mt-1 block text-xs text-destructive">{errors.email}</span>}
-                  </label>
+              {isLoading ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-3.5 rounded-lg border border-border/80 bg-muted/20 space-y-2">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-4 w-36" />
+                    </div>
+                  ))}
                 </div>
-
-                <div className="pt-2 border-t border-border">
-                  <CollegeDepartmentSelect
-                    collegeValue={collegeId}
-                    onCollegeChange={(colId) => setCollegeId(colId)}
-                    departmentValue={profile.department}
-                    onDepartmentChange={(deptVal) => update('department', deptVal)}
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <ReadOnlyField
+                    label="College"
+                    value={academicData?.college || 'Not provided'}
+                    icon={<Building className="h-4 w-4" />}
                   />
+                  <ReadOnlyField
+                    label="Department"
+                    value={academicData?.department || 'Not provided'}
+                    icon={<Building2 className="h-4 w-4" />}
+                  />
+                  <ReadOnlyField
+                    label="Academic Program"
+                    value={academicData?.program || 'Not provided'}
+                    icon={<BookOpen className="h-4 w-4" />}
+                  />
+                  <ReadOnlyField
+                    label="Student Identifier"
+                    value={displayedAccountId}
+                    icon={<GraduationCap className="h-4 w-4" />}
+                    isMono
+                  />
+                  <ReadOnlyField
+                    label="Academic Year"
+                    value={academicData?.academicYear || 'Not provided'}
+                    icon={<Calendar className="h-4 w-4" />}
+                  />
+                  <ReadOnlyField
+                    label="Class Standing / Status"
+                    value={academicData?.classStanding || 'Not provided'}
+                    icon={<Award className="h-4 w-4" />}
+                  />
+                  <div className="sm:col-span-2 pt-2">
+                    <ReadOnlyField
+                      label="Enrolled Courses Count"
+                      value={academicData ? `${academicData.totalEnrolledCourses} Active Enrollment(s)` : 'Not provided'}
+                      icon={<BookOpen className="h-4 w-4" />}
+                    />
+                  </div>
                 </div>
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <label>
-                    <span className="mb-1.5 block text-sm font-medium">Program</span>
-                    <Input value={profile.program} onChange={(e) => update('program', e.target.value)} />
-                  </label>
-
-                  <label>
-                    <span className="mb-1.5 block text-sm font-medium">Year of study</span>
-                    <Input value={profile.yearOfStudy} onChange={(e) => update('yearOfStudy', e.target.value)} />
-                  </label>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button type="submit" leftIcon={<Save className="h-4 w-4" />}>
-                    Save changes
-                  </Button>
-                </div>
-              </form>
+              )}
             </CardContent>
           </Card>
-
-          {saved && (
-            <SuccessState
-              className="rounded-xl border border-success/20 bg-success/5"
-              title="Profile updated"
-              description="Your changes have been validated and saved locally."
-            />
-          )}
         </div>
       </div>
     </div>
   );
 }
 
-function DetailField({ label, value }: { label: string; value: string }) {
+function ReadOnlyField({
+  label,
+  value,
+  icon,
+  isMono = false,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  isMono?: boolean;
+}) {
+  const isMissing = value === 'Not provided' || value === 'Not available';
+
   return (
-    <div className="rounded-lg border border-border/80 p-3 bg-muted/20">
-      <span className="block text-xs text-muted-foreground font-medium">{label}</span>
-      <span className="block text-sm font-semibold text-foreground mt-0.5">{value}</span>
+    <div className="rounded-lg border border-border/80 p-3.5 bg-muted/20 flex flex-col justify-between">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mb-1">
+        {icon && <span className="text-muted-foreground/80">{icon}</span>}
+        <span>{label}</span>
+      </div>
+      <span
+        className={`text-sm font-semibold ${
+          isMono ? 'font-mono text-xs font-bold text-primary' : ''
+        } ${isMissing ? 'text-muted-foreground/60 italic font-normal' : 'text-foreground'}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

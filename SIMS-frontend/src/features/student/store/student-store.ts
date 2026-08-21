@@ -6,6 +6,7 @@ import type {
   Notification,
   Course,
   CourseOffering,
+  Result,
 } from '../types/student.types';
 
 function formatErrorMessage(err: any, fallback: string): string {
@@ -44,21 +45,25 @@ interface StudentState {
   notifications: Notification[];
   courses: Course[];
   courseOfferings: CourseOffering[];
+  results: Result[];
 
   isLoadingEnrollments: boolean;
   isLoadingExams: boolean;
   isLoadingNotifications: boolean;
   isLoadingCourses: boolean;
+  isLoadingResults: boolean;
 
   enrollmentsError: string | null;
   examsError: string | null;
   notificationsError: string | null;
   coursesError: string | null;
+  resultsError: string | null;
 
   fetchEnrollments: () => Promise<void>;
   fetchActiveExams: () => Promise<void>;
   fetchNotifications: () => Promise<void>;
   fetchCourses: () => Promise<void>;
+  fetchResults: () => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   reset: () => void;
@@ -70,20 +75,37 @@ const initialState = {
   notifications: [],
   courses: [],
   courseOfferings: [],
+  results: [],
 
   isLoadingEnrollments: false,
   isLoadingExams: false,
   isLoadingNotifications: false,
   isLoadingCourses: false,
+  isLoadingResults: false,
 
   enrollmentsError: null,
   examsError: null,
   notificationsError: null,
   coursesError: null,
+  resultsError: null,
 };
 
 export const useStudentStore = create<StudentState>()((set, get) => ({
   ...initialState,
+
+  fetchResults: async () => {
+    set({ isLoadingResults: true, resultsError: null });
+    try {
+      const results = await studentService.getMyResults();
+      set({ results, isLoadingResults: false });
+    } catch (err: any) {
+      const message = formatErrorMessage(
+        err,
+        "We couldn't load your examination results. Please try again."
+      );
+      set({ resultsError: message, isLoadingResults: false });
+    }
+  },
 
   fetchEnrollments: async () => {
     set({ isLoadingEnrollments: true, enrollmentsError: null });

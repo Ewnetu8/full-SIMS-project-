@@ -77,10 +77,10 @@ export function CoursesPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                      <span className="inline-block font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded">
                         {course?.course_code || 'COURSE'}
-                      </p>
-                      <CardTitle className="mt-1">{course?.title || 'Enrolled Course'}</CardTitle>
+                      </span>
+                      <CardTitle className="mt-2">{course?.title || 'Enrolled Course'}</CardTitle>
                     </div>
                     <Badge variant={statusVariant}>{status}</Badge>
                   </div>
@@ -92,7 +92,7 @@ export function CoursesPage() {
                         <Award className="h-3.5 w-3.5" />
                         Credit Hours
                       </dt>
-                      <dd className="mt-1 font-medium text-foreground">
+                      <dd className="mt-1 font-mono text-xs font-semibold text-foreground">
                         {course?.credit_hours ?? 'N/A'} hrs
                       </dd>
                     </div>
@@ -101,7 +101,7 @@ export function CoursesPage() {
                         <Hash className="h-3.5 w-3.5" />
                         Section
                       </dt>
-                      <dd className="mt-1 font-medium text-foreground">
+                      <dd className="mt-1 font-mono text-xs font-semibold text-foreground">
                         Section {offering?.section || 'A'}
                       </dd>
                     </div>
@@ -119,7 +119,7 @@ export function CoursesPage() {
                     {enrollment.grade && (
                       <div className="col-span-2 pt-2 border-t border-border/60 flex items-center justify-between">
                         <span className="text-xs font-medium text-muted-foreground">Final Grade</span>
-                        <span className="text-sm font-bold text-success">{enrollment.grade}</span>
+                        <span className="text-sm font-mono font-bold text-success">{enrollment.grade}</span>
                       </div>
                     )}
                   </dl>

@@ -143,11 +143,18 @@ export const API_ENDPOINTS = {
     BY_ID: (id: string) => `/api/v1/notifications/${id}/`,
   },
 
-  // ── Legacy/Users/Grades/Analytics ─────────────────────────────────────────
+  // ── Results (SIMS API 4) ───────────────────────────────────────────────────
+  RESULTS: {
+    ME: '/api/v1/results/me',
+    EXAM: (id: string) => `/api/v1/results/exam/${id}`,
+  },
+
+  // ── Users / Grades / Analytics ──────────────────────────────────────────
+  // Note: The SIMS REST API specification does not currently provide a GET /api/v1/users listing endpoint.
   USERS: {
-    ROOT: '/users',
-    BY_ID: (id: string) => `/users/${id}`,
-    PROFILE: '/users/profile',
+    ROOT: '/api/v1/users',
+    BY_ID: (id: string) => `/api/v1/users/${id}`,
+    PROFILE: '/api/v1/users/profile',
   },
 
   GRADES: {

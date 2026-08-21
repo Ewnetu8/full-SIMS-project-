@@ -108,8 +108,8 @@ function ExamCard({ exam, completed }: { exam: Examination; completed: boolean }
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary">{courseCode}</p>
-            <CardTitle className="mt-1">{exam.title}</CardTitle>
+            <span className="inline-block font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded">{courseCode}</span>
+            <CardTitle className="mt-2">{exam.title}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               {courseTitle} {exam.lecturer ? `· ${exam.lecturer}` : ''}
             </p>

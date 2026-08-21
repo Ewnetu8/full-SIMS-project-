@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -105,26 +106,16 @@ export function ProgramManagement() {
   }, [colleges, departments]);
 
   const availableDepartments = React.useMemo(() => {
-    if (!formData.collegeId) return [];
+    if (!formData.collegeId) return departments;
 
-    const selectedCollege = colleges.find((c) => c.id === formData.collegeId);
-    const colCode = (selectedCollege?.code || (formData.collegeId === 'col-coe-001' ? 'COE' : formData.collegeId === 'col-coas-002' ? 'COAS' : '')).toUpperCase();
-
-    const coeCodes = ['CHE', 'EME', 'ECE', 'CE', 'ENV', 'SE', 'MNE', 'ME'];
-    const coasCodes = ['FN', 'BT', 'IND', 'GL'];
-
-    const targetCodes = colCode === 'COE' ? coeCodes : colCode === 'COAS' ? coasCodes : [];
+    const selectedCollege = colleges.find(
+      (c) => c.id === formData.collegeId || c.name === formData.collegeId || c.code === formData.collegeId
+    );
 
     return departments.filter((d) => {
-      const codeUpper = d.code.toUpperCase();
-      // Direct match: department's college FK === selected college ID
       if (d.college === formData.collegeId) return true;
-      // Match by college code
-      if (selectedCollege && d.college === selectedCollege.code) return true;
-      // Match by seed collegeId
-      if (selectedCollege && (d as any).collegeId === formData.collegeId) return true;
-      // Match by expected department codes for the selected college
-      if (targetCodes.length > 0 && targetCodes.includes(codeUpper)) return true;
+      if (selectedCollege && (d.college === selectedCollege.id || d.college === selectedCollege.name || d.college === selectedCollege.code)) return true;
+      if (!d.college) return true;
       return false;
     });
   }, [departments, colleges, formData.collegeId]);
@@ -133,10 +124,6 @@ export function ProgramManagement() {
     const errors: Record<string, string> = {};
     const trimmedCode = formData.code.trim();
     const trimmedName = formData.name.trim();
-
-    if (!formData.collegeId) {
-      errors.college = 'College selection is required.';
-    }
 
     if (!formData.departmentId) {
       errors.department = 'Department selection is required.';
@@ -174,7 +161,6 @@ export function ProgramManagement() {
       code: formData.code.trim().toUpperCase(),
       degree_level: formData.degreeLevel,
       total_credit_hours_required: Number(formData.totalCreditHoursRequired),
-      collegeId: formData.collegeId,
     };
 
     try {
@@ -339,7 +325,7 @@ export function ProgramManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
             {(fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message) && (
               <div className="p-3 text-xs font-medium rounded-md bg-destructive/10 text-destructive border border-destructive/20">
                 {fieldErrors.non_field_errors || fieldErrors.detail || fieldErrors.message}
@@ -348,51 +334,54 @@ export function ProgramManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>College</Label>
+                <Label htmlFor="college">
+                  Filter by College (Optional)
+                </Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] mt-1.5 transition-all shadow-sm"
+                  id="college"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] mt-1.5 transition-all shadow-sm text-foreground"
                   value={formData.collegeId}
                   onChange={(e) => {
                     const newCollegeId = e.target.value;
                     setFormData((prev) => ({
                       ...prev,
                       collegeId: newCollegeId,
-                      departmentId: '', // Reset department selection when college changes
                     }));
                   }}
                 >
-                  <option value="">-- Select College --</option>
+                  <option value="">-- All Colleges --</option>
                   {colleges.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} ({c.code})
                     </option>
                   ))}
                 </select>
-                {fieldErrors.college && <p className="text-xs text-destructive mt-1">{fieldErrors.college}</p>}
               </div>
 
               <div>
-                <Label required>Department</Label>
+                <Label htmlFor="department" required>
+                  Department
+                </Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm"
+                  id="department"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus:border-[#102A7A] disabled:cursor-not-allowed disabled:opacity-50 mt-1.5 transition-all shadow-sm text-foreground"
                   value={formData.departmentId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, departmentId: e.target.value }))}
-                  disabled={!formData.collegeId}
+                  onChange={(e) => {
+                    const deptId = e.target.value;
+                    const dept = departments.find((d) => d.id === deptId);
+                    setFormData((prev) => ({
+                      ...prev,
+                      departmentId: deptId,
+                      ...(dept?.college ? { collegeId: dept.college } : {}),
+                    }));
+                  }}
                 >
-                  {!formData.collegeId ? (
-                    <option value="">-- Select College First --</option>
-                  ) : availableDepartments.length === 0 ? (
-                    <option value="">No departments available</option>
-                  ) : (
-                    <>
-                      <option value="">-- Select Department --</option>
-                      {availableDepartments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} ({d.code})
-                        </option>
-                      ))}
-                    </>
-                  )}
+                  <option value="">-- Select Department --</option>
+                  {availableDepartments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.code})
+                    </option>
+                  ))}
                 </select>
                 {fieldErrors.department && <p className="text-xs text-destructive mt-1">{fieldErrors.department}</p>}
               </div>
@@ -400,8 +389,11 @@ export function ProgramManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label required>Program Code</Label>
+                <Label htmlFor="code" required>
+                  Program Code
+                </Label>
                 <Input
+                  id="code"
                   placeholder="e.g. BS-CS"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
@@ -412,8 +404,11 @@ export function ProgramManagement() {
               </div>
 
               <div>
-                <Label required>Program Name</Label>
+                <Label htmlFor="name" required>
+                  Program Name
+                </Label>
                 <Input
+                  id="name"
                   placeholder="e.g. B.Sc. in Computer Science"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -424,12 +419,14 @@ export function ProgramManagement() {
               </div>
 
               <div>
-                <Label required>Degree Level</Label>
+                <Label htmlFor="degreeLevel" required>
+                  Degree Level
+                </Label>
                 <Select
                   value={formData.degreeLevel}
                   onValueChange={(val: any) => setFormData({ ...formData, degreeLevel: val })}
                 >
-                  <SelectTrigger className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
+                  <SelectTrigger id="degreeLevel" className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -444,8 +441,11 @@ export function ProgramManagement() {
               </div>
 
               <div>
-                <Label required>Total Credit Hours</Label>
+                <Label htmlFor="totalCreditHoursRequired" required>
+                  Total Credit Hours
+                </Label>
                 <Input
+                  id="totalCreditHoursRequired"
                   type="number"
                   min={0}
                   value={formData.totalCreditHoursRequired}
@@ -457,7 +457,7 @@ export function ProgramManagement() {
                 )}
               </div>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button

@@ -43,7 +43,6 @@ import {
 } from '@/components/ui';
 
 import { useAdminStore } from '../store';
-import { COLLEGES, getDepartmentsByCollege } from '@/constants';
 
 import type { AdminUser, UserRole, UserStatus } from '../types';
 
@@ -53,12 +52,14 @@ export function UserManagement() {
     isLoadingUsers,
     usersError,
     departments,
+    colleges,
     userSearchQuery,
     userRoleFilter,
     userDeptFilter,
     userStatusFilter,
     fetchUsers,
     fetchDepartments,
+    fetchColleges,
     addUser,
     updateUser,
     deleteUser,
@@ -66,23 +67,31 @@ export function UserManagement() {
     setUserRoleFilter,
     setUserDeptFilter,
     setUserStatusFilter,
-    fetchAdminData,
   } = useAdminStore();
-
-  React.useEffect(() => {
-    fetchUsers();
-    fetchDepartments();
-    void fetchAdminData();
-  }, [fetchUsers, fetchDepartments, fetchAdminData]);
 
   // Modals & Drawers state
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<AdminUser | null>(null);
   const [editingUser, setEditingUser] = React.useState<AdminUser | null>(null);
   const [viewingUser, setViewingUser] = React.useState<AdminUser | null>(null);
   const [deletingUser, setDeletingUser] = React.useState<AdminUser | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-
   const [userCollegeFilter, setUserCollegeFilter] = React.useState<string>('ALL');
+
+  const filteredDepartments = React.useMemo(() => {
+    if (!userCollegeFilter || userCollegeFilter === 'ALL') return departments;
+    return departments.filter(
+      (d) =>
+        d.college === userCollegeFilter ||
+        (colleges.find((c) => c.name === userCollegeFilter || c.code === userCollegeFilter)?.id === d.college)
+    );
+  }, [departments, colleges, userCollegeFilter]);
+
+  React.useEffect(() => {
+    fetchUsers();
+    fetchDepartments();
+    fetchColleges();
+  }, [fetchUsers, fetchDepartments, fetchColleges]);
 
   // Form State matching UserRegisterRequest
   const [formData, setFormData] = React.useState({
@@ -95,7 +104,6 @@ export function UserManagement() {
     facultyIdentifier: '',
     departmentId: '',
     nationalId: '',
-    phone: '',
   });
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -110,9 +118,8 @@ export function UserManagement() {
       role: 'student',
       studentIdentifier: '',
       facultyIdentifier: '',
-      departmentId: departments[0]?.id || '',
+      departmentId: '',
       nationalId: '',
-      phone: '',
     });
     setIsAddModalOpen(true);
   };
@@ -131,25 +138,35 @@ export function UserManagement() {
       facultyIdentifier: user.facultyIdentifier || '',
       departmentId: userDept?.id || '',
       nationalId: '',
-      phone: user.phone || '',
     });
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
-    if (!formData.email.trim()) {
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
       errors.email = 'Email address is required.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    } else if (trimmedEmail.length > 254) {
+      errors.email = 'Email address must not exceed 254 characters.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       errors.email = 'Please enter a valid email address.';
     }
 
     if (!editingUser) {
       if (!formData.password) {
         errors.password = 'Password is required.';
-      } else if (formData.password.length < 8) {
-        errors.password = 'Password must be at least 8 characters long.';
+      } else if (formData.password.length < 1) {
+        errors.password = 'Password is required.';
       }
+    }
+
+    if (formData.firstName.trim().length > 150) {
+      errors.first_name = 'First name must not exceed 150 characters.';
+    }
+
+    if (formData.lastName.trim().length > 150) {
+      errors.last_name = 'Last name must not exceed 150 characters.';
     }
 
     if (formData.role === 'student' && !formData.studentIdentifier.trim()) {
@@ -174,29 +191,28 @@ export function UserManagement() {
       if (editingUser) {
         const selectedDept = departments.find((d) => d.id === formData.departmentId);
         await updateUser(editingUser.id, {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          email: formData.email.trim(),
           role: formData.role,
           department: selectedDept?.name || editingUser.department,
-          phone: formData.phone || editingUser.phone,
         });
         toast.success('User account updated successfully.');
         setEditingUser(null);
       } else {
         await addUser({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
+          first_name: formData.firstName.trim() || undefined,
+          last_name: formData.lastName.trim() || undefined,
+          national_id_fan: formData.nationalId.trim() || null,
           role: formData.role.toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN',
-          student_identifier: formData.role === 'student' ? formData.studentIdentifier : undefined,
-          faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier : undefined,
-          department_id: (formData.role === 'student' || formData.role === 'lecturer') && formData.departmentId ? formData.departmentId : null,
+          student_identifier: formData.role === 'student' ? formData.studentIdentifier.trim() : undefined,
+          faculty_identifier: formData.role === 'lecturer' ? formData.facultyIdentifier.trim() : undefined,
+          department_id: formData.departmentId ? formData.departmentId : null,
         });
-        toast.success('User account created successfully.');
+        toast.success('User created successfully.');
         setIsAddModalOpen(false);
-        fetchUsers();
       }
     } catch (error: any) {
       const parsedFields = parseFieldErrors(error);
@@ -300,9 +316,9 @@ export function UserManagement() {
               }}
             >
               <option value="ALL">All Colleges</option>
-              {COLLEGES.map((col) => (
-                <option key={col} value={col}>
-                  {col}
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
                 </option>
               ))}
             </select>
@@ -315,9 +331,9 @@ export function UserManagement() {
               onChange={(e) => setUserDeptFilter(e.target.value)}
             >
               <option value="ALL">All Departments</option>
-              {getDepartmentsByCollege(userCollegeFilter).map((d) => (
+              {filteredDepartments.map((d) => (
                 <option key={d.id} value={d.name}>
-                  {d.name}
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>
@@ -342,8 +358,8 @@ export function UserManagement() {
       {usersError && (
         <Card className="p-4 border-destructive/40 bg-destructive/10 flex items-center justify-between">
           <div className="flex items-center gap-3 text-destructive">
-            <XCircle className="h-5 w-5" />
-            <p className="text-sm font-medium">Unable to load users. Please try again.</p>
+            <XCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">{usersError}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => fetchUsers()}>
             Retry
@@ -378,8 +394,27 @@ export function UserManagement() {
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                    No users have been created yet.
+                  <td colSpan={7} className="px-4 py-16 text-center">
+                    <div className="mx-auto flex max-w-md flex-col items-center justify-center text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+                        <Users className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">User Management Data Unavailable</h3>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        User management data is currently unavailable because the backend does not provide a user list endpoint.
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground/80">
+                        You can still provision new student, lecturer, and administrator accounts using the button below.
+                      </p>
+                      <Button
+                        className="mt-5"
+                        size="sm"
+                        leftIcon={<Plus className="h-4 w-4" />}
+                        onClick={handleOpenAddModal}
+                      >
+                        Add New User
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
@@ -416,8 +451,8 @@ export function UserManagement() {
                           user.role === 'admin'
                             ? 'default'
                             : user.role === 'lecturer'
-                            ? 'secondary'
-                            : 'outline'
+                              ? 'secondary'
+                              : 'outline'
                         }
                         className="capitalize gap-1"
                       >
@@ -438,8 +473,8 @@ export function UserManagement() {
                           user.status === 'active'
                             ? 'success'
                             : user.status === 'inactive'
-                            ? 'secondary'
-                            : 'destructive'
+                              ? 'secondary'
+                              : 'destructive'
                         }
                         className="capitalize"
                       >
@@ -516,7 +551,7 @@ export function UserManagement() {
           <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <Label htmlFor="firstName" required>
+                <Label htmlFor="firstName">
                   First Name
                 </Label>
                 <Input
@@ -530,7 +565,7 @@ export function UserManagement() {
               </div>
 
               <div>
-                <Label htmlFor="lastName" required>
+                <Label htmlFor="lastName">
                   Last Name
                 </Label>
                 <Input
@@ -591,6 +626,20 @@ export function UserManagement() {
                 </select>
                 {fieldErrors.role && <p className="text-xs text-destructive mt-1">{fieldErrors.role}</p>}
               </div>
+
+              <div>
+                <Label htmlFor="nationalId">
+                  National ID (FAN)
+                </Label>
+                <Input
+                  id="nationalId"
+                  value={formData.nationalId}
+                  onChange={(e) => setFormData({ ...formData, nationalId: e.target.value })}
+                  placeholder="e.g. FAN-12345678"
+                  className="mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50"
+                />
+                {fieldErrors.national_id_fan && <p className="text-xs text-destructive mt-1">{fieldErrors.national_id_fan}</p>}
+              </div>
             </div>
 
             {/* Dynamic Role-Specific Fields */}
@@ -612,7 +661,7 @@ export function UserManagement() {
                 </div>
 
                 <div>
-                  <Label htmlFor="studentDepartment">Department</Label>
+                  <Label htmlFor="studentDepartment">Department (Optional)</Label>
                   <select
                     id="studentDepartment"
                     className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
@@ -650,9 +699,32 @@ export function UserManagement() {
                 </div>
 
                 <div>
-                  <Label htmlFor="lecturerDepartment">Department</Label>
+                  <Label htmlFor="lecturerDepartment">Department (Optional)</Label>
                   <select
                     id="lecturerDepartment"
+                    className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                    value={formData.departmentId}
+                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                  >
+                    <option value="">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.departmentId && <p className="text-xs text-destructive mt-1">{fieldErrors.departmentId}</p>}
+                  {fieldErrors.department_id && <p className="text-xs text-destructive mt-1">{fieldErrors.department_id}</p>}
+                </div>
+              </div>
+            )}
+
+            {formData.role === 'admin' && (
+              <div className="space-y-4 p-4 rounded-xl border border-[#102A7A]/15 bg-accent/15">
+                <div>
+                  <Label htmlFor="adminDepartment">Department (Optional)</Label>
+                  <select
+                    id="adminDepartment"
                     className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                     value={formData.departmentId}
                     onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
@@ -758,9 +830,9 @@ export function UserManagement() {
 
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5" /> Phone Number:
+                    <Shield className="h-3.5 w-3.5" /> National ID (FAN):
                   </span>
-                  <span className="font-medium">{viewingUser.phone || 'N/A'}</span>
+                  <span className="font-medium font-mono">{viewingUser.nationalIdFan || 'N/A'}</span>
                 </div>
               </div>
             </div>

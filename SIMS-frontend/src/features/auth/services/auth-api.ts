@@ -16,6 +16,7 @@ import { apiClient } from '@/services';
 import { API_ENDPOINTS } from '@/constants';
 import { env } from '@/lib/env';
 import { getCsrfToken } from '@/utils/csrf';
+import { isValidUuid } from '@/lib/user-identifier';
 
 import type {
   LoginCredentials,
@@ -39,18 +40,35 @@ export const authApi = {
         const backendResponse = r.data;
         
         if (backendResponse?.user) {
-          const user: any = { ...backendResponse.user };
-          if (user.first_name) { 
-            user.firstName = user.first_name; 
-            delete user.first_name; 
-          }
-          if (user.last_name) { 
-            user.lastName = user.last_name; 
-            delete user.last_name; 
-          }
-          if (user.role) {
-            user.role = user.role.toLowerCase();
-          }
+          const rawUser = backendResponse.user;
+          const userEmail = rawUser.email || data.email;
+          const userId = rawUser.id;
+
+          let studentIdentifier =
+            (data?.student_identifier && !isValidUuid(data.student_identifier) ? String(data.student_identifier).trim() : null) ||
+            (rawUser?.student_identifier && !isValidUuid(rawUser.student_identifier) ? String(rawUser.student_identifier).trim() : null) ||
+            (rawUser?.studentIdentifier && !isValidUuid(rawUser.studentIdentifier) ? String(rawUser.studentIdentifier).trim() : null) ||
+            (rawUser?.student_id && !isValidUuid(rawUser.student_id) ? String(rawUser.student_id).trim() : null) ||
+            undefined;
+
+          let facultyIdentifier =
+            (data?.faculty_identifier && !isValidUuid(data.faculty_identifier) ? String(data.faculty_identifier).trim() : null) ||
+            (rawUser?.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
+            (rawUser?.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
+            undefined;
+
+          const user: BaseUser = {
+            id: rawUser.id || 'usr-default',
+            email: userEmail,
+            firstName: rawUser.first_name || data.first_name || 'User',
+            lastName: rawUser.last_name || data.last_name || '',
+            role: (rawUser.role ? rawUser.role.toLowerCase() : (data.role ? data.role.toLowerCase() : 'student')) as any,
+            avatarUrl: rawUser.avatar_url || rawUser.avatarUrl,
+            studentIdentifier,
+            facultyIdentifier,
+            createdAt: rawUser.created_at || new Date().toISOString(),
+            updatedAt: rawUser.updated_at || new Date().toISOString(),
+          };
           
           return {
             message: 'Registration successful',
@@ -70,13 +88,29 @@ export const authApi = {
     const data = response.data || {};
 
     const rawUser = data.user || {};
+    const userEmail = rawUser.email || credentials.email;
+    const userId = rawUser.id;
+
+    let studentIdentifier =
+      (rawUser.student_identifier && !isValidUuid(rawUser.student_identifier) ? String(rawUser.student_identifier).trim() : null) ||
+      (rawUser.studentIdentifier && !isValidUuid(rawUser.studentIdentifier) ? String(rawUser.studentIdentifier).trim() : null) ||
+      (rawUser.student_id && !isValidUuid(rawUser.student_id) ? String(rawUser.student_id).trim() : null) ||
+      undefined;
+
+    let facultyIdentifier =
+      (rawUser.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
+      (rawUser.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
+      undefined;
+
     const formattedUser: BaseUser = {
       id: rawUser.id || 'usr-default',
-      email: rawUser.email || credentials.email,
+      email: userEmail,
       firstName: rawUser.first_name || rawUser.firstName || 'User',
       lastName: rawUser.last_name || rawUser.lastName || '',
       role: (rawUser.role ? rawUser.role.toLowerCase() : 'student') as any,
       avatarUrl: rawUser.avatar_url || rawUser.avatarUrl,
+      studentIdentifier,
+      facultyIdentifier,
       createdAt: rawUser.created_at || rawUser.createdAt || new Date().toISOString(),
       updatedAt: rawUser.updated_at || rawUser.updatedAt || new Date().toISOString(),
     };
@@ -89,22 +123,6 @@ export const authApi = {
       refreshToken: data.refresh || data.tokens?.refreshToken || '',
       expiresAt,
     };
-
-    // Synchronize Next.js edge middleware session cookie and AWAIT completion
-    try {
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: formattedUser.id,
-          role: formattedUser.role,
-          exp: expiresAt,
-          rememberMe: credentials.rememberMe,
-        }),
-      });
-    } catch (e) {
-      console.error('Failed to sync session cookie:', e);
-    }
 
     return {
       user: formattedUser,
@@ -122,12 +140,6 @@ export const authApi = {
       await apiClient.post<void>(API_ENDPOINTS.AUTH.LOGOUT, {});
     } catch (e) {
       console.error('Logout request error:', e);
-    } finally {
-      try {
-        await fetch('/api/auth/session', { method: 'DELETE' });
-      } catch (e) {
-        console.error('Failed to clear session cookie:', e);
-      }
     }
   },
 
@@ -154,12 +166,14 @@ export const authApi = {
    * and includes the Django CSRF token from the browser cookie in the
    * X-CSRFToken header, which is required by enforce_csrf() on the backend.
    */
-  refreshToken: async (): Promise<RefreshTokenResponse> => {
+  refreshToken: async (token?: string): Promise<RefreshTokenResponse> => {
     const csrfToken = getCsrfToken();
+    const storedRefresh = token || (typeof window !== 'undefined' ? (window as any).__EXAMSPHERE_REFRESH__ : undefined);
+    const payload = storedRefresh ? { refresh: storedRefresh } : {};
 
     const response = await axios.post<any>(
       `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
-      {},
+      payload,
       {
         withCredentials: true,
         headers: {
@@ -176,7 +190,7 @@ export const authApi = {
     return {
       tokens: {
         accessToken,
-        refreshToken: data.refresh || data.tokens?.refreshToken || '',
+        refreshToken: data.refresh || data.tokens?.refreshToken || storedRefresh || '',
         expiresAt: Date.now() + 15 * 60 * 1000,
       },
     } as any;
@@ -189,20 +203,35 @@ export const authApi = {
     apiClient
       .get<any>(API_ENDPOINTS.AUTH.ME)
       .then((r) => {
-        // Transform user fields
-        const user: any = { ...r.data };
-        if (user.first_name) { 
-          user.firstName = user.first_name; 
-          delete user.first_name; 
-        }
-        if (user.last_name) { 
-          user.lastName = user.last_name; 
-          delete user.last_name; 
-        }
-        if (user.role) {
-          user.role = user.role.toLowerCase();
-        }
+        const rawUser = r.data || {};
+        const userEmail = rawUser.email;
+        const userId = rawUser.id;
+
+        let studentIdentifier =
+          (rawUser.student_identifier && !isValidUuid(rawUser.student_identifier) ? String(rawUser.student_identifier).trim() : null) ||
+          (rawUser.studentIdentifier && !isValidUuid(rawUser.studentIdentifier) ? String(rawUser.studentIdentifier).trim() : null) ||
+          (rawUser.student_id && !isValidUuid(rawUser.student_id) ? String(rawUser.student_id).trim() : null) ||
+          undefined;
+
+        let facultyIdentifier =
+          (rawUser.faculty_identifier && !isValidUuid(rawUser.faculty_identifier) ? String(rawUser.faculty_identifier).trim() : null) ||
+          (rawUser.facultyIdentifier && !isValidUuid(rawUser.facultyIdentifier) ? String(rawUser.facultyIdentifier).trim() : null) ||
+          undefined;
+
+        const user: BaseUser = {
+          id: rawUser.id || 'usr-default',
+          email: userEmail || '',
+          firstName: rawUser.first_name || rawUser.firstName || 'User',
+          lastName: rawUser.last_name || rawUser.lastName || '',
+          role: (rawUser.role ? rawUser.role.toLowerCase() : 'student') as any,
+          avatarUrl: rawUser.avatar_url || rawUser.avatarUrl,
+          studentIdentifier,
+          facultyIdentifier,
+          createdAt: rawUser.created_at || rawUser.createdAt || new Date().toISOString(),
+          updatedAt: rawUser.updated_at || rawUser.updatedAt || new Date().toISOString(),
+        };
         
         return { user };
       }),
 };
+

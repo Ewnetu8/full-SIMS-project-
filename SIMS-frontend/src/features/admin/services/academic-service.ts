@@ -1,7 +1,7 @@
-import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
-import { AASTU_ACADEMIC_STRUCTURE } from '@/constants/academic-structure';
-import type { College, Program, AcademicYear, Semester, Department, Course } from '../types';
+import { api } from '@/services/api-client';
+
+import type { College, Program, AcademicYear, Semester, Department, Course, ClassStanding } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 function isValidUuid(id?: string | null): boolean {
@@ -18,16 +18,18 @@ export interface ApiUniversity {
 
 export interface ApiCollege {
   id: string;
-  university?: string;
+  university: string;
+  university_detail?: ApiUniversity;
   name: string;
   code: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ApiDepartment {
   id: string;
   college?: string | null;
+  college_detail?: ApiCollege;
   name: string;
   code: string;
   created_at?: string;
@@ -37,6 +39,7 @@ export interface ApiDepartment {
 export interface ApiProgram {
   id: string;
   department: string;
+  department_detail?: ApiDepartment;
   name: string;
   code: string;
   degree_level: 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA' | 'CERTIFICATE';
@@ -66,10 +69,11 @@ export interface ApiSemester {
 export interface ApiCourse {
   id: string;
   program?: string | null;
+  program_detail?: ApiProgram | null;
   title: string;
   course_code: string;
   credit_hours: number;
-  intended_class_standing?: string;
+  intended_class_standing?: ClassStanding;
   created_at?: string;
   updated_at?: string;
 }
@@ -88,41 +92,26 @@ export const academicService = {
   async getColleges(): Promise<College[]> {
     try {
       const raw = await api.get<ApiCollege[]>(API_ENDPOINTS.ACADEMICS.COLLEGES);
-      if (raw && raw.length > 0) {
+      if (Array.isArray(raw)) {
         return raw.map((c) => ({
           id: c.id,
           name: c.name,
           code: c.code,
           university: c.university,
+          university_detail: c.university_detail,
           createdAt: c.created_at,
           updatedAt: c.updated_at,
         }));
       }
+      return [];
     } catch {
-      // fallback to seed
+      return [];
     }
-
-    return AASTU_ACADEMIC_STRUCTURE.map((c) => ({
-      id: c.id,
-      name: c.name,
-      code: c.code,
-      university: 'uni-aastu-001',
-    }));
   },
 
-  async createCollege(data: { name: string; code: string; university?: string }): Promise<College> {
-    let universityId = data.university;
-    if (!universityId) {
-      const unis = await this.getUniversities();
-      if (unis.length > 0) {
-        universityId = unis[0]?.id;
-      } else {
-        const newUni = await this.createUniversity({ name: 'Addis Ababa Science and Technology University', code: 'AASTU' });
-        universityId = newUni.id;
-      }
-    }
+  async createCollege(data: { name: string; code: string; university: string }): Promise<College> {
     const res = await api.post<ApiCollege>(API_ENDPOINTS.ACADEMICS.COLLEGES, {
-      university: universityId,
+      university: data.university,
       name: data.name,
       code: data.code.toUpperCase(),
     });
@@ -131,18 +120,25 @@ export const academicService = {
       name: res.name,
       code: res.code,
       university: res.university,
+      university_detail: res.university_detail,
       createdAt: res.created_at,
       updatedAt: res.updated_at,
     };
   },
 
-  async updateCollege(id: string, data: Partial<{ name: string; code: string }>): Promise<College> {
-    const res = await api.patch<ApiCollege>(API_ENDPOINTS.ACADEMICS.COLLEGE_BY_ID(id), data);
+  async updateCollege(id: string, data: Partial<{ name: string; code: string; university: string }>): Promise<College> {
+    const payload: Record<string, any> = {};
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.code !== undefined) payload.code = data.code.toUpperCase();
+    if (data.university !== undefined) payload.university = data.university;
+
+    const res = await api.patch<ApiCollege>(API_ENDPOINTS.ACADEMICS.COLLEGE_BY_ID(id), payload);
     return {
       id: res.id,
       name: res.name,
       code: res.code,
       university: res.university,
+      university_detail: res.university_detail,
       createdAt: res.created_at,
       updatedAt: res.updated_at,
     };
@@ -154,66 +150,40 @@ export const academicService = {
 
   // ── Departments ──────────────────────────────────────────────────────────────
   async getDepartments(): Promise<Department[]> {
-    let backendDepts: Department[] = [];
     try {
       const raw = await api.get<ApiDepartment[]>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS);
       if (Array.isArray(raw)) {
-        backendDepts = raw.map((d) => ({
+        return raw.map((d) => ({
           id: d.id,
           code: d.code,
           name: d.name,
           college: d.college || null,
-          description: `Department of ${d.name}`,
-          headOfDepartment: {
-            id: 'hod-default',
-            name: 'Head of Department',
-            email: `hod.${d.code.toLowerCase()}@aastu.edu.et`,
-          },
-          lecturerCount: 0,
-          studentCount: 0,
-          courseCount: 0,
-          createdAt: d.created_at || new Date().toISOString(),
+          college_detail: d.college_detail,
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
         }));
       }
+      return [];
     } catch {
-      // ignore API error, fallback will fill missing items
+      return [];
     }
-
-    const seedDepts: Department[] = AASTU_ACADEMIC_STRUCTURE.flatMap((c) =>
-      c.departments.map((d) => ({
-        id: d.id,
-        code: d.code,
-        name: d.name,
-        college: d.collegeId,
-        description: `Department of ${d.name}`,
-        headOfDepartment: {
-          id: 'hod-default',
-          name: 'Head of Department',
-          email: `hod.${d.code.toLowerCase()}@aastu.edu.et`,
-        },
-        lecturerCount: 0,
-        studentCount: 0,
-        courseCount: 0,
-        createdAt: new Date().toISOString(),
-      })),
-    );
-
-    // Merge: seed departments first, overridden by backend departments if matching by code or id
-    const mergedMap = new Map<string, Department>();
-
-    for (const d of seedDepts) {
-      mergedMap.set(d.code.toUpperCase(), d);
-    }
-
-    for (const d of backendDepts) {
-      mergedMap.set(d.code.toUpperCase(), d);
-    }
-
-    return Array.from(mergedMap.values());
   },
 
-  async createDepartment(data: { name: string; code: string; college?: string }): Promise<Department> {
-    const payload: Record<string, any> = {
+  async getDepartmentById(id: string): Promise<Department> {
+    const res = await api.get<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id));
+    return {
+      id: res.id,
+      code: res.code,
+      name: res.name,
+      college: res.college || null,
+      college_detail: res.college_detail,
+      createdAt: res.created_at,
+      updatedAt: res.updated_at,
+    };
+  },
+
+  async createDepartment(data: { name: string; code: string; college?: string | null }): Promise<Department> {
+    const payload: Record<string, unknown> = {
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
       college: data.college && isValidUuid(data.college) ? data.college : null,
@@ -221,94 +191,46 @@ export const academicService = {
 
     const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENTS;
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Department Creation Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
     try {
       const res = await api.post<ApiDepartment>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[DEBUG] Department Creation Response (201 Created):', res);
-      }
 
       return {
         id: res.id,
         code: res.code,
         name: res.name,
         college: res.college || null,
-        description: `Department of ${res.name}`,
-        headOfDepartment: {
-          id: 'hod-default',
-          name: 'Head of Department',
-          email: `hod.${res.code.toLowerCase()}@aastu.edu.et`,
-        },
-        lecturerCount: 0,
-        studentCount: 0,
-        courseCount: 0,
-        createdAt: res.created_at || new Date().toISOString(),
+        college_detail: res.college_detail,
+        createdAt: res.created_at,
+        updatedAt: res.updated_at,
       };
-    } catch (err: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Department Creation Error:', {
-          status: err?.statusCode || err?.response?.status || 400,
-          errors: err?.errors || err?.response?.data || err?.message,
-        });
-      }
+    } catch (err: unknown) {
       throw err;
     }
   },
 
-  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string }>): Promise<Department> {
-    const payload: Record<string, any> = {};
+  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string | null }>): Promise<Department> {
+    const payload: Record<string, unknown> = {};
     if (data.name !== undefined) payload.name = data.name.trim();
     if (data.code !== undefined) payload.code = data.code.trim().toUpperCase();
     if (data.college !== undefined) {
-      payload.college = isValidUuid(data.college) ? data.college : null;
+      payload.college = data.college && isValidUuid(data.college) ? data.college : null;
     }
 
     const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id);
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Department Update Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
     try {
       const res = await api.patch<ApiDepartment>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[DEBUG] Department Update Response:', res);
-      }
 
       return {
         id: res.id,
         code: res.code,
         name: res.name,
         college: res.college || null,
-        description: `Department of ${res.name}`,
-        headOfDepartment: {
-          id: 'hod-default',
-          name: 'Head of Department',
-          email: `hod.${res.code.toLowerCase()}@aastu.edu.et`,
-        },
-        lecturerCount: 0,
-        studentCount: 0,
-        courseCount: 0,
-        createdAt: res.created_at || new Date().toISOString(),
+        college_detail: res.college_detail,
+        createdAt: res.created_at,
+        updatedAt: res.updated_at,
       };
-    } catch (err: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Department Update Error:', {
-          status: err?.statusCode || err?.response?.status || 400,
-          errors: err?.errors || err?.response?.data || err?.message,
-        });
-      }
+    } catch (err: unknown) {
       throw err;
     }
   },
@@ -332,22 +254,8 @@ export const academicService = {
     }));
   },
 
-  async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number; collegeId?: string }): Promise<Program> {
-    let departmentId = data.department;
-
-    // Auto-create department in backend if it's a seed ID
-    if (!isValidUuid(departmentId)) {
-      const allDepts = await this.getDepartments();
-      const seedDept = allDepts.find((d) => d.id === departmentId);
-      if (seedDept) {
-        const createdDept = await this.createDepartment({
-          name: seedDept.name,
-          code: seedDept.code,
-          college: data.collegeId && isValidUuid(data.collegeId) ? data.collegeId : undefined,
-        });
-        departmentId = createdDept.id;
-      }
-    }
+  async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
+    const departmentId = data.department;
 
     const payload: Record<string, any> = {
       department: departmentId,
@@ -492,11 +400,11 @@ export const academicService = {
       academicYear: s.academic_year,
       academicYearDetail: s.academic_year_detail
         ? {
-            id: s.academic_year_detail.id,
-            displayLabel: s.academic_year_detail.display_label,
-            startBoundary: s.academic_year_detail.start_boundary,
-            endBoundary: s.academic_year_detail.end_boundary,
-          }
+          id: s.academic_year_detail.id,
+          displayLabel: s.academic_year_detail.display_label,
+          startBoundary: s.academic_year_detail.start_boundary,
+          endBoundary: s.academic_year_detail.end_boundary,
+        }
         : undefined,
       semesterIndex: s.semester_index,
       createdAt: s.created_at,
@@ -511,11 +419,11 @@ export const academicService = {
       academicYear: res.academic_year,
       academicYearDetail: res.academic_year_detail
         ? {
-            id: res.academic_year_detail.id,
-            displayLabel: res.academic_year_detail.display_label,
-            startBoundary: res.academic_year_detail.start_boundary,
-            endBoundary: res.academic_year_detail.end_boundary,
-          }
+          id: res.academic_year_detail.id,
+          displayLabel: res.academic_year_detail.display_label,
+          startBoundary: res.academic_year_detail.start_boundary,
+          endBoundary: res.academic_year_detail.end_boundary,
+        }
         : undefined,
       semesterIndex: res.semester_index,
       createdAt: res.created_at,
@@ -530,11 +438,11 @@ export const academicService = {
       academicYear: res.academic_year,
       academicYearDetail: res.academic_year_detail
         ? {
-            id: res.academic_year_detail.id,
-            displayLabel: res.academic_year_detail.display_label,
-            startBoundary: res.academic_year_detail.start_boundary,
-            endBoundary: res.academic_year_detail.end_boundary,
-          }
+          id: res.academic_year_detail.id,
+          displayLabel: res.academic_year_detail.display_label,
+          startBoundary: res.academic_year_detail.start_boundary,
+          endBoundary: res.academic_year_detail.end_boundary,
+        }
         : undefined,
       semesterIndex: res.semester_index,
       createdAt: res.created_at,
@@ -554,47 +462,112 @@ export const academicService = {
       code: c.course_code,
       name: c.title,
       creditHours: c.credit_hours,
-      department: 'Academic Department',
-      assignedLecturer: { id: '', name: 'Unassigned' },
-      studentCount: 0,
-      status: 'active',
-      semester: 'Current Semester',
+      program: c.program || c.program_detail?.id || null,
+      programDetail: c.program_detail
+        ? {
+            id: c.program_detail.id,
+            name: c.program_detail.name,
+            code: c.program_detail.code,
+            department: c.program_detail.department,
+            degreeLevel: c.program_detail.degree_level,
+            totalCreditHoursRequired: c.program_detail.total_credit_hours_required,
+          }
+        : null,
+      intendedClassStanding: c.intended_class_standing,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
     }));
   },
 
-  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: string }): Promise<Course> {
-    const res = await api.post<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSES, {
-      title: data.title,
-      course_code: data.course_code.toUpperCase(),
-      credit_hours: data.credit_hours,
+  async createCourse(data: {
+    title: string;
+    course_code: string;
+    credit_hours: number;
+    program?: string | null;
+    intended_class_standing?: ClassStanding;
+  }): Promise<Course> {
+    const payload: {
+      title: string;
+      course_code: string;
+      credit_hours: number;
+      program?: string | null;
+      intended_class_standing?: ClassStanding;
+    } = {
+      title: data.title.trim(),
+      course_code: data.course_code.trim().toUpperCase(),
+      credit_hours: Number(data.credit_hours),
       program: data.program || null,
-      ...(data.intended_class_standing ? { intended_class_standing: data.intended_class_standing } : {}),
-    });
+    };
+    if (data.intended_class_standing) {
+      payload.intended_class_standing = data.intended_class_standing;
+    }
+
+    const res = await api.post<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSES, payload);
     return {
       id: res.id,
       code: res.course_code,
       name: res.title,
       creditHours: res.credit_hours,
-      department: 'Academic Department',
-      assignedLecturer: { id: '', name: 'Unassigned' },
-      studentCount: 0,
-      status: 'active',
-      semester: 'Current Semester',
+      program: res.program || res.program_detail?.id || null,
+      programDetail: res.program_detail
+        ? {
+            id: res.program_detail.id,
+            name: res.program_detail.name,
+            code: res.program_detail.code,
+            department: res.program_detail.department,
+            degreeLevel: res.program_detail.degree_level,
+            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
+          }
+        : null,
+      intendedClassStanding: res.intended_class_standing,
+      createdAt: res.created_at,
+      updatedAt: res.updated_at,
     };
   },
 
-  async updateCourse(id: string, data: Partial<{ title: string; course_code: string; credit_hours: number }>): Promise<Course> {
-    const res = await api.patch<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id), data);
+  async updateCourse(
+    id: string,
+    data: Partial<{
+      title: string;
+      course_code: string;
+      credit_hours: number;
+      program?: string | null;
+      intended_class_standing?: ClassStanding;
+    }>
+  ): Promise<Course> {
+    const payload: Partial<{
+      title: string;
+      course_code: string;
+      credit_hours: number;
+      program: string | null;
+      intended_class_standing: ClassStanding;
+    }> = {};
+    if (data.title !== undefined) payload.title = data.title.trim();
+    if (data.course_code !== undefined) payload.course_code = data.course_code.trim().toUpperCase();
+    if (data.credit_hours !== undefined) payload.credit_hours = Number(data.credit_hours);
+    if (data.program !== undefined) payload.program = data.program || null;
+    if (data.intended_class_standing !== undefined) payload.intended_class_standing = data.intended_class_standing;
+
+    const res = await api.patch<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id), payload);
     return {
       id: res.id,
       code: res.course_code,
       name: res.title,
       creditHours: res.credit_hours,
-      department: 'Academic Department',
-      assignedLecturer: { id: '', name: 'Unassigned' },
-      studentCount: 0,
-      status: 'active',
-      semester: 'Current Semester',
+      program: res.program || res.program_detail?.id || null,
+      programDetail: res.program_detail
+        ? {
+            id: res.program_detail.id,
+            name: res.program_detail.name,
+            code: res.program_detail.code,
+            department: res.program_detail.department,
+            degreeLevel: res.program_detail.degree_level,
+            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
+          }
+        : null,
+      intendedClassStanding: res.intended_class_standing,
+      createdAt: res.created_at,
+      updatedAt: res.updated_at,
     };
   },
 
