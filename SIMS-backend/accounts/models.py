@@ -55,6 +55,8 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    mfa_enabled = models.BooleanField(default=False)
+    mfa_secret = models.CharField(max_length=64, blank=True, default='')
 
     objects = UserManager()
 
@@ -112,3 +114,19 @@ class Lecturer(BaseModel):
 
     def __str__(self):
         return f"Lecturer: {self.faculty_identifier} - {self.user.email}"
+
+
+class MFABackupCode(BaseModel):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='backup_codes'
+    )
+    code_hash = models.CharField(max_length=128)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = 'MFA backup codes'
+
+    def __str__(self):
+        return f"Backup code for {self.user.email} (used={self.used})"

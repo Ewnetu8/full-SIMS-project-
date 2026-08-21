@@ -9,7 +9,7 @@ pytestmark = pytest.mark.django_db
 
 
 def create_admin():
-    return User.objects.create_user(email="admin_hier@example.com", password="password123", role=RoleChoices.ADMIN)
+    return User.objects.create_user(email="admin_hier@aastu.edu.et", password="password123", role=RoleChoices.ADMIN)
 
 
 def get_token(client, user):
