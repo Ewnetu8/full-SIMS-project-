@@ -9,6 +9,8 @@ from rest_framework import serializers as drf_serializers
 
 from accounts.permissions import HasRole
 from accounts.models import RoleChoices, Student, Lecturer
+from academics.models import College, Department, Program, Course
+from exams.models import Examination
 from management.serializers import (
     UserCompactSerializer,
     UserDetailSerializer,
@@ -383,3 +385,44 @@ class LecturerDetailView(APIView):
             serializer.save()
             return Response(LecturerDetailSerializer(obj).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ADMIN DASHBOARD ANALYTICS
+
+_AdminAnalyticsOut = inline_serializer(
+    name='AdminAnalyticsOut',
+    fields={
+        'total_users': drf_serializers.IntegerField(),
+        'total_students': drf_serializers.IntegerField(),
+        'total_lecturers': drf_serializers.IntegerField(),
+        'total_colleges': drf_serializers.IntegerField(),
+        'total_departments': drf_serializers.IntegerField(),
+        'total_programs': drf_serializers.IntegerField(),
+        'total_courses': drf_serializers.IntegerField(),
+        'total_exams': drf_serializers.IntegerField(),
+    },
+)
+
+
+class AdminAnalyticsView(APIView):
+    """Aggregate counts for the admin dashboard."""
+
+    permission_classes = [IsAuthenticated, HasRole(RoleChoices.ADMIN)]
+
+    @extend_schema(
+        tags=['Analytics'],
+        summary='Admin dashboard statistics',
+        description='Returns aggregate counts for users, students, lecturers, colleges, departments, programs, courses, and exams.',
+        responses={200: _AdminAnalyticsOut},
+    )
+    def get(self, request):
+        return Response({
+            'total_users': User.objects.count(),
+            'total_students': Student.objects.count(),
+            'total_lecturers': Lecturer.objects.count(),
+            'total_colleges': College.objects.count(),
+            'total_departments': Department.objects.count(),
+            'total_programs': Program.objects.count(),
+            'total_courses': Course.objects.count(),
+            'total_exams': Examination.objects.count(),
+        })
