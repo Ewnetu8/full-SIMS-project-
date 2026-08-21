@@ -14,13 +14,11 @@ import {
   Activity,
   Plus,
   ArrowUpRight,
-  RefreshCw,
   Clock,
   Server,
   Database,
-  Cpu,
-  HardDrive,
   FileText,
+  UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -38,8 +36,6 @@ export function DashboardOverview() {
     students,
     lecturers,
     departments,
-    colleges,
-    programs,
     courses,
     exams,
     aiJobs,
@@ -57,8 +53,6 @@ export function DashboardOverview() {
   const totalAdmins = users.filter((u) => u.role === 'admin').length;
   const totalCourses = courses.length;
   const totalDepts = departments.length;
-  const totalColleges = colleges ? colleges.length : 0;
-  const totalPrograms = programs ? programs.length : 0;
   const totalExamsCount = exams.length;
   const activeExamsCount = exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length;
   const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length;
@@ -161,6 +155,16 @@ export function DashboardOverview() {
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
                 <UserCheck className="h-4 w-4 text-primary" /> Manage Users & Roles
+              </span>
+              <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-between text-left h-auto py-2.5 px-3"
+              onClick={() => router.push(ROUTES.ADMIN.ENROLLMENTS)}
+            >
+              <span className="flex items-center gap-2.5 text-xs font-medium">
+                <UserPlus className="h-4 w-4 text-primary" /> Manage Course Enrollments
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>

@@ -7,6 +7,7 @@ import { examApiService } from './exam-api-service';
 
 import type {
   AdminUser,
+  UserRole,
   StudentProfile,
   LecturerProfile,
   Department,
@@ -22,6 +23,11 @@ import type {
   SystemSettings,
   AdminDashboardStats,
   AdminNotification,
+  AdminCourseOffering,
+  AdminEnrollment,
+  CreateEnrollmentPayload,
+  UpdateEnrollmentPayload,
+  BatchImportResponse,
 } from '../types';
 
 export interface RegisterUserPayload {
@@ -54,7 +60,7 @@ export const adminService = {
   async createUser(data: RegisterUserPayload): Promise<AdminUser> {
     const roleUpper = (data.role || 'STUDENT').toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
 
-    const payload: Record<string, any> = {
+    const payload: Record<string, unknown> = {
       email: data.email.trim(),
       password: data.password || 'Temp!Pass2026',
       first_name: data.first_name ? data.first_name.trim() : '',
@@ -72,8 +78,8 @@ export const adminService = {
     payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
 
     try {
-      const res = await api.post<any>(API_ENDPOINTS.AUTH.REGISTER, payload);
-      const registeredUser = res.user || res;
+      const res = await api.post<{ user?: Record<string, unknown>; [key: string]: unknown }>(API_ENDPOINTS.AUTH.REGISTER, payload);
+      const registeredUser = (res.user || res) as Record<string, unknown>;
 
       let resolvedDepartment = 'Not assigned';
       if (data.department_id) {
@@ -84,21 +90,21 @@ export const adminService = {
         }
       }
 
-      const rawStudentId = data.student_identifier || registeredUser.student_identifier;
+      const rawStudentId = (data.student_identifier || registeredUser.student_identifier) as string | undefined;
       const studentId = rawStudentId && !isValidUuid(rawStudentId) ? String(rawStudentId).trim() : undefined;
 
-      const rawFacultyId = data.faculty_identifier || registeredUser.faculty_identifier;
+      const rawFacultyId = (data.faculty_identifier || registeredUser.faculty_identifier) as string | undefined;
       const facultyId = rawFacultyId && !isValidUuid(rawFacultyId) ? String(rawFacultyId).trim() : undefined;
 
-      const displayUserId = studentId || facultyId || registeredUser.id;
+      const displayUserId = studentId || facultyId || (registeredUser.id as string);
 
       const newUser: AdminUser = {
-        id: registeredUser.id,
+        id: String(registeredUser.id),
         userId: displayUserId,
-        firstName: registeredUser.first_name || data.first_name || 'User',
-        lastName: registeredUser.last_name || data.last_name || '',
-        email: registeredUser.email || data.email,
-        role: (registeredUser.role ? registeredUser.role.toLowerCase() : (data.role || 'student').toLowerCase()) as any,
+        firstName: String(registeredUser.first_name || data.first_name || 'User'),
+        lastName: String(registeredUser.last_name || data.last_name || ''),
+        email: String(registeredUser.email || data.email),
+        role: (registeredUser.role ? String(registeredUser.role).toLowerCase() : (data.role || 'student').toLowerCase()) as UserRole,
         department: resolvedDepartment,
         departmentId: data.department_id || null,
         status: 'active',
@@ -106,11 +112,11 @@ export const adminService = {
         studentIdentifier: studentId,
         facultyIdentifier: facultyId,
         nationalIdFan: data.national_id_fan ? data.national_id_fan.trim() : null,
-        createdAt: registeredUser.created_at || new Date().toISOString(),
+        createdAt: String(registeredUser.created_at || new Date().toISOString()),
       };
 
       return newUser;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   },
@@ -123,7 +129,7 @@ export const adminService = {
       firstName: data.firstName || '',
       lastName: data.lastName || '',
       email: data.email || '',
-      role: (data.role || 'student') as any,
+      role: (data.role || 'student') as UserRole,
       department: data.department || '',
       departmentId: data.departmentId || null,
       status: data.status || 'active',
@@ -332,35 +338,48 @@ export const adminService = {
     return examApiService.deleteExam(id);
   },
 
-  // ─── Students & Lecturers ──────────────────────────────────────────────────
-  async getStudents(): Promise<StudentProfile[]> {
-    try {
-      const data = await api.get<any>(API_ENDPOINTS.ENROLLMENTS.ROOT).catch(() => []);
-      const list = Array.isArray(data) ? data : data?.results || [];
-      return list.map((e: any) => ({
-        id: e.id,
-        studentId: e.student_id || e.student_detail?.student_id || e.student || 'Not assigned',
-        firstName: e.student_detail?.first_name || (e.student_name ? e.student_name.split(' ')[0] : 'Student'),
-        lastName: e.student_detail?.last_name || (e.student_name ? e.student_name.split(' ').slice(1).join(' ') : ''),
-        email: e.student_detail?.email || e.student_email || '—',
-        department: e.course_offering_detail?.course_detail?.program_detail?.department_detail?.name || e.course_offering_detail?.department || 'Not assigned',
-        program: e.course_offering_detail?.course_detail?.program_detail?.name || '—',
-        gpa: e.gpa ?? 0,
-        academicYear: e.course_offering_detail?.semester_detail?.academic_year_detail?.display_label || '—',
-        enrolledCoursesCount: 1,
-        status: e.status === 'ENROLLED' ? 'active' : (e.status ? e.status.toLowerCase() : 'active'),
-      }));
-    } catch {
-      return [];
-    }
+  // ─── Course Offerings ───────────────────────────────────────────────────────
+  async getCourseOfferings(): Promise<AdminCourseOffering[]> {
+    return academicService.getCourseOfferings();
   },
 
-  async batchImportEnrollments(file: File): Promise<{ message?: string; imported_count?: number }> {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post(API_ENDPOINTS.ENROLLMENTS.BATCH_IMPORT, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  async getCourseOfferingById(id: string): Promise<AdminCourseOffering> {
+    return academicService.getCourseOfferingById(id);
+  },
+
+  // ─── Enrollments ────────────────────────────────────────────────────────────
+  async getEnrollments(): Promise<AdminEnrollment[]> {
+    return academicService.getEnrollments();
+  },
+
+  async getEnrollmentById(id: string): Promise<AdminEnrollment> {
+    return academicService.getEnrollmentById(id);
+  },
+
+  async createEnrollment(data: CreateEnrollmentPayload): Promise<AdminEnrollment> {
+    return academicService.createEnrollment(data);
+  },
+
+  async updateEnrollment(id: string, data: UpdateEnrollmentPayload): Promise<AdminEnrollment> {
+    return academicService.updateEnrollment(id, data);
+  },
+
+  async deleteEnrollment(id: string): Promise<void> {
+    return academicService.deleteEnrollment(id);
+  },
+
+  async batchImportEnrollments(file: File): Promise<BatchImportResponse> {
+    return academicService.batchImportEnrollments(file);
+  },
+
+  // ─── Students & Lecturers ──────────────────────────────────────────────────
+  /**
+   * Returns student profiles.
+   * Note: The backend SIMS REST API does not provide a dedicated GET /api/v1/students listing endpoint.
+   * Returns empty array to prevent 404s, repeated network requests, and displaying fabricated mock data.
+   */
+  async getStudents(): Promise<StudentProfile[]> {
+    return [];
   },
 
   /**

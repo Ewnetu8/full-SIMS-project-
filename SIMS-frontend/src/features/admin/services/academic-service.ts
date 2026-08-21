@@ -1,7 +1,20 @@
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
 import { api } from '@/services/api-client';
 
-import type { College, Program, AcademicYear, Semester, Department, Course, ClassStanding } from '../types';
+import type {
+  College,
+  Program,
+  AcademicYear,
+  Semester,
+  Department,
+  Course,
+  ClassStanding,
+  AdminCourseOffering,
+  AdminEnrollment,
+  CreateEnrollmentPayload,
+  UpdateEnrollmentPayload,
+  BatchImportResponse,
+} from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 function isValidUuid(id?: string | null): boolean {
@@ -127,7 +140,7 @@ export const academicService = {
   },
 
   async updateCollege(id: string, data: Partial<{ name: string; code: string; university: string }>): Promise<College> {
-    const payload: Record<string, any> = {};
+    const payload: Record<string, unknown> = {};
     if (data.name !== undefined) payload.name = data.name;
     if (data.code !== undefined) payload.code = data.code.toUpperCase();
     if (data.university !== undefined) payload.university = data.university;
@@ -257,7 +270,7 @@ export const academicService = {
   async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
     const departmentId = data.department;
 
-    const payload: Record<string, any> = {
+    const payload: Record<string, unknown> = {
       department: departmentId,
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
@@ -268,7 +281,7 @@ export const academicService = {
     const endpoint = API_ENDPOINTS.ACADEMICS.PROGRAMS;
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Program Creation Request:', {
+      console.warn('[DEBUG] Program Creation Request:', {
         url: endpoint,
         payload,
       });
@@ -278,7 +291,7 @@ export const academicService = {
       const res = await api.post<ApiProgram>(endpoint, payload);
 
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[DEBUG] Program Creation Response (201 Created):', res);
+        console.warn('[DEBUG] Program Creation Response (201 Created):', res);
       }
 
       return {
@@ -291,19 +304,16 @@ export const academicService = {
         createdAt: res.created_at,
         updatedAt: res.updated_at,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Program Creation Error:', {
-          status: err?.statusCode || err?.response?.status || 400,
-          errors: err?.errors || err?.response?.data || err?.message,
-        });
+        console.error('[DEBUG] Program Creation Error:', err);
       }
       throw err;
     }
   },
 
   async updateProgram(id: string, data: Partial<{ department?: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }>): Promise<Program> {
-    const payload: Record<string, any> = {};
+    const payload: Record<string, unknown> = {};
     if (data.department !== undefined) payload.department = data.department;
     if (data.name !== undefined) payload.name = data.name.trim();
     if (data.code !== undefined) payload.code = data.code.trim().toUpperCase();
@@ -313,7 +323,7 @@ export const academicService = {
     const endpoint = API_ENDPOINTS.ACADEMICS.PROGRAM_BY_ID(id);
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEBUG] Program Update Request:', {
+      console.warn('[DEBUG] Program Update Request:', {
         url: endpoint,
         payload,
       });
@@ -323,7 +333,7 @@ export const academicService = {
       const res = await api.patch<ApiProgram>(endpoint, payload);
 
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[DEBUG] Program Update Response:', res);
+        console.warn('[DEBUG] Program Update Response:', res);
       }
 
       return {
@@ -336,12 +346,9 @@ export const academicService = {
         createdAt: res.created_at,
         updatedAt: res.updated_at,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Program Update Error:', {
-          status: err?.statusCode || err?.response?.status || 400,
-          errors: err?.errors || err?.response?.data || err?.message,
-        });
+        console.error('[DEBUG] Program Update Error:', err);
       }
       throw err;
     }
@@ -573,5 +580,69 @@ export const academicService = {
 
   async deleteCourse(id: string): Promise<void> {
     await api.delete(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id));
+  },
+
+  // ── Course Offerings ─────────────────────────────────────────────────────────
+  async getCourseOfferings(): Promise<AdminCourseOffering[]> {
+    const data = await api.get<
+      AdminCourseOffering[] | { results?: AdminCourseOffering[]; data?: AdminCourseOffering[] }
+    >(API_ENDPOINTS.COURSE_OFFERINGS.ROOT);
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  },
+
+  async getCourseOfferingById(id: string): Promise<AdminCourseOffering> {
+    return api.get<AdminCourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
+  },
+
+  // ── Enrollments ──────────────────────────────────────────────────────────────
+  async getEnrollments(): Promise<AdminEnrollment[]> {
+    const data = await api.get<
+      AdminEnrollment[] | { results?: AdminEnrollment[]; data?: AdminEnrollment[] }
+    >(API_ENDPOINTS.ENROLLMENTS.ROOT);
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  },
+
+  async getEnrollmentById(id: string): Promise<AdminEnrollment> {
+    return api.get<AdminEnrollment>(API_ENDPOINTS.ENROLLMENTS.BY_ID(id));
+  },
+
+  async createEnrollment(payload: CreateEnrollmentPayload): Promise<AdminEnrollment> {
+    const body: Record<string, unknown> = {
+      student: payload.student.trim(),
+      course_offering: payload.course_offering.trim(),
+    };
+    if (payload.status) body.status = payload.status;
+    if (payload.grade !== undefined && payload.grade !== null && payload.grade.trim() !== '') {
+      body.grade = payload.grade.trim();
+    }
+
+    return api.post<AdminEnrollment>(API_ENDPOINTS.ENROLLMENTS.ROOT, body);
+  },
+
+  async updateEnrollment(id: string, payload: UpdateEnrollmentPayload): Promise<AdminEnrollment> {
+    const body: Record<string, unknown> = {};
+    if (payload.status !== undefined) body.status = payload.status;
+    if (payload.grade !== undefined) {
+      body.grade = payload.grade && payload.grade.trim() !== '' ? payload.grade.trim() : null;
+    }
+    if (payload.course_offering !== undefined) body.course_offering = payload.course_offering;
+
+    return api.patch<AdminEnrollment>(API_ENDPOINTS.ENROLLMENTS.BY_ID(id), body);
+  },
+
+  async deleteEnrollment(id: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.ENROLLMENTS.BY_ID(id));
+  },
+
+  async batchImportEnrollments(file: File): Promise<BatchImportResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<BatchImportResponse>(API_ENDPOINTS.ENROLLMENTS.BATCH_IMPORT, formData);
   },
 };

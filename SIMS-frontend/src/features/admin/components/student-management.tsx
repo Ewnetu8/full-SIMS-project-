@@ -6,14 +6,11 @@ import {
   BookOpen,
   Award,
   Calendar,
-  CheckCircle,
   Building,
   Mail,
 } from 'lucide-react';
 import * as React from 'react';
 
-import { toast } from '@/components/feedback';
-import { Label } from '@/components/forms';
 import {
   Badge,
   Button,
@@ -21,15 +18,12 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Input,
   SearchInput,
 } from '@/components/ui';
 
-import { adminService } from '../services/admin-service';
 import { useAdminStore } from '../store';
 
 import type { StudentProfile } from '../types';
@@ -53,7 +47,7 @@ export function StudentManagement() {
   const [selectedStudent, setSelectedStudent] = React.useState<StudentProfile | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [studentCollegeFilter, setStudentCollegeFilter] = React.useState<string>('ALL');
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   const filteredDepartments = React.useMemo(() => {
     if (!studentCollegeFilter || studentCollegeFilter === 'ALL') return departments;
@@ -64,47 +58,25 @@ export function StudentManagement() {
     );
   }, [departments, colleges, studentCollegeFilter]);
 
-  const filteredStudents = students.filter((s) => {
-    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
-    const matchesSearch =
-      fullName.includes(studentSearchQuery.toLowerCase()) ||
-      s.email.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
-      s.studentId.toLowerCase().includes(studentSearchQuery.toLowerCase());
+  const filteredStudents = React.useMemo(() => {
+    return students.filter((s) => {
+      const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+      const matchesSearch =
+        fullName.includes(studentSearchQuery.toLowerCase()) ||
+        s.email.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+        s.studentId.toLowerCase().includes(studentSearchQuery.toLowerCase());
 
-    const matchesDept = studentDeptFilter === 'ALL' || s.department === studentDeptFilter;
+      const matchesDept = studentDeptFilter === 'ALL' || s.department === studentDeptFilter;
 
-    return matchesSearch && matchesDept;
-  });
+      return matchesSearch && matchesDept;
+    });
+  }, [students, studentSearchQuery, studentDeptFilter]);
 
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
   const paginatedStudents = filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const selectClass =
     'flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground';
-
-  const [isImportOpen, setIsImportOpen] = React.useState(false);
-  const [importFile, setImportFile] = React.useState<File | null>(null);
-  const [isImporting, setIsImporting] = React.useState(false);
-
-  const handleBatchImport = async () => {
-    if (!importFile) {
-      toast.error('No file selected', { description: 'Please select a CSV file to import.' });
-      return;
-    }
-    setIsImporting(true);
-    try {
-      const res = await adminService.batchImportEnrollments(importFile);
-      toast.success('Batch enrollment imported', {
-        description: res.message || `Successfully processed ${res.imported_count || 'all'} records.`,
-      });
-      setIsImportOpen(false);
-      setImportFile(null);
-    } catch (err: any) {
-      toast.error('Import failed', { description: err?.message || 'An error occurred during batch import.' });
-    } finally {
-      setIsImporting(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -115,12 +87,9 @@ export function StudentManagement() {
             <GraduationCap className="h-6 w-6 text-primary" /> Student Directory
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            View all enrolled student profiles, academic standings, programs, and course enrollments.
+            View student profiles, academic standings, and departmental affiliations.
           </p>
         </div>
-        <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-          Batch Import CSV
-        </Button>
       </div>
 
       {/* Filter Bar */}
@@ -187,7 +156,7 @@ export function StudentManagement() {
                 <th className="px-4 py-3.5">Student Name</th>
                 <th className="px-4 py-3.5">Department</th>
                 <th className="px-4 py-3.5">Program</th>
-                <th className="px-4 py-3.5">Academic Year</th>
+                <th className="px-4 py-3.5">Academic Level</th>
                 <th className="px-4 py-3.5">GPA</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5 text-right">Actions</th>
@@ -196,8 +165,14 @@ export function StudentManagement() {
             <tbody className="divide-y divide-border">
               {paginatedStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No student profiles match your search criteria.
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    <GraduationCap className="mx-auto h-10 w-10 text-muted-foreground/40 mb-2" />
+                    <p className="font-medium text-foreground">No student profiles found</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {studentSearchQuery || studentDeptFilter !== 'ALL' || studentCollegeFilter !== 'ALL'
+                        ? 'No student profiles match your search criteria.'
+                        : 'No student profiles are currently available.'}
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -207,8 +182,8 @@ export function StudentManagement() {
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
-                          {std.firstName[0]}
-                          {std.lastName[0]}
+                          {std.firstName?.[0] || 'S'}
+                          {std.lastName?.[0] || ''}
                         </div>
                         <div>
                           <p className="font-semibold text-foreground">
@@ -218,12 +193,12 @@ export function StudentManagement() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{std.department}</td>
-                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{std.program}</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{std.academicYear}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{std.department || '—'}</td>
+                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{std.program || '—'}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{std.academicYear || std.classStanding || '—'}</td>
                     <td className="px-4 py-3.5">
                       <Badge variant="outline" className="font-mono font-bold text-success bg-success/10 border-success/20">
-                        {std.gpa.toFixed(2)}
+                        {(std.gpa ?? 0).toFixed(2)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3.5">
@@ -284,8 +259,8 @@ export function StudentManagement() {
             <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
               <div className="flex items-center gap-4 border-b border-border pb-4">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl shrink-0">
-                  {selectedStudent.firstName[0]}
-                  {selectedStudent.lastName[0]}
+                  {selectedStudent.firstName?.[0] || 'S'}
+                  {selectedStudent.lastName?.[0] || ''}
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">
@@ -305,35 +280,37 @@ export function StudentManagement() {
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Building className="h-3.5 w-3.5" /> Department:
                   </span>
-                  <span className="font-medium text-right max-w-[240px]">{selectedStudent.department}</span>
+                  <span className="font-medium text-right max-w-[240px]">{selectedStudent.department || 'Not assigned'}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <BookOpen className="h-3.5 w-3.5" /> Program of Study:
                   </span>
-                  <span className="font-medium">{selectedStudent.program}</span>
+                  <span className="font-medium">{selectedStudent.program || 'Not assigned'}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" /> Current Academic Level:
+                    <Calendar className="h-3.5 w-3.5" /> Academic Level:
                   </span>
-                  <span className="font-medium">{selectedStudent.academicYear}</span>
+                  <span className="font-medium">{selectedStudent.academicYear || selectedStudent.classStanding || '—'}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Award className="h-3.5 w-3.5" /> Cumulative GPA:
                   </span>
-                  <span className="font-mono font-bold text-success">{selectedStudent.gpa.toFixed(2)} / 4.00</span>
+                  <span className="font-mono font-bold text-success">{(selectedStudent.gpa ?? 0).toFixed(2)} / 4.00</span>
                 </div>
 
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <CheckCircle className="h-3.5 w-3.5" /> Enrolled Courses:
+                    Status:
                   </span>
-                  <span className="font-semibold text-foreground">{selectedStudent.enrolledCoursesCount} Courses</span>
+                  <Badge variant={selectedStudent.status === 'active' ? 'success' : 'secondary'} className="capitalize">
+                    {selectedStudent.status}
+                  </Badge>
                 </div>
               </div>
             </DialogBody>
@@ -344,37 +321,6 @@ export function StudentManagement() {
           </DialogContent>
         </Dialog>
       )}
-
-      {/* Batch CSV Import Dialog */}
-      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent size="sm">
-          <DialogHeader>
-            <DialogTitle>Batch Student Enrollment CSV Import</DialogTitle>
-            <DialogDescription>
-              Select a CSV file containing student identifiers and course offering IDs to perform batch enrollment.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4 py-3">
-            <div>
-              <Label htmlFor="csvFile">CSV File</Label>
-              <Input
-                id="csvFile"
-                type="file"
-                accept=".csv"
-                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-              />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsImportOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleBatchImport} disabled={isImporting || !importFile}>
-              {isImporting ? 'Importing...' : 'Upload & Import'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

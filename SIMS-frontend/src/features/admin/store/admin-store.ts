@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { getUserFriendlyErrorMessage } from '@/lib/errors';
+
 import { adminService, type RegisterUserPayload } from '../services/admin-service';
 
 import type {
@@ -19,6 +20,11 @@ import type {
   Program,
   AcademicYear,
   Semester,
+  AdminCourseOffering,
+  AdminEnrollment,
+  CreateEnrollmentPayload,
+  UpdateEnrollmentPayload,
+  BatchImportResponse,
 } from '../types';
 
 interface AdminStoreState {
@@ -32,6 +38,8 @@ interface AdminStoreState {
   academicYears: AcademicYear[];
   semesters: Semester[];
   courses: Course[];
+  courseOfferings: AdminCourseOffering[];
+  enrollments: AdminEnrollment[];
   exams: AdminExamOverview[];
   aiJobs: AIGradingJob[];
   auditLogs: AuditLog[];
@@ -50,6 +58,10 @@ interface AdminStoreState {
   isLoadingAcademicYears: boolean;
   isLoadingSemesters: boolean;
   isLoadingCourses: boolean;
+  isLoadingCourseOfferings: boolean;
+  courseOfferingsError: string | null;
+  isLoadingEnrollments: boolean;
+  enrollmentsError: string | null;
   isLoadingExams: boolean;
 
   // Search & Filter States
@@ -75,6 +87,11 @@ interface AdminStoreState {
   courseStandingFilter: string;
   courseDeptFilter: string;
 
+  enrollmentSearchQuery: string;
+  enrollmentStatusFilter: string;
+  enrollmentSemesterFilter: string;
+  enrollmentCourseFilter: string;
+
   examSearchQuery: string;
   examStatusFilter: string;
 
@@ -92,6 +109,8 @@ interface AdminStoreState {
   fetchAcademicYears: () => Promise<void>;
   fetchSemesters: () => Promise<void>;
   fetchCourses: () => Promise<void>;
+  fetchCourseOfferings: () => Promise<void>;
+  fetchEnrollments: () => Promise<void>;
   fetchExams: () => Promise<void>;
 
   // Actions - Users
@@ -144,6 +163,16 @@ interface AdminStoreState {
   deleteCourse: (id: string) => Promise<void>;
   toggleCourseArchive: (id: string) => void;
 
+  // Actions - Course Offerings & Enrollments
+  setEnrollmentSearchQuery: (q: string) => void;
+  setEnrollmentStatusFilter: (status: string) => void;
+  setEnrollmentSemesterFilter: (semesterId: string) => void;
+  setEnrollmentCourseFilter: (courseId: string) => void;
+  addEnrollment: (data: CreateEnrollmentPayload) => Promise<AdminEnrollment>;
+  updateEnrollment: (id: string, data: UpdateEnrollmentPayload) => Promise<AdminEnrollment>;
+  deleteEnrollment: (id: string) => Promise<void>;
+  batchImportEnrollments: (file: File) => Promise<BatchImportResponse>;
+
   // Actions - Exams
   setExamSearchQuery: (q: string) => void;
   setExamStatusFilter: (status: string) => void;
@@ -177,6 +206,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   academicYears: [],
   semesters: [],
   courses: [],
+  courseOfferings: [],
+  enrollments: [],
   exams: [],
   aiJobs: [],
   auditLogs: [],
@@ -224,6 +255,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   isLoadingAcademicYears: false,
   isLoadingSemesters: false,
   isLoadingCourses: false,
+  isLoadingCourseOfferings: false,
+  courseOfferingsError: null,
+  isLoadingEnrollments: false,
+  enrollmentsError: null,
   isLoadingExams: false,
 
   userSearchQuery: '',
@@ -248,6 +283,11 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courseStandingFilter: 'ALL',
   courseDeptFilter: 'ALL',
 
+  enrollmentSearchQuery: '',
+  enrollmentStatusFilter: 'ALL',
+  enrollmentSemesterFilter: 'ALL',
+  enrollmentCourseFilter: 'ALL',
+
   examSearchQuery: '',
   examStatusFilter: 'ALL',
 
@@ -257,7 +297,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters] = await Promise.all([
+      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments] = await Promise.all([
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
         adminService.getAllExams().catch(() => []),
@@ -268,6 +308,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         adminService.getPrograms().catch(() => []),
         adminService.getAcademicYears().catch(() => []),
         adminService.getSemesters().catch(() => []),
+        adminService.getCourseOfferings().catch(() => []),
+        adminService.getEnrollments().catch(() => []),
       ]);
 
       set({
@@ -281,6 +323,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         programs,
         academicYears,
         semesters,
+        courseOfferings,
+        enrollments,
         isLoadingData: false,
       });
     } catch {
@@ -369,6 +413,26 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       set({ courses, isLoadingCourses: false });
     } catch {
       set({ isLoadingCourses: false });
+    }
+  },
+
+  fetchCourseOfferings: async () => {
+    set({ isLoadingCourseOfferings: true, courseOfferingsError: null });
+    try {
+      const courseOfferings = await adminService.getCourseOfferings();
+      set({ courseOfferings, isLoadingCourseOfferings: false, courseOfferingsError: null });
+    } catch (err: unknown) {
+      set({ courseOfferings: [], isLoadingCourseOfferings: false, courseOfferingsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchEnrollments: async () => {
+    set({ isLoadingEnrollments: true, enrollmentsError: null });
+    try {
+      const enrollments = await adminService.getEnrollments();
+      set({ enrollments, isLoadingEnrollments: false, enrollmentsError: null });
+    } catch (err: unknown) {
+      set({ enrollments: [], isLoadingEnrollments: false, enrollmentsError: getUserFriendlyErrorMessage(err) });
     }
   },
 
@@ -508,6 +572,35 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     set((state) => ({ courses: state.courses.filter((c) => c.id !== id) }));
   },
   toggleCourseArchive: (_id) => {},
+
+  // Actions - Course Offerings & Enrollments
+  setEnrollmentSearchQuery: (enrollmentSearchQuery) => set({ enrollmentSearchQuery }),
+  setEnrollmentStatusFilter: (enrollmentStatusFilter) => set({ enrollmentStatusFilter }),
+  setEnrollmentSemesterFilter: (enrollmentSemesterFilter) => set({ enrollmentSemesterFilter }),
+  setEnrollmentCourseFilter: (enrollmentCourseFilter) => set({ enrollmentCourseFilter }),
+
+  addEnrollment: async (payload) => {
+    const newEnrollment = await adminService.createEnrollment(payload);
+    await get().fetchEnrollments();
+    return newEnrollment;
+  },
+
+  updateEnrollment: async (id, data) => {
+    const updated = await adminService.updateEnrollment(id, data);
+    await get().fetchEnrollments();
+    return updated;
+  },
+
+  deleteEnrollment: async (id) => {
+    await adminService.deleteEnrollment(id);
+    await get().fetchEnrollments();
+  },
+
+  batchImportEnrollments: async (file) => {
+    const res = await adminService.batchImportEnrollments(file);
+    await get().fetchEnrollments();
+    return res;
+  },
 
   // Actions - Exams
   setExamSearchQuery: (examSearchQuery) => set({ examSearchQuery }),
