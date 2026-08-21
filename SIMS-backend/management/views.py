@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,11 +8,14 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework import serializers as drf_serializers
 
 from accounts.permissions import HasRole
-from accounts.models import RoleChoices
+from accounts.models import RoleChoices, Student
 from management.serializers import (
     UserCompactSerializer,
     UserDetailSerializer,
     UserUpdateSerializer,
+    StudentListSerializer,
+    StudentDetailSerializer,
+    StudentUpdateSerializer,
 )
 
 User = get_user_model()
@@ -144,3 +148,122 @@ class UserDetailView(APIView):
         obj.is_active = False
         obj.save(update_fields=['is_active', 'updated_at'])
         return Response({'detail': 'User deactivated successfully.'}, status=status.HTTP_200_OK)
+
+
+# ==========================================
+# STUDENT DIRECTORY VIEWS
+# ==========================================
+
+class StudentListView(APIView):
+    """List/search/filter students."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Student Management'],
+        summary='List and search students',
+        description=(
+            'Returns a list of all students. '
+            'Supports `?search=` on student_identifier, user email, first/last name. '
+            'Supports `?department=<uuid>` and `?class_standing=` filters.'
+        ),
+        responses={200: StudentListSerializer(many=True)},
+    )
+    def get(self, request):
+        queryset = Student.objects.select_related(
+            'user', 'department'
+        ).order_by('-created_at')
+
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(student_identifier__icontains=search)
+                | Q(user__email__icontains=search)
+                | Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+            )
+
+        department = request.query_params.get('department')
+        if department:
+            queryset = queryset.filter(department_id=department)
+
+        class_standing = request.query_params.get('class_standing')
+        if class_standing and class_standing in ClassStandingChoices.values:
+            queryset = queryset.filter(class_standing=class_standing)
+
+        serializer = StudentListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class StudentDetailView(APIView):
+    """Retrieve or update a specific student."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk):
+        try:
+            return Student.objects.select_related(
+                'user', 'department'
+            ).get(pk=pk)
+        except Student.DoesNotExist:
+            return None
+
+    def _can_edit(self, request):
+        return request.user.is_superuser or request.user.role == RoleChoices.ADMIN
+
+    @extend_schema(
+        tags=['Student Management'],
+        summary='Get student profile',
+        description='Returns full student details with nested user info and department.',
+        responses={
+            200: StudentDetailSerializer,
+            404: OpenApiResponse(
+                response=_DetailOut,
+                description='Student not found.',
+                examples=[OpenApiExample('Not found', value={'detail': 'Student not found.'}, response_only=True)],
+            ),
+        },
+    )
+    def get(self, request, pk):
+        obj = self.get_object(pk)
+        if not obj:
+            return Response({'detail': 'Student not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Students can only view their own profile
+        if request.user.role == RoleChoices.STUDENT:
+            if not hasattr(request.user, 'student_profile') or request.user.student_profile.pk != obj.pk:
+                return Response({'detail': 'Student not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(StudentDetailSerializer(obj).data)
+
+    @extend_schema(
+        tags=['Student Management'],
+        summary='Update student information',
+        description=(
+            'Partially update a student. Allowed fields: `student_identifier`, '
+            '`class_standing`, `department_id`. Admin only.'
+        ),
+        request=StudentUpdateSerializer,
+        responses={
+            200: StudentDetailSerializer,
+            400: OpenApiResponse(description='Validation error.'),
+            403: OpenApiResponse(description='Permission denied.'),
+            404: OpenApiResponse(description='Student not found.'),
+        },
+    )
+    def patch(self, request, pk):
+        if not self._can_edit(request):
+            return Response(
+                {'detail': 'You do not have permission to perform this action.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        obj = self.get_object(pk)
+        if not obj:
+            return Response({'detail': 'Student not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = StudentUpdateSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(StudentDetailSerializer(obj).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
