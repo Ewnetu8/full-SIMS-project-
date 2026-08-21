@@ -17,6 +17,7 @@ import {
   Calendar,
   Clock,
   Bell,
+  UserPlus,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -24,11 +25,10 @@ import * as React from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { Breadcrumb } from '@/components/navigation';
 import { NotificationDropdown } from '@/components/navigation';
-import { Button } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { useRouteProtection } from '@/features/auth/hooks';
 
 import { useAdminStore } from '../store';
-import { useRouteProtection } from '@/features/auth/hooks';
 
 import type { NavItem } from '@/components/layout/sidebar';
 
@@ -36,6 +36,7 @@ const adminNavigation: NavItem[] = [
   { label: 'Overview', href: ROUTES.ADMIN.DASHBOARD, icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'User Management', href: ROUTES.ADMIN.USERS, icon: <Users className="h-4 w-4" /> },
   { label: 'Student Directory', href: ROUTES.ADMIN.STUDENTS, icon: <GraduationCap className="h-4 w-4" /> },
+  { label: 'Enrollment Management', href: ROUTES.ADMIN.ENROLLMENTS, icon: <UserPlus className="h-4 w-4" /> },
   { label: 'Lecturer Directory', href: ROUTES.ADMIN.LECTURERS, icon: <UserCheck className="h-4 w-4" /> },
   { label: 'Colleges', href: ROUTES.ADMIN.COLLEGES, icon: <Landmark className="h-4 w-4" /> },
   { label: 'Departments', href: ROUTES.ADMIN.DEPARTMENTS, icon: <Building2 className="h-4 w-4" /> },
@@ -97,7 +98,7 @@ export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
               message: n.message,
               time: n.timestamp,
               read: n.read,
-              type: (n.category === 'ai' ? 'ai' : n.category === 'security' ? 'warning' : 'info') as any,
+              type: (n.category === 'ai' ? 'ai' : n.category === 'security' ? 'warning' : 'info') as 'ai' | 'warning' | 'info',
             }))}
             onMarkAllRead={markAllNotificationsRead}
             onViewAll={() => router.push(ROUTES.ADMIN.NOTIFICATIONS)}

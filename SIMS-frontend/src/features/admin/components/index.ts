@@ -6,6 +6,7 @@ export * from './lecturer-management';
 export * from './department-management';
 export * from './department-detail';
 export * from './course-management';
+export * from './enrollment-management';
 export * from './examination-management';
 export * from './ai-grading-monitor';
 export * from './reports-analytics';

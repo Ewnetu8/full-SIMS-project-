@@ -5,11 +5,11 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 
+import { toast } from '@/components/feedback';
+import { API_ENDPOINTS } from '@/constants';
 import { useAuthStore } from '@/features/auth/store';
 import { env } from '@/lib/env';
-import { API_ENDPOINTS } from '@/constants';
 import { createApiError } from '@/lib/errors';
-import { toast } from '@/components/feedback';
 import { getCsrfToken } from '@/utils/csrf';
 
 import type { ApiErrorResponse } from '@/types';
@@ -78,6 +78,12 @@ function createApiClient(): AxiosInstance {
       const csrfToken = getCsrfToken();
       if (csrfToken) {
         config.headers.set('X-CSRFToken', csrfToken);
+      }
+
+      // If data is FormData, remove Content-Type so the browser/Axios sets the multipart boundary
+      if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+        config.headers.delete('Content-Type');
+        config.headers.delete('content-type');
       }
 
       return config;
@@ -184,10 +190,10 @@ function createApiClient(): AxiosInstance {
           } else {
             throw new Error('No access token returned from refresh endpoint');
           }
-        } catch (refreshError: any) {
+        } catch (refreshError: unknown) {
           processQueue(refreshError, null);
 
-          const refreshStatus = refreshError?.response?.status;
+          const refreshStatus = axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined;
 
           // ONLY clear session if refresh explicitly fails with 401 (refresh token missing/expired)
           if (refreshStatus === 401) {
