@@ -8,7 +8,7 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework import serializers as drf_serializers
 
 from accounts.permissions import HasRole
-from accounts.models import RoleChoices, Student
+from accounts.models import RoleChoices, Student, Lecturer
 from management.serializers import (
     UserCompactSerializer,
     UserDetailSerializer,
@@ -16,6 +16,9 @@ from management.serializers import (
     StudentListSerializer,
     StudentDetailSerializer,
     StudentUpdateSerializer,
+    LecturerListSerializer,
+    LecturerDetailSerializer,
+    LecturerUpdateSerializer,
 )
 
 User = get_user_model()
@@ -266,4 +269,117 @@ class StudentDetailView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(StudentDetailSerializer(obj).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# LECTURER DIRECTORY VIEWS
+
+class LecturerListView(APIView):
+    """List/search/filter lecturers."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Lecturer Management'],
+        summary='List and search lecturers',
+        description=(
+            'Returns a list of all lecturers. '
+            'Supports `?search=` on faculty_identifier, user email, first/last name. '
+            'Supports `?department=<uuid>` filter.'
+        ),
+        responses={200: LecturerListSerializer(many=True)},
+    )
+    def get(self, request):
+        queryset = Lecturer.objects.select_related(
+            'user', 'department'
+        ).order_by('-created_at')
+
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(faculty_identifier__icontains=search)
+                | Q(user__email__icontains=search)
+                | Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+            )
+
+        department = request.query_params.get('department')
+        if department:
+            queryset = queryset.filter(department_id=department)
+
+        serializer = LecturerListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class LecturerDetailView(APIView):
+    """Retrieve or update a specific lecturer."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk):
+        try:
+            return Lecturer.objects.select_related(
+                'user', 'department'
+            ).get(pk=pk)
+        except Lecturer.DoesNotExist:
+            return None
+
+    def _can_edit(self, request):
+        return request.user.is_superuser or request.user.role == RoleChoices.ADMIN
+
+    @extend_schema(
+        tags=['Lecturer Management'],
+        summary='Get lecturer profile',
+        description='Returns full lecturer details with nested user info and department.',
+        responses={
+            200: LecturerDetailSerializer,
+            404: OpenApiResponse(
+                response=_DetailOut,
+                description='Lecturer not found.',
+                examples=[OpenApiExample('Not found', value={'detail': 'Lecturer not found.'}, response_only=True)],
+            ),
+        },
+    )
+    def get(self, request, pk):
+        obj = self.get_object(pk)
+        if not obj:
+            return Response({'detail': 'Lecturer not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Lecturers can only view their own profile
+        if request.user.role == RoleChoices.LECTURER:
+            if not hasattr(request.user, 'lecturer_profile') or request.user.lecturer_profile.pk != obj.pk:
+                return Response({'detail': 'Lecturer not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(LecturerDetailSerializer(obj).data)
+
+    @extend_schema(
+        tags=['Lecturer Management'],
+        summary='Update lecturer information',
+        description=(
+            'Partially update a lecturer. Allowed fields: `faculty_identifier`, '
+            '`department_id`. Admin only.'
+        ),
+        request=LecturerUpdateSerializer,
+        responses={
+            200: LecturerDetailSerializer,
+            400: OpenApiResponse(description='Validation error.'),
+            403: OpenApiResponse(description='Permission denied.'),
+            404: OpenApiResponse(description='Lecturer not found.'),
+        },
+    )
+    def patch(self, request, pk):
+        if not self._can_edit(request):
+            return Response(
+                {'detail': 'You do not have permission to perform this action.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        obj = self.get_object(pk)
+        if not obj:
+            return Response({'detail': 'Lecturer not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = LecturerUpdateSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(LecturerDetailSerializer(obj).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

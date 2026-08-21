@@ -4,6 +4,8 @@ from management.views import (
     UserDetailView,
     StudentListView,
     StudentDetailView,
+    LecturerListView,
+    LecturerDetailView,
 )
 
 urlpatterns = [
@@ -11,4 +13,6 @@ urlpatterns = [
     path('users/<uuid:pk>', UserDetailView.as_view(), name='user_detail'),
     path('students', StudentListView.as_view(), name='student_list'),
     path('students/<uuid:pk>', StudentDetailView.as_view(), name='student_detail'),
+    path('lecturers', LecturerListView.as_view(), name='lecturer_list'),
+    path('lecturers/<uuid:pk>', LecturerDetailView.as_view(), name='lecturer_detail'),
 ]
