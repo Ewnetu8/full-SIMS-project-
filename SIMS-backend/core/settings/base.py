@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'results.apps.ResultsConfig',
     'notifications.apps.NotificationsConfig',
     'audit.apps.AuditConfig',
+    'management.apps.ManagementConfig',
 ]
 
 MIDDLEWARE = [
