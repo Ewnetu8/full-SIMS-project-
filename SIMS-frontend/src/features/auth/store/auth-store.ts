@@ -1,10 +1,13 @@
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
+import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 
-import { mockAuthService } from '../mock';
+import { authApi } from '../services';
+
+import { toast } from '@/components/feedback';
 
 import type { AuthState, AuthActions } from '../types';
 import type { AuthSession, AuthTokens, BaseUser } from '@/types';
+import type { StateStorage } from 'zustand/middleware';
 
 // ─── Store Type ───────────────────────────────────────────────────────────────
 
@@ -21,6 +24,95 @@ const initialState: AuthState = {
   error:           null,
 };
 
+// ─── Remember Me Storage Adapter ──────────────────────────────────────────────
+
+/**
+ * Zustand persist key — the main data blob.
+ * A tiny helper flag (`REMEMBER_FLAG_KEY`) stored in localStorage tells us
+ * whether the session data lives in localStorage or sessionStorage.
+ */
+const STORAGE_KEY   = 'examsphere_auth';
+const REMEMBER_FLAG = 'examsphere_auth_remember';
+
+/**
+ * Returns true when the last login used "Remember Me".
+ * The flag itself is always in localStorage (it is a single boolean,
+ * never contains sensitive data, and must survive browser close so
+ * we know where to look for session data on the next visit).
+ */
+function isRemembered(): boolean {
+  try {
+    return localStorage.getItem(REMEMBER_FLAG) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Persists or clears the remember-me flag.
+ */
+function setRememberFlag(value: boolean): void {
+  try {
+    if (value) {
+      localStorage.setItem(REMEMBER_FLAG, 'true');
+    } else {
+      localStorage.removeItem(REMEMBER_FLAG);
+    }
+  } catch {
+    // SSR or storage unavailable — silently ignore.
+  }
+}
+
+/**
+ * Removes session data from **both** storages + the flag.
+ * Called on logout / clearSession to guarantee a clean slate.
+ */
+function purgeAllStorages(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(REMEMBER_FLAG);
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // SSR or storage unavailable.
+  }
+}
+
+/**
+ * Custom StateStorage for Zustand `persist`.
+ *
+ * - `getItem`: tries the "active" storage first (based on `REMEMBER_FLAG`),
+ *   then falls back to the other. This covers the edge case where the flag
+ *   was updated but data hasn't migrated yet.
+ * - `setItem`: writes to the active storage and removes from the other.
+ * - `removeItem`: clears both storages + the flag.
+ */
+const rememberMeStorage: StateStorage = {
+  getItem(name: string): string | null {
+    try {
+      const primary   = isRemembered() ? localStorage : sessionStorage;
+      const secondary = isRemembered() ? sessionStorage : localStorage;
+      return primary.getItem(name) ?? secondary.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+
+  setItem(name: string, value: string): void {
+    try {
+      const target  = isRemembered() ? localStorage : sessionStorage;
+      const other   = isRemembered() ? sessionStorage : localStorage;
+      target.setItem(name, value);
+      other.removeItem(name);
+    } catch {
+      // SSR or storage unavailable.
+    }
+  },
+
+  removeItem(name: string): void {
+    purgeAllStorages();
+  },
+};
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 /**
@@ -29,11 +121,11 @@ const initialState: AuthState = {
  * Persisted fields: `user`, `tokens`, `isAuthenticated`, `rememberMe`.
  * Non-persisted: `isLoading`, `error` (ephemeral UI state).
  *
- * The store is wrapped in Redux DevTools (`devtools`) for debugging.
- * Session cookie management is handled by the mock/api service.
+ * When `rememberMe` is **true** the data is stored in `localStorage`
+ * (survives browser close). When **false** it goes into `sessionStorage`
+ * (cleared when the browser tab/window is closed).
  *
- * Integration with real backend (Phase 4+):
- *   Replace `mockAuthService` calls in `logout` with `authApi.logout()`.
+ * The store is wrapped in Redux DevTools (`devtools`) for debugging.
  */
 export const useAuthStore = create<AuthStore>()(
   devtools(
@@ -63,8 +155,17 @@ export const useAuthStore = create<AuthStore>()(
         /**
          * Called after a successful login response.
          * Stores user + tokens and marks the session as authenticated.
+         *
+         * Sets the remember-me flag **before** updating state so that when
+         * Zustand's persist middleware serialises the new state it writes
+         * to the correct storage (localStorage or sessionStorage).
          */
-        login: (session: AuthSession, rememberMe: boolean) =>
+        login: (session: AuthSession, rememberMe: boolean) => {
+          // 1. Update the flag so the custom storage adapter knows where to write.
+          setRememberFlag(rememberMe);
+
+          // 2. Update the store state — persist middleware will call setItem
+          //    which now targets the correct storage.
           set(
             {
               user:            session.user,
@@ -76,29 +177,33 @@ export const useAuthStore = create<AuthStore>()(
             },
             false,
             'auth/login',
-          ),
+          );
+        },
 
         /**
-         * Full logout — clears the session cookie via API, then resets the store.
+         * Full logout — clears authentication via backend API, then resets the store.
          */
         logout: async () => {
           set({ isLoading: true }, false, 'auth/logout/start');
           try {
             // Only call the service if we were authenticated
             if (get().isAuthenticated) {
-              await mockAuthService.logout();
+              await authApi.logout();
             }
           } finally {
+            purgeAllStorages();
             set({ ...initialState }, false, 'auth/logout/complete');
           }
         },
 
         /**
-         * Clear local state only — used on 401 or when the session cookie is gone.
+         * Clear local state only — used on 401 or when credentials expire.
          * Does not call the server.
          */
-        clearSession: () =>
-          set({ ...initialState }, false, 'auth/clearSession'),
+        clearSession: () => {
+          purgeAllStorages();
+          set({ ...initialState }, false, 'auth/clearSession');
+        },
 
         /**
          * Update access + refresh tokens without modifying the user.
@@ -111,6 +216,94 @@ export const useAuthStore = create<AuthStore>()(
             'auth/refreshSession',
           ),
 
+        initializeAuth: async () => {
+          set({ isLoading: true }, false, 'auth/initialize/start');
+
+          const hasRehydratedToken = !!get().tokens?.accessToken;
+          const hasRehydratedUser = !!get().user;
+          const storedRefreshToken = get().tokens?.refreshToken;
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[DEV LOG] App auth initialization started. Rehydrated session present:', {
+              hasToken: hasRehydratedToken,
+              hasUser: hasRehydratedUser,
+            });
+          }
+
+          // If no session exists, finish initialization immediately without making unauthenticated refresh request
+          if (!hasRehydratedToken && !hasRehydratedUser && !storedRefreshToken) {
+            set({ isAuthenticated: false, isLoading: false }, false, 'auth/initialize/anonymous');
+            return;
+          }
+
+          try {
+            const res = await authApi.refreshToken(storedRefreshToken);
+            const newAccessToken = (res as any).access || (res as any).access_token || (res as any).accessToken || res.tokens?.accessToken || '';
+
+            if (newAccessToken) {
+              set(
+                {
+                  tokens: { ...get().tokens, accessToken: newAccessToken },
+                  isAuthenticated: true,
+                  isLoading: false,
+                },
+                false,
+                'auth/initialize/success'
+              );
+
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[DEV LOG] User session successfully restored via refresh endpoint.');
+              }
+              return;
+            } else {
+              throw new Error('No access token returned from refresh endpoint');
+            }
+          } catch (error: any) {
+            const statusCode = error?.response?.status || error?.statusCode || 0;
+            const message = error?.message || error;
+
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[DEV LOG] Refresh token request failed:', { statusCode, reason: message });
+            }
+
+            // 401 Unauthorized means the refresh token is genuinely invalid or expired.
+            if (statusCode === 401) {
+              const hadPreviousSession = get().isAuthenticated || hasRehydratedUser;
+              get().clearSession();
+
+              if (hadPreviousSession) {
+                try {
+                  toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+                } catch {
+                  // Ignore toast errors if component not mounted
+                }
+              }
+              return;
+            }
+
+            // Non-401 errors (e.g. 403 CSRF verification failure or network/CORS error):
+            // If the user already has a rehydrated session (user + accessToken), preserve it so page reloads do not log out the user!
+            if (hasRehydratedToken && hasRehydratedUser) {
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[DEV LOG] Preserving rehydrated session for authenticated user:', get().user?.email);
+              }
+              set(
+                {
+                  isAuthenticated: true,
+                  isLoading: false,
+                },
+                false,
+                'auth/initialize/preserved'
+              );
+              return;
+            }
+
+            get().clearSession();
+          } finally {
+            set({ isLoading: false }, false, 'auth/initialize/complete');
+          }
+        },
+
         /**
          * Update the current user's profile data without resetting the session.
          */
@@ -122,7 +315,8 @@ export const useAuthStore = create<AuthStore>()(
           ),
       }),
       {
-        name: 'examsphere_auth',
+        name: STORAGE_KEY,
+        storage: createJSONStorage(() => rememberMeStorage),
         // Only persist session-relevant fields.
         // isLoading and error are ephemeral and should not survive a page reload.
         partialize: (state): Partial<AuthState> => ({

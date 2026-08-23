@@ -13,6 +13,8 @@ import {
 import * as React from 'react';
 
 import { toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
+import { Label } from '@/components/forms';
 import {
   Button,
   Card,
@@ -23,7 +25,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui';
-import { Label } from '@/components/forms';
+
 import { useAdminStore } from '../store';
 
 export function SystemSettings() {
@@ -32,10 +34,12 @@ export function SystemSettings() {
   const [formData, setFormData] = React.useState({ ...settings });
 
   const handleSave = () => {
-    updateSettings(formData);
-    toast.success('Settings Saved', {
-      description: 'System settings updated successfully across institutional portal.',
-    });
+    try {
+      updateSettings(formData);
+      toast.success('System settings saved successfully.');
+    } catch (err) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
   const selectClass =
@@ -47,7 +51,7 @@ export function SystemSettings() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Settings className="h-6 w-6 text-indigo-500" /> System Settings & Configuration
+            <Settings className="h-6 w-6 text-primary" /> System Settings & Configuration
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Configure institutional profile, branding, examination policies, AI grading engine thresholds, and security preferences.
@@ -133,7 +137,7 @@ export function SystemSettings() {
         <TabsContent value="branding">
           <Card className="p-6 space-y-4">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-              <Palette className="h-4 w-4 text-purple-500" /> Portal Branding & Design System
+              <Palette className="h-4 w-4 text-primary" /> Portal Branding & Design System
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -193,7 +197,7 @@ export function SystemSettings() {
         <TabsContent value="academic">
           <Card className="p-6 space-y-4">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-              <Calendar className="h-4 w-4 text-emerald-500" /> Academic Calendar Settings
+              <Calendar className="h-4 w-4 text-success" /> Academic Calendar Settings
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -221,7 +225,7 @@ export function SystemSettings() {
         <TabsContent value="exams">
           <Card className="p-6 space-y-4">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-              <ClipboardCheck className="h-4 w-4 text-sky-500" /> Default Examination Policies
+              <ClipboardCheck className="h-4 w-4 text-primary" /> Default Examination Policies
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
@@ -303,12 +307,12 @@ export function SystemSettings() {
                 >
                   <option value="OpenAI GPT-4o (Fine-Tuned Academic Model)">OpenAI GPT-4o (Fine-Tuned Academic Model)</option>
                   <option value="Claude 3.5 Sonnet (Academic Fine-Tune)">Claude 3.5 Sonnet (Academic Fine-Tune)</option>
-                  <option value="Local On-Premises Llama 3 Cluster">Local On-Premises Llama 3 Cluster</option>
+                  <option value="Local On-Premises Llama 3 Cluster">On-Premises Grading Server (Llama 3)</option>
                 </select>
               </div>
 
               <div>
-                <Label htmlFor="apiKey">API Key (Masked Placeholder)</Label>
+                <Label htmlFor="apiKey">Integration Service Key</Label>
                 <Input id="apiKey" value={formData.aiConfig.apiKeyMasked} disabled />
               </div>
 
@@ -371,14 +375,14 @@ export function SystemSettings() {
         <TabsContent value="notifications">
           <Card className="p-6 space-y-4">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-              <Bell className="h-4 w-4 text-amber-500" /> Administrative Notification Alerts
+              <Bell className="h-4 w-4 text-accent" /> Administrative Notification Alerts
             </h2>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-muted/20">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Email Alerts on System Errors</p>
-                  <p className="text-xs text-muted-foreground">Send high-priority alerts to support email when AI jobs fail or server errors occur.</p>
+                  <p className="text-xs text-muted-foreground">Send notification alerts to system administrator when evaluation jobs fail or system warnings occur.</p>
                 </div>
                 <Switch
                   checked={formData.notificationSettings.emailAlertsOnSystemErrors}

@@ -1,81 +1,185 @@
 import { create } from 'zustand';
+
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
+
+import { adminService, type RegisterUserPayload } from '../services/admin-service';
+
 import type {
   AdminUser,
   StudentProfile,
   LecturerProfile,
   Department,
   Course,
+  ClassStanding,
   AdminExamOverview,
   AIGradingJob,
   AuditLog,
   SystemSettings,
   AdminNotification,
+  College,
+  Program,
+  AcademicYear,
+  Semester,
+  AdminCourseOffering,
+  AdminEnrollment,
+  CreateEnrollmentPayload,
+  UpdateEnrollmentPayload,
+  BatchImportResponse,
 } from '../types';
-
-import {
-  INITIAL_USERS,
-  INITIAL_STUDENTS,
-  INITIAL_LECTURERS,
-  INITIAL_DEPARTMENTS,
-  INITIAL_COURSES,
-  INITIAL_EXAMS,
-  INITIAL_AI_JOBS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_SETTINGS,
-  INITIAL_NOTIFICATIONS,
-} from '../mock';
 
 interface AdminStoreState {
   // Datasets
   users: AdminUser[];
   students: StudentProfile[];
   lecturers: LecturerProfile[];
+  colleges: College[];
   departments: Department[];
+  programs: Program[];
+  academicYears: AcademicYear[];
+  semesters: Semester[];
   courses: Course[];
+  courseOfferings: AdminCourseOffering[];
+  enrollments: AdminEnrollment[];
   exams: AdminExamOverview[];
   aiJobs: AIGradingJob[];
   auditLogs: AuditLog[];
   settings: SystemSettings;
   notifications: AdminNotification[];
+  isLoadingData: boolean;
 
-  // User filters & state
+  // Loading states
+  isLoadingUsers: boolean;
+  usersError: string | null;
+  isLoadingColleges: boolean;
+  collegesError: string | null;
+  isLoadingDepartments: boolean;
+  departmentsError: string | null;
+  isLoadingPrograms: boolean;
+  isLoadingAcademicYears: boolean;
+  isLoadingSemesters: boolean;
+  isLoadingCourses: boolean;
+  isLoadingCourseOfferings: boolean;
+  courseOfferingsError: string | null;
+  isLoadingEnrollments: boolean;
+  enrollmentsError: string | null;
+  isLoadingExams: boolean;
+
+  // Search & Filter States
   userSearchQuery: string;
   userRoleFilter: string;
   userDeptFilter: string;
   userStatusFilter: string;
 
-  // Student filters & state
   studentSearchQuery: string;
   studentDeptFilter: string;
 
-  // Lecturer filters & state
   lecturerSearchQuery: string;
   lecturerDeptFilter: string;
 
-  // Department search
+  collegeSearchQuery: string;
   departmentSearchQuery: string;
+  programSearchQuery: string;
+  academicYearSearchQuery: string;
+  semesterSearchQuery: string;
 
-  // Course search & filter
   courseSearchQuery: string;
+  courseProgramFilter: string;
+  courseStandingFilter: string;
   courseDeptFilter: string;
 
-  // Exam search & filter
+  enrollmentSearchQuery: string;
+  enrollmentStatusFilter: string;
+  enrollmentSemesterFilter: string;
+  enrollmentCourseFilter: string;
+
   examSearchQuery: string;
   examStatusFilter: string;
 
-  // Audit logs search & filter
   auditSearchQuery: string;
   auditCategoryFilter: string;
 
+  // Fetch Actions
+  fetchAdminData: () => Promise<void>;
+  fetchUsers: () => Promise<void>;
+  fetchStudents: () => Promise<void>;
+  fetchLecturers: () => Promise<void>;
+  fetchColleges: () => Promise<void>;
+  fetchDepartments: () => Promise<void>;
+  fetchPrograms: () => Promise<void>;
+  fetchAcademicYears: () => Promise<void>;
+  fetchSemesters: () => Promise<void>;
+  fetchCourses: () => Promise<void>;
+  fetchCourseOfferings: () => Promise<void>;
+  fetchEnrollments: () => Promise<void>;
+  fetchExams: () => Promise<void>;
+
   // Actions - Users
   setUsers: (users: AdminUser[]) => void;
-  addUser: (user: Omit<AdminUser, 'id' | 'lastLogin' | 'createdAt'>) => void;
-  updateUser: (id: string, data: Partial<AdminUser>) => void;
-  deleteUser: (id: string) => void;
+  addUser: (user: RegisterUserPayload) => Promise<AdminUser>;
+  updateUser: (id: string, data: Partial<AdminUser>) => Promise<AdminUser>;
+  deleteUser: (id: string) => Promise<void>;
   setUserSearchQuery: (q: string) => void;
   setUserRoleFilter: (role: string) => void;
   setUserDeptFilter: (dept: string) => void;
   setUserStatusFilter: (status: string) => void;
+
+  // Actions - Colleges
+  setCollegeSearchQuery: (q: string) => void;
+  addCollege: (data: { name: string; code: string; university: string }) => Promise<College>;
+  updateCollege: (id: string, data: Partial<{ name: string; code: string; university: string }>) => Promise<College>;
+  deleteCollege: (id: string) => Promise<void>;
+
+  // Actions - Departments
+  setDepartmentSearchQuery: (q: string) => void;
+  addDepartment: (data: { name: string; code: string; college?: string | null }) => Promise<Department>;
+  updateDepartment: (id: string, data: Partial<{ name: string; code: string; college?: string | null }>) => Promise<Department>;
+  deleteDepartment: (id: string) => Promise<void>;
+
+  // Actions - Programs
+  setProgramSearchQuery: (q: string) => void;
+  addProgram: (data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }) => Promise<Program>;
+  updateProgram: (id: string, data: Partial<{ department?: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }>) => Promise<Program>;
+  deleteProgram: (id: string) => Promise<void>;
+
+  // Actions - Academic Years
+  setAcademicYearSearchQuery: (q: string) => void;
+  addAcademicYear: (data: { display_label: string; start_boundary: string; end_boundary: string }) => Promise<AcademicYear>;
+  updateAcademicYear: (id: string, data: Partial<{ display_label: string; start_boundary: string; end_boundary: string }>) => Promise<AcademicYear>;
+  deleteAcademicYear: (id: string) => Promise<void>;
+
+  // Actions - Semesters
+  setSemesterSearchQuery: (q: string) => void;
+  addSemester: (data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }) => Promise<Semester>;
+  updateSemester: (id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>) => Promise<Semester>;
+  deleteSemester: (id: string) => Promise<void>;
+
+  // Actions - Courses
+  setCourseSearchQuery: (q: string) => void;
+  setCourseProgramFilter: (progId: string) => void;
+  setCourseStandingFilter: (standing: string) => void;
+  setCourseDeptFilter: (dept: string) => void;
+  addCourse: (data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }) => Promise<Course>;
+  updateCourse: (id: string, data: Partial<{ title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }>) => Promise<Course>;
+  deleteCourse: (id: string) => Promise<void>;
+  toggleCourseArchive: (id: string) => void;
+
+  // Actions - Course Offerings & Enrollments
+  setEnrollmentSearchQuery: (q: string) => void;
+  setEnrollmentStatusFilter: (status: string) => void;
+  setEnrollmentSemesterFilter: (semesterId: string) => void;
+  setEnrollmentCourseFilter: (courseId: string) => void;
+  addEnrollment: (data: CreateEnrollmentPayload) => Promise<AdminEnrollment>;
+  updateEnrollment: (id: string, data: UpdateEnrollmentPayload) => Promise<AdminEnrollment>;
+  deleteEnrollment: (id: string) => Promise<void>;
+  batchImportEnrollments: (file: File) => Promise<BatchImportResponse>;
+
+  // Actions - Exams
+  setExamSearchQuery: (q: string) => void;
+  setExamStatusFilter: (status: string) => void;
+  addExam: (data: { title: string; duration_minutes: number; course_offering?: string }) => Promise<AdminExamOverview>;
+  scheduleExam: (id: string, data: { start_window: string; end_window: string; duration_minutes: number }) => Promise<void>;
+  archiveExam: (id: string) => void;
+  deleteExam: (id: string) => Promise<void>;
 
   // Actions - Students & Lecturers
   setStudentSearchQuery: (q: string) => void;
@@ -83,29 +187,8 @@ interface AdminStoreState {
   setLecturerSearchQuery: (q: string) => void;
   setLecturerDeptFilter: (dept: string) => void;
 
-  // Actions - Departments
-  setDepartmentSearchQuery: (q: string) => void;
-  addDepartment: (dept: Omit<Department, 'id' | 'createdAt' | 'lecturerCount' | 'studentCount' | 'courseCount'>) => void;
-  updateDepartment: (id: string, data: Partial<Department>) => void;
-  deleteDepartment: (id: string) => void;
-
-  // Actions - Courses
-  setCourseSearchQuery: (q: string) => void;
-  setCourseDeptFilter: (dept: string) => void;
-  addCourse: (course: Omit<Course, 'id' | 'studentCount'>) => void;
-  updateCourse: (id: string, data: Partial<Course>) => void;
-  toggleCourseArchive: (id: string) => void;
-
-  // Actions - Exams
-  setExamSearchQuery: (q: string) => void;
-  setExamStatusFilter: (status: string) => void;
-  archiveExam: (id: string) => void;
-  deleteExam: (id: string) => void;
-
-  // Actions - AI Jobs
+  // Actions - AI Jobs, Audit, Settings & Notifications
   retryAIJob: (id: string) => void;
-
-  // Actions - Settings & Notifications & Audit
   updateSettings: (settings: Partial<SystemSettings>) => void;
   setAuditSearchQuery: (q: string) => void;
   setAuditCategoryFilter: (cat: string) => void;
@@ -113,17 +196,70 @@ interface AdminStoreState {
   markAllNotificationsRead: () => void;
 }
 
-export const useAdminStore = create<AdminStoreState>((set) => ({
-  users: INITIAL_USERS,
-  students: INITIAL_STUDENTS,
-  lecturers: INITIAL_LECTURERS,
-  departments: INITIAL_DEPARTMENTS,
-  courses: INITIAL_COURSES,
-  exams: INITIAL_EXAMS,
-  aiJobs: INITIAL_AI_JOBS,
-  auditLogs: INITIAL_AUDIT_LOGS,
-  settings: INITIAL_SETTINGS,
-  notifications: INITIAL_NOTIFICATIONS,
+export const useAdminStore = create<AdminStoreState>((set, get) => ({
+  users: [],
+  students: [],
+  lecturers: [],
+  colleges: [],
+  departments: [],
+  programs: [],
+  academicYears: [],
+  semesters: [],
+  courses: [],
+  courseOfferings: [],
+  enrollments: [],
+  exams: [],
+  aiJobs: [],
+  auditLogs: [],
+  settings: {
+    institutionName: 'Addis Ababa Science and Technology University',
+    institutionCode: 'AASTU',
+    supportEmail: 'support@aastu.edu.et',
+    timezone: 'Africa/Addis_Ababa',
+    academicYear: '2025/2026',
+    activeSemester: 'First Semester',
+    branding: {
+      primaryColor: '#102A7A',
+      darkThemeDefault: false,
+      portalTitle: 'AASTU SIMS',
+    },
+    examDefaults: {
+      defaultDurationMinutes: 60,
+      passPercentageThreshold: 50,
+      autoSaveIntervalSeconds: 30,
+      allowReviewBeforeSubmission: true,
+    },
+    aiConfig: {
+      provider: 'AASTU AI Engine',
+      apiKeyMasked: '••••••••••••••••',
+      autoGradingConfidenceThreshold: 85,
+      flagLowConfidenceForManualReview: true,
+      maxParallelGradingWorkers: 4,
+    },
+    notificationSettings: {
+      emailAlertsOnSystemErrors: true,
+      notifyLecturersOnExamPublish: true,
+      weeklyDigestEmail: false,
+    },
+  },
+  notifications: [],
+  isLoadingData: false,
+
+  isLoadingUsers: false,
+  usersError: null,
+  isLoadingColleges: false,
+  collegesError: null,
+  isLoadingDepartments: false,
+  departmentsError: null,
+  isLoadingPrograms: false,
+  isLoadingAcademicYears: false,
+  isLoadingSemesters: false,
+  isLoadingCourses: false,
+  isLoadingCourseOfferings: false,
+  courseOfferingsError: null,
+  isLoadingEnrollments: false,
+  enrollmentsError: null,
+  isLoadingExams: false,
 
   userSearchQuery: '',
   userRoleFilter: 'ALL',
@@ -136,10 +272,21 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
   lecturerSearchQuery: '',
   lecturerDeptFilter: 'ALL',
 
+  collegeSearchQuery: '',
   departmentSearchQuery: '',
+  programSearchQuery: '',
+  academicYearSearchQuery: '',
+  semesterSearchQuery: '',
 
   courseSearchQuery: '',
+  courseProgramFilter: 'ALL',
+  courseStandingFilter: 'ALL',
   courseDeptFilter: 'ALL',
+
+  enrollmentSearchQuery: '',
+  enrollmentStatusFilter: 'ALL',
+  enrollmentSemesterFilter: 'ALL',
+  enrollmentCourseFilter: 'ALL',
 
   examSearchQuery: '',
   examStatusFilter: 'ALL',
@@ -147,69 +294,334 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
   auditSearchQuery: '',
   auditCategoryFilter: 'ALL',
 
+  fetchAdminData: async () => {
+    set({ isLoadingData: true });
+    try {
+      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments] = await Promise.all([
+        adminService.getDepartments().catch(() => []),
+        adminService.getCourses().catch(() => []),
+        adminService.getAllExams().catch(() => []),
+        adminService.getStudents().catch(() => []),
+        adminService.getUsers().catch(() => []),
+        adminService.getLecturers().catch(() => []),
+        adminService.getColleges().catch(() => []),
+        adminService.getPrograms().catch(() => []),
+        adminService.getAcademicYears().catch(() => []),
+        adminService.getSemesters().catch(() => []),
+        adminService.getCourseOfferings().catch(() => []),
+        adminService.getEnrollments().catch(() => []),
+      ]);
+
+      set({
+        departments,
+        courses,
+        exams,
+        students,
+        users,
+        lecturers,
+        colleges,
+        programs,
+        academicYears,
+        semesters,
+        courseOfferings,
+        enrollments,
+        isLoadingData: false,
+      });
+    } catch {
+      set({ isLoadingData: false });
+    }
+  },
+
+  fetchUsers: async () => {
+    set({ isLoadingUsers: true, usersError: null });
+    try {
+      const users = await adminService.getUsers();
+      set({ users, isLoadingUsers: false, usersError: null });
+    } catch (err: unknown) {
+      set({ users: [], isLoadingUsers: false, usersError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchStudents: async () => {
+    try {
+      const students = await adminService.getStudents();
+      set({ students });
+    } catch { }
+  },
+
+  fetchLecturers: async () => {
+    try {
+      const lecturers = await adminService.getLecturers();
+      set({ lecturers });
+    } catch { }
+  },
+
+  fetchColleges: async () => {
+    set({ isLoadingColleges: true, collegesError: null });
+    try {
+      const colleges = await adminService.getColleges();
+      set({ colleges, isLoadingColleges: false, collegesError: null });
+    } catch (err: unknown) {
+      set({ colleges: [], isLoadingColleges: false, collegesError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchDepartments: async () => {
+    set({ isLoadingDepartments: true, departmentsError: null });
+    try {
+      const departments = await adminService.getDepartments();
+      set({ departments, isLoadingDepartments: false, departmentsError: null });
+    } catch (err: unknown) {
+      set({ departments: [], isLoadingDepartments: false, departmentsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchPrograms: async () => {
+    set({ isLoadingPrograms: true });
+    try {
+      const programs = await adminService.getPrograms();
+      set({ programs, isLoadingPrograms: false });
+    } catch {
+      set({ isLoadingPrograms: false });
+    }
+  },
+
+  fetchAcademicYears: async () => {
+    set({ isLoadingAcademicYears: true });
+    try {
+      const academicYears = await adminService.getAcademicYears();
+      set({ academicYears, isLoadingAcademicYears: false });
+    } catch {
+      set({ isLoadingAcademicYears: false });
+    }
+  },
+
+  fetchSemesters: async () => {
+    set({ isLoadingSemesters: true });
+    try {
+      const semesters = await adminService.getSemesters();
+      set({ semesters, isLoadingSemesters: false });
+    } catch {
+      set({ isLoadingSemesters: false });
+    }
+  },
+
+  fetchCourses: async () => {
+    set({ isLoadingCourses: true });
+    try {
+      const courses = await adminService.getCourses();
+      set({ courses, isLoadingCourses: false });
+    } catch {
+      set({ isLoadingCourses: false });
+    }
+  },
+
+  fetchCourseOfferings: async () => {
+    set({ isLoadingCourseOfferings: true, courseOfferingsError: null });
+    try {
+      const courseOfferings = await adminService.getCourseOfferings();
+      set({ courseOfferings, isLoadingCourseOfferings: false, courseOfferingsError: null });
+    } catch (err: unknown) {
+      set({ courseOfferings: [], isLoadingCourseOfferings: false, courseOfferingsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchEnrollments: async () => {
+    set({ isLoadingEnrollments: true, enrollmentsError: null });
+    try {
+      const enrollments = await adminService.getEnrollments();
+      set({ enrollments, isLoadingEnrollments: false, enrollmentsError: null });
+    } catch (err: unknown) {
+      set({ enrollments: [], isLoadingEnrollments: false, enrollmentsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchExams: async () => {
+    set({ isLoadingExams: true });
+    try {
+      const exams = await adminService.getAllExams();
+      set({ exams, isLoadingExams: false });
+    } catch {
+      set({ isLoadingExams: false });
+    }
+  },
+
   // Actions - Users
   setUsers: (users) => set({ users }),
-  addUser: (userData) =>
-    set((state) => {
-      const dateStr = new Date().toISOString().split('T')[0] || '';
-      const newUser: AdminUser = {
-        ...userData,
-        id: `usr-${Date.now()}`,
-        lastLogin: 'Never',
-        createdAt: dateStr,
-      };
-      // Log event to audit logs as well
-      const newAudit: AuditLog = {
-        id: `log-${Date.now()}`,
-        timestamp: new Date().toLocaleString(),
-        actorName: 'Marcus Aurelius (Admin)',
-        actorEmail: 'admin.marcus@university.edu',
-        actorRole: 'admin',
-        actionEvent: 'user.created',
-        resourceType: 'User',
-        resourceName: `${newUser.firstName} ${newUser.lastName} (${newUser.userId})`,
-        ipAddress: '192.168.1.100',
-        details: `Created user account with role '${newUser.role}' in department '${newUser.department}'.`,
-      };
-      return {
-        users: [newUser, ...state.users],
-        auditLogs: [newAudit, ...state.auditLogs],
-      };
-    }),
+  addUser: async (payload) => {
+    const newUser = await adminService.createUser(payload);
+    return newUser;
+  },
 
-  updateUser: (id, data) =>
-    set((state) => ({
-      users: state.users.map((u) => (u.id === id ? { ...u, ...data } : u)),
-    })),
+  updateUser: async (id, data) => {
+    const updated = await adminService.updateUser(id, data);
+    return updated;
+  },
 
-  deleteUser: (id) =>
-    set((state) => {
-      const user = state.users.find((u) => u.id === id);
-      const updatedUsers = state.users.filter((u) => u.id !== id);
-      if (!user) return { users: updatedUsers };
-
-      const newAudit: AuditLog = {
-        id: `log-${Date.now()}`,
-        timestamp: new Date().toLocaleString(),
-        actorName: 'Marcus Aurelius (Admin)',
-        actorEmail: 'admin.marcus@university.edu',
-        actorRole: 'admin',
-        actionEvent: 'user.deleted',
-        resourceType: 'User',
-        resourceName: `${user.firstName} ${user.lastName} (${user.userId})`,
-        ipAddress: '192.168.1.100',
-        details: `Deleted user record permanently from institution database.`,
-      };
-      return {
-        users: updatedUsers,
-        auditLogs: [newAudit, ...state.auditLogs],
-      };
-    }),
+  deleteUser: async (id) => {
+    await adminService.deleteUser(id);
+  },
 
   setUserSearchQuery: (userSearchQuery) => set({ userSearchQuery }),
   setUserRoleFilter: (userRoleFilter) => set({ userRoleFilter }),
   setUserDeptFilter: (userDeptFilter) => set({ userDeptFilter }),
   setUserStatusFilter: (userStatusFilter) => set({ userStatusFilter }),
+
+  // Actions - Colleges
+  setCollegeSearchQuery: (collegeSearchQuery) => set({ collegeSearchQuery }),
+  addCollege: async (data) => {
+    const college = await adminService.createCollege(data);
+    set((state) => ({ colleges: [college, ...state.colleges] }));
+    return college;
+  },
+  updateCollege: async (id, data) => {
+    const updated = await adminService.updateCollege(id, data);
+    set((state) => ({ colleges: state.colleges.map((c) => (c.id === id ? updated : c)) }));
+    return updated;
+  },
+  deleteCollege: async (id) => {
+    await adminService.deleteCollege(id);
+    set((state) => ({ colleges: state.colleges.filter((c) => c.id !== id) }));
+  },
+
+  // Actions - Departments
+  setDepartmentSearchQuery: (departmentSearchQuery) => set({ departmentSearchQuery }),
+  addDepartment: async (data) => {
+    const newDept = await adminService.createDepartment(data);
+    set((state) => ({ departments: [newDept, ...state.departments] }));
+    return newDept;
+  },
+  updateDepartment: async (id, data) => {
+    const updated = await adminService.updateDepartment(id, data);
+    set((state) => ({ departments: state.departments.map((d) => (d.id === id ? updated : d)) }));
+    return updated;
+  },
+  deleteDepartment: async (id) => {
+    await adminService.deleteDepartment(id);
+    set((state) => ({ departments: state.departments.filter((d) => d.id !== id) }));
+  },
+
+  // Actions - Programs
+  setProgramSearchQuery: (programSearchQuery) => set({ programSearchQuery }),
+  addProgram: async (data) => {
+    const program = await adminService.createProgram(data);
+    set((state) => ({ programs: [program, ...state.programs] }));
+    return program;
+  },
+  updateProgram: async (id, data) => {
+    const updated = await adminService.updateProgram(id, data);
+    set((state) => ({ programs: state.programs.map((p) => (p.id === id ? updated : p)) }));
+    return updated;
+  },
+  deleteProgram: async (id) => {
+    await adminService.deleteProgram(id);
+    set((state) => ({ programs: state.programs.filter((p) => p.id !== id) }));
+  },
+
+  // Actions - Academic Years
+  setAcademicYearSearchQuery: (academicYearSearchQuery) => set({ academicYearSearchQuery }),
+  addAcademicYear: async (data) => {
+    const year = await adminService.createAcademicYear(data);
+    set((state) => ({ academicYears: [year, ...state.academicYears] }));
+    return year;
+  },
+  updateAcademicYear: async (id, data) => {
+    const updated = await adminService.updateAcademicYear(id, data);
+    set((state) => ({ academicYears: state.academicYears.map((y) => (y.id === id ? updated : y)) }));
+    return updated;
+  },
+  deleteAcademicYear: async (id) => {
+    await adminService.deleteAcademicYear(id);
+    set((state) => ({ academicYears: state.academicYears.filter((y) => y.id !== id) }));
+  },
+
+  // Actions - Semesters
+  setSemesterSearchQuery: (semesterSearchQuery) => set({ semesterSearchQuery }),
+  addSemester: async (data) => {
+    const sem = await adminService.createSemester(data);
+    set((state) => ({ semesters: [sem, ...state.semesters] }));
+    return sem;
+  },
+  updateSemester: async (id, data) => {
+    const updated = await adminService.updateSemester(id, data);
+    set((state) => ({ semesters: state.semesters.map((s) => (s.id === id ? updated : s)) }));
+    return updated;
+  },
+  deleteSemester: async (id) => {
+    await adminService.deleteSemester(id);
+    set((state) => ({ semesters: state.semesters.filter((s) => s.id !== id) }));
+  },
+
+  // Actions - Courses
+  setCourseSearchQuery: (courseSearchQuery) => set({ courseSearchQuery }),
+  setCourseProgramFilter: (courseProgramFilter) => set({ courseProgramFilter }),
+  setCourseStandingFilter: (courseStandingFilter) => set({ courseStandingFilter }),
+  setCourseDeptFilter: (courseDeptFilter) => set({ courseDeptFilter }),
+  addCourse: async (data) => {
+    const course = await adminService.createCourse(data);
+    set((state) => ({ courses: [course, ...state.courses] }));
+    return course;
+  },
+  updateCourse: async (id, data) => {
+    const updated = await adminService.updateCourse(id, data);
+    set((state) => ({ courses: state.courses.map((c) => (c.id === id ? updated : c)) }));
+    return updated;
+  },
+  deleteCourse: async (id) => {
+    await adminService.deleteCourse(id);
+    set((state) => ({ courses: state.courses.filter((c) => c.id !== id) }));
+  },
+  toggleCourseArchive: (_id) => {},
+
+  // Actions - Course Offerings & Enrollments
+  setEnrollmentSearchQuery: (enrollmentSearchQuery) => set({ enrollmentSearchQuery }),
+  setEnrollmentStatusFilter: (enrollmentStatusFilter) => set({ enrollmentStatusFilter }),
+  setEnrollmentSemesterFilter: (enrollmentSemesterFilter) => set({ enrollmentSemesterFilter }),
+  setEnrollmentCourseFilter: (enrollmentCourseFilter) => set({ enrollmentCourseFilter }),
+
+  addEnrollment: async (payload) => {
+    const newEnrollment = await adminService.createEnrollment(payload);
+    await get().fetchEnrollments();
+    return newEnrollment;
+  },
+
+  updateEnrollment: async (id, data) => {
+    const updated = await adminService.updateEnrollment(id, data);
+    await get().fetchEnrollments();
+    return updated;
+  },
+
+  deleteEnrollment: async (id) => {
+    await adminService.deleteEnrollment(id);
+    await get().fetchEnrollments();
+  },
+
+  batchImportEnrollments: async (file) => {
+    const res = await adminService.batchImportEnrollments(file);
+    await get().fetchEnrollments();
+    return res;
+  },
+
+  // Actions - Exams
+  setExamSearchQuery: (examSearchQuery) => set({ examSearchQuery }),
+  setExamStatusFilter: (examStatusFilter) => set({ examStatusFilter }),
+  addExam: async (data) => {
+    const exam = await adminService.createExam(data);
+    set((state) => ({ exams: [exam, ...state.exams] }));
+    return exam;
+  },
+  scheduleExam: async (id, data) => {
+    await adminService.scheduleExam(id, data);
+    get().fetchExams();
+  },
+  archiveExam: (id) =>
+    set((state) => ({
+      exams: state.exams.map((e) => (e.id === id ? { ...e, status: 'archived' } : e)),
+    })),
+  deleteExam: async (id) => {
+    await adminService.deleteExam(id);
+    set((state) => ({ exams: state.exams.filter((e) => e.id !== id) }));
+  },
 
   // Actions - Students & Lecturers
   setStudentSearchQuery: (studentSearchQuery) => set({ studentSearchQuery }),
@@ -217,87 +629,16 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
   setLecturerSearchQuery: (lecturerSearchQuery) => set({ lecturerSearchQuery }),
   setLecturerDeptFilter: (lecturerDeptFilter) => set({ lecturerDeptFilter }),
 
-  // Actions - Departments
-  setDepartmentSearchQuery: (departmentSearchQuery) => set({ departmentSearchQuery }),
-  addDepartment: (deptData) =>
-    set((state) => {
-      const dateStr = new Date().toISOString().split('T')[0] || '';
-      const newDept: Department = {
-        ...deptData,
-        id: `dept-${Date.now()}`,
-        lecturerCount: 0,
-        studentCount: 0,
-        courseCount: 0,
-        createdAt: dateStr,
-      };
-      return { departments: [newDept, ...state.departments] };
-    }),
-
-  updateDepartment: (id, data) =>
-    set((state) => ({
-      departments: state.departments.map((d) => (d.id === id ? { ...d, ...data } : d)),
-    })),
-
-  deleteDepartment: (id) =>
-    set((state) => ({
-      departments: state.departments.filter((d) => d.id !== id),
-    })),
-
-  // Actions - Courses
-  setCourseSearchQuery: (courseSearchQuery) => set({ courseSearchQuery }),
-  setCourseDeptFilter: (courseDeptFilter) => set({ courseDeptFilter }),
-  addCourse: (courseData) =>
-    set((state) => {
-      const newCourse: Course = {
-        ...courseData,
-        id: `crs-${Date.now()}`,
-        studentCount: 0,
-      };
-      return { courses: [newCourse, ...state.courses] };
-    }),
-
-  updateCourse: (id, data) =>
-    set((state) => ({
-      courses: state.courses.map((c) => (c.id === id ? { ...c, ...data } : c)),
-    })),
-
-  toggleCourseArchive: (id) =>
-    set((state) => ({
-      courses: state.courses.map((c) =>
-        c.id === id ? { ...c, status: c.status === 'active' ? 'archived' : 'active' } : c
-      ),
-    })),
-
-  // Actions - Exams
-  setExamSearchQuery: (examSearchQuery) => set({ examSearchQuery }),
-  setExamStatusFilter: (examStatusFilter) => set({ examStatusFilter }),
-
-  archiveExam: (id) =>
-    set((state) => ({
-      exams: state.exams.map((e) => (e.id === id ? { ...e, status: 'archived' } : e)),
-    })),
-
-  deleteExam: (id) =>
-    set((state) => ({
-      exams: state.exams.filter((e) => e.id !== id),
-    })),
-
-  // Actions - AI Jobs
+  // Actions - AI Jobs, Audit, Settings & Notifications
   retryAIJob: (id) =>
     set((state) => ({
       aiJobs: state.aiJobs.map((j) =>
         j.id === id
-          ? {
-              ...j,
-              status: 'processing',
-              errorReason: undefined,
-              startedAt: new Date().toLocaleString(),
-            }
+          ? { ...j, status: 'processing', errorReason: undefined, startedAt: new Date().toLocaleString() }
           : j
       ),
     })),
 
-  // Actions - Settings & Notifications & Audit
   updateSettings: (newSettings) =>
     set((state) => ({
       settings: { ...state.settings, ...newSettings },
@@ -305,12 +646,10 @@ export const useAdminStore = create<AdminStoreState>((set) => ({
 
   setAuditSearchQuery: (auditSearchQuery) => set({ auditSearchQuery }),
   setAuditCategoryFilter: (auditCategoryFilter) => set({ auditCategoryFilter }),
-
   markNotificationRead: (id) =>
     set((state) => ({
       notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
     })),
-
   markAllNotificationsRead: () =>
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),

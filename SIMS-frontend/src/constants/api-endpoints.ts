@@ -5,32 +5,158 @@
 export const API_ENDPOINTS = {
   // ── Auth ──────────────────────────────────────────────────────────────────
   AUTH: {
-    LOGIN: '/auth/login',
-    LOGOUT: '/auth/logout',
-    REGISTER: '/auth/register',
-    REFRESH: '/auth/refresh',
-    FORGOT_PASSWORD: '/auth/forgot-password',
-    RESET_PASSWORD: '/auth/reset-password',
-    ME: '/auth/me',
+    LOGIN: '/api/v1/auth/login',
+    LOGOUT: '/api/v1/auth/logout',
+    REGISTER: '/api/v1/auth/register',
+    REFRESH: '/api/v1/auth/refresh',
+    FORGOT_PASSWORD: '/api/v1/auth/forgot-password',
+    RESET_PASSWORD: '/api/v1/auth/reset-password',
+    ME: '/api/v1/auth/me',
+    LECTURER_PROTECTED: '/api/v1/auth/protected/lecturer-only',
   },
 
-  // ── Users ─────────────────────────────────────────────────────────────────
-  USERS: {
-    ROOT: '/users',
-    BY_ID: (id: string) => `/users/${id}`,
-    PROFILE: '/users/profile',
+  // ── Academics ─────────────────────────────────────────────────────────────
+  ACADEMICS: {
+    UNIVERSITIES: '/api/v1/universities',
+    UNIVERSITY_BY_ID: (id: string) => `/api/v1/universities/${id}`,
+    COLLEGES: '/api/v1/colleges',
+    COLLEGE_BY_ID: (id: string) => `/api/v1/colleges/${id}`,
+    DEPARTMENTS: '/api/v1/departments',
+    DEPARTMENT_BY_ID: (id: string) => `/api/v1/departments/${id}`,
+    PROGRAMS: '/api/v1/programs',
+    PROGRAM_BY_ID: (id: string) => `/api/v1/programs/${id}`,
+    ACADEMIC_YEARS: '/api/v1/academic-years',
+    ACADEMIC_YEAR_BY_ID: (id: string) => `/api/v1/academic-years/${id}`,
+    SEMESTERS: '/api/v1/semesters',
+    SEMESTER_BY_ID: (id: string) => `/api/v1/semesters/${id}`,
+    COURSES: '/api/v1/courses',
+    COURSE_BY_ID: (id: string) => `/api/v1/courses/${id}`,
+    COURSE_OFFERINGS: '/api/v1/course-offerings',
+    COURSE_OFFERING_BY_ID: (id: string) => `/api/v1/course-offerings/${id}`,
+    ENROLLMENTS: '/api/v1/enrollments',
+    ENROLLMENT_BY_ID: (id: string) => `/api/v1/enrollments/${id}`,
+    BATCH_ENROLLMENT_IMPORT: '/api/v1/enrollments/batch-import',
   },
 
-  // ── Exams ─────────────────────────────────────────────────────────────────
+  // ── Questions ─────────────────────────────────────────────────────────────
+  QUESTIONS: {
+    ROOT: '/api/v1/questions',
+    BY_ID: (id: string) => `/api/v1/questions/${id}`,
+    OPTIONS: '/api/v1/questions/options',
+    OPTION_BY_ID: (id: string) => `/api/v1/questions/options/${id}`,
+    RUBRIC_CRITERIA: '/api/v1/questions/rubric-criteria',
+    RUBRIC_CRITERION_BY_ID: (id: string) => `/api/v1/questions/rubric-criteria/${id}`,
+    TAGS: '/api/v1/tags',
+    TAG_BY_ID: (id: string) => `/api/v1/tags/${id}`,
+  },
+
+  // ── Tags ──────────────────────────────────────────────────────────────────
+  TAGS: {
+    ROOT: '/api/v1/tags',
+    BY_ID: (id: string) => `/api/v1/tags/${id}`,
+  },
+
+  // ── Examinations ──────────────────────────────────────────────────────────
   EXAMS: {
-    ROOT: '/exams',
-    BY_ID: (id: string) => `/exams/${id}`,
-    SUBMIT: (id: string) => `/exams/${id}/submit`,
-    RESULTS: (id: string) => `/exams/${id}/results`,
-    QUESTIONS: (id: string) => `/exams/${id}/questions`,
+    ROOT: '/api/v1/exams',
+    ACTIVE: '/api/v1/exams/active',
+    BY_ID: (id: string) => `/api/v1/exams/${id}`,
+    SCHEDULE: (id: string) => `/api/v1/exams/${id}/schedule`,
+    PUBLISH: (id: string) => `/api/v1/exams/${id}/publish`,
+    START: (id: string) => `/api/v1/exams/${id}/start`,
+    SUBMIT: (id: string) => `/api/v1/exams/${id}/submit`,
   },
 
-  // ── Grades ────────────────────────────────────────────────────────────────
+  // ── Exam Attempts (Student & Lecturer) ────────────────────────────────────
+  ATTEMPTS: {
+    ANSWER: (attemptId: string, questionId: string) =>
+      `/api/v1/attempts/${attemptId}/answers/${questionId}`,
+    AUTO_SAVE_ANSWER: (attemptId: string, questionId: string) =>
+      `/api/v1/attempts/${attemptId}/answers/${questionId}`,
+  },
+
+  // ── Academic Hierarchy ───────────────────────────────────────────────────
+  UNIVERSITIES: {
+    ROOT: '/api/v1/universities',
+    BY_ID: (id: string) => `/api/v1/universities/${id}`,
+  },
+
+  COLLEGES: {
+    ROOT: '/api/v1/colleges',
+    BY_ID: (id: string) => `/api/v1/colleges/${id}`,
+  },
+
+  DEPARTMENTS: {
+    ROOT: '/api/v1/departments',
+    BY_ID: (id: string) => `/api/v1/departments/${id}`,
+  },
+
+  PROGRAMS: {
+    ROOT: '/api/v1/programs',
+    BY_ID: (id: string) => `/api/v1/programs/${id}`,
+  },
+
+  ACADEMIC_YEARS: {
+    ROOT: '/api/v1/academic-years',
+    BY_ID: (id: string) => `/api/v1/academic-years/${id}`,
+  },
+
+  SEMESTERS: {
+    ROOT: '/api/v1/semesters',
+    BY_ID: (id: string) => `/api/v1/semesters/${id}`,
+  },
+
+  // ── Courses & Offerings ───────────────────────────────────────────────────
+  COURSES: {
+    ROOT: '/api/v1/courses',
+    BY_ID: (id: string) => `/api/v1/courses/${id}`,
+    PREREQUISITES: '/api/v1/course-prerequisites',
+    PREREQUISITE_BY_ID: (id: string) => `/api/v1/course-prerequisites/${id}`,
+  },
+
+  COURSE_OFFERINGS: {
+    ROOT: '/api/v1/course-offerings',
+    BY_ID: (id: string) => `/api/v1/course-offerings/${id}`,
+  },
+
+  // ── Enrollments ───────────────────────────────────────────────────────────
+  ENROLLMENTS: {
+    ROOT: '/api/v1/enrollments',
+    BY_ID: (id: string) => `/api/v1/enrollments/${id}`,
+    BATCH_IMPORT: '/api/v1/enrollments/batch-import',
+  },
+
+  // ── Credit Policies & Overrides (Admin) ───────────────────────────────────
+  CREDIT_POLICIES: {
+    ROOT: '/api/v1/credit-hour-policies',
+    BY_ID: (id: string) => `/api/v1/credit-hour-policies/${id}`,
+  },
+
+  ENROLLMENT_OVERRIDES: {
+    ROOT: '/api/v1/enrollment-overrides',
+    BY_ID: (id: string) => `/api/v1/enrollment-overrides/${id}`,
+  },
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  NOTIFICATIONS: {
+    ROOT: '/api/v1/notifications/',
+    BY_ID: (id: string) => `/api/v1/notifications/${id}/`,
+  },
+
+  // ── Results (SIMS API 4) ───────────────────────────────────────────────────
+  RESULTS: {
+    ME: '/api/v1/results/me',
+    EXAM: (id: string) => `/api/v1/results/exam/${id}`,
+  },
+
+  // ── Users / Grades / Analytics ──────────────────────────────────────────
+  // Note: The SIMS REST API specification does not currently provide a GET /api/v1/users listing endpoint.
+  USERS: {
+    ROOT: '/api/v1/users',
+    BY_ID: (id: string) => `/api/v1/users/${id}`,
+    PROFILE: '/api/v1/users/profile',
+  },
+
   GRADES: {
     ROOT: '/grades',
     BY_ID: (id: string) => `/grades/${id}`,
@@ -38,16 +164,11 @@ export const API_ENDPOINTS = {
     BY_STUDENT: (studentId: string) => `/grades/students/${studentId}`,
   },
 
-  // ── Analytics ─────────────────────────────────────────────────────────────
   ANALYTICS: {
     OVERVIEW: '/analytics/overview',
     EXAM: (id: string) => `/analytics/exams/${id}`,
+    EXAM_ANALYTICS: (id: string) => `/api/v1/analytics/exam/${id}`,
+    ADVISING: '/api/v1/analytics/advising',
     STUDENT: (id: string) => `/analytics/students/${id}`,
-  },
-
-  // ── Departments ───────────────────────────────────────────────────────────
-  DEPARTMENTS: {
-    ROOT: '/departments',
-    BY_ID: (id: string) => `/departments/${id}`,
   },
 } as const;

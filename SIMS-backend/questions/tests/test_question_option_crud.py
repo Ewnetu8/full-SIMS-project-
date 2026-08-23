@@ -21,13 +21,13 @@ pytestmark = pytest.mark.django_db
 
 
 def create_lecturer():
-    user = User.objects.create_user(email="lecturer@example.com", password="strongpass123", role=RoleChoices.LECTURER)
+    user = User.objects.create_user(email="lecturer@aastu.edu.et", password="strongpass123", role=RoleChoices.LECTURER)
     lecturer = Lecturer.objects.create(user=user, faculty_identifier="L001")
     return user, lecturer
 
 
 def create_admin():
-    return User.objects.create_user(email="admin@example.com", password="strongpass123", role=RoleChoices.ADMIN)
+    return User.objects.create_user(email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.ADMIN)
 
 
 def auth_client(client, user):
@@ -165,7 +165,7 @@ def test_option_delete(client):
 
 
 def test_non_admin_cannot_create(client):
-    student = User.objects.create_user(email="student@example.com", password="strongpass123", role=RoleChoices.STUDENT)
+    student = User.objects.create_user(email="student@aastu.edu.et", password="strongpass123", role=RoleChoices.STUDENT)
     token = auth_client(client, student)
 
     response = client.post(

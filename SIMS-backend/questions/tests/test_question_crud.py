@@ -26,7 +26,7 @@ _counter = 0
 def create_lecturer():
     global _counter
     _counter += 1
-    email = f"lecturer{_counter}@example.com"
+    email = f"lecturer{_counter}@aastu.edu.et"
     identifier = f"L{_counter:03d}"
     user = User.objects.create_user(email=email, password="strongpass123", role=RoleChoices.LECTURER)
     lecturer = Lecturer.objects.create(user=user, faculty_identifier=identifier)
@@ -36,7 +36,7 @@ def create_lecturer():
 def create_admin():
     global _counter
     _counter += 1
-    email = f"admin{_counter}@example.com"
+    email = f"admin{_counter}@aastu.edu.et"
     return User.objects.create_user(email=email, password="strongpass123", role=RoleChoices.ADMIN)
 
 
@@ -287,7 +287,7 @@ def test_question_delete(client):
 
 
 def test_non_admin_cannot_create(client):
-    student = User.objects.create_user(email="s@example.com", password="strongpass123", role=RoleChoices.STUDENT)
+    student = User.objects.create_user(email="s@aastu.edu.et", password="strongpass123", role=RoleChoices.STUDENT)
     token = auth_client(client, student)
 
     response = client.post(

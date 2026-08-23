@@ -7,6 +7,7 @@ import * as React from 'react';
 import { AppLayout } from '@/components/layout';
 import { Button, Card, CardContent } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import type { SubmissionReceipt } from '../types';
 
 export interface SubmissionSuccessProps {

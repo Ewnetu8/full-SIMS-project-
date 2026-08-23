@@ -1,24 +1,11 @@
-import { Geist, Geist_Mono } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 
 import { APP_NAME, APP_DESCRIPTION } from '@/constants';
 import { AppProviders } from '@/providers';
 
 import type { Metadata } from 'next';
 import './globals.css';
-
-// ─── Fonts ────────────────────────────────────────────────────────────────────
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-  display: 'swap',
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-  display: 'swap',
-});
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 
@@ -53,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
       data-scroll-behavior="smooth"
     >

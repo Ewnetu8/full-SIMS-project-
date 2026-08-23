@@ -18,8 +18,19 @@ def set_csrf_cookie(client):
     return {'HTTP_X_CSRFTOKEN': 'test-csrf-token'}
 
 
-def create_user(email='student@example.com', password='strongpass123', role=RoleChoices.STUDENT):
+def create_user(email='student@aastu.edu.et', password='strongpass123', role=RoleChoices.STUDENT):
     return User.objects.create_user(email=email, password=password, role=role)
+
+
+def register_user(client, email, password='StrongPass123!', role=RoleChoices.STUDENT, **extra):
+    data = {'email': email, 'password': password, 'first_name': 'Test', 'last_name': 'User', 'role': role}
+    data.update(extra)
+    if role == RoleChoices.STUDENT:
+        data.setdefault('student_identifier', f'STU-{email.split("@")[0]}')
+    elif role == RoleChoices.LECTURER:
+        data.setdefault('faculty_identifier', f'FAC-{email.split("@")[0]}')
+    csrf_headers = set_csrf_cookie(client)
+    return client.post(reverse('auth_register'), data, content_type='application/json', **csrf_headers)
 
 
 def test_login_success_and_generic_failure_responses(client):
@@ -32,7 +43,7 @@ def test_login_success_and_generic_failure_responses(client):
     assert 'access' in success.json()
     assert 'refresh_token' in success.cookies
 
-    failure_email = client.post(login_url, {'email': 'wrong@example.com', 'password': 'strongpass123'}, content_type='application/json', **csrf_headers)
+    failure_email = client.post(login_url, {'email': 'wrong@aastu.edu.et', 'password': 'strongpass123'}, content_type='application/json', **csrf_headers)
     failure_password = client.post(login_url, {'email': user.email, 'password': 'wrongpass'}, content_type='application/json', **csrf_headers)
 
     assert failure_email.status_code == status.HTTP_401_UNAUTHORIZED
@@ -76,3 +87,45 @@ def test_logout_blacklists_refresh_token_and_prevents_refresh(client):
 
     refresh_response = client.post(reverse('auth_refresh'), {}, content_type='application/json', **csrf_headers)
     assert refresh_response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# ── Email domain restriction tests ─────────────────────────────────────────
+
+class TestEmailDomainRestriction:
+
+    def test_student_registration_with_valid_aastu_email(self, client):
+        response = register_user(client, 'student@aastu.edu.et')
+        assert response.status_code == status.HTTP_201_CREATED
+        assert User.objects.filter(email='student@aastu.edu.et').exists()
+
+    def test_student_registration_with_subdomain_aastu_email(self, client):
+        response = register_user(client, 'student@cit.aastu.edu.et')
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_student_registration_with_invalid_domain_rejected(self, client):
+        response = register_user(client, 'student@gmail.com')
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'approved educational domains' in str(response.json())
+
+    def test_lecturer_registration_with_valid_aastu_email(self, client):
+        response = register_user(
+            client, 'lecturer@aastu.edu.et', role=RoleChoices.LECTURER
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_lecturer_registration_with_invalid_domain_rejected(self, client):
+        response = register_user(
+            client, 'lecturer@yahoo.com', role=RoleChoices.LECTURER
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_admin_registration_with_invalid_domain_rejected(self, client):
+        response = register_user(
+            client, 'admin@random-domain.com', role=RoleChoices.ADMIN
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_email_is_case_insensitive(self, client):
+        response = register_user(client, 'Student@AASTU.EDU.ET')
+        assert response.status_code == status.HTTP_201_CREATED
+        assert User.objects.filter(email='student@aastu.edu.et').exists()

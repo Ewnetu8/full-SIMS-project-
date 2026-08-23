@@ -18,13 +18,13 @@ const iconButtonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+          'bg-[#102A7A] text-white shadow-sm hover:bg-[#B08A00] hover:text-[#102A7A] dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+          'bg-white border border-[#102A7A] text-[#102A7A] hover:bg-[#B08A00] hover:text-[#102A7A] dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/80',
         outline:
-          'border border-border bg-transparent text-foreground hover:bg-accent',
+          'border border-[#102A7A] bg-white text-[#102A7A] hover:bg-[#B08A00] hover:text-[#102A7A] dark:border-border dark:bg-transparent dark:text-foreground dark:hover:bg-accent',
         ghost:
-          'text-foreground/70 hover:text-foreground hover:bg-accent',
+          'text-[#102A7A] hover:text-[#B08A00] hover:bg-amber-500/10 dark:text-foreground/70 dark:hover:text-foreground dark:hover:bg-accent',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',
       },

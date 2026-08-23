@@ -1,4 +1,4 @@
-export type ExamStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+export type ExamStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
 
 export type QuestionType =
   | 'multiple_choice'
@@ -83,6 +83,13 @@ export interface LecturerAnalytics {
   questionDifficulty: { questionId: string; prompt: string; averageScorePct: number; difficulty: 'Easy' | 'Medium' | 'Hard' }[];
 }
 
+export interface LecturerStats {
+  totalStudents: number;
+  totalCourses: number;
+  activeExams: number;
+  pendingGrading: number;
+}
+
 export interface LecturerNotification {
   id: string;
   title: string;
@@ -111,3 +118,13 @@ export interface ExamWizardData {
   showResultsAfterSubmission: boolean;
   questions: Question[];
 }
+
+export type {
+  ExamResults,
+  ExamResultRow,
+  ExamAnalytics,
+  ExamAnalyticsResponse,
+  ScoreBand,
+  ScoreSummary,
+  QuestionAnalytics,
+} from '@/types/api';

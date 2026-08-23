@@ -26,7 +26,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       'flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none',
-      'focus:bg-accent data-[state=open]:bg-accent gap-2',
+      'focus:bg-[#B08A00] focus:text-[#102A7A] data-[state=open]:bg-[#102A7A] data-[state=open]:text-white dark:focus:bg-accent dark:focus:text-accent-foreground dark:data-[state=open]:bg-accent gap-2',
       inset && 'pl-8',
       className,
     )}
@@ -92,7 +92,7 @@ const DropdownMenuItem = React.forwardRef<
     className={cn(
       'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm',
       'outline-none transition-colors',
-      'focus:bg-accent focus:text-accent-foreground',
+      'focus:bg-[#B08A00] focus:text-[#102A7A] dark:focus:bg-accent dark:focus:text-accent-foreground',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       destructive && 'text-destructive focus:bg-destructive/10 focus:text-destructive',
       inset && 'pl-8',
@@ -114,7 +114,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     className={cn(
       'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm',
       'outline-none transition-colors',
-      'focus:bg-accent focus:text-accent-foreground',
+      'focus:bg-[#B08A00] focus:text-[#102A7A] data-[state=checked]:bg-[#102A7A] data-[state=checked]:text-white dark:focus:bg-accent dark:focus:text-accent-foreground',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className,
     )}
@@ -142,7 +142,7 @@ const DropdownMenuRadioItem = React.forwardRef<
     className={cn(
       'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm',
       'outline-none transition-colors',
-      'focus:bg-accent focus:text-accent-foreground',
+      'focus:bg-[#B08A00] focus:text-[#102A7A] data-[state=checked]:bg-[#102A7A] data-[state=checked]:text-white dark:focus:bg-accent dark:focus:text-accent-foreground',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className,
     )}

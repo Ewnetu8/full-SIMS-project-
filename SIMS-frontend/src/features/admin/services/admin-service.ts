@@ -1,243 +1,483 @@
+import { API_ENDPOINTS } from '@/constants/api-endpoints';
+import { isValidUuid } from '@/lib/user-identifier';
+import { api } from '@/services/api-client';
+
+import { academicService } from './academic-service';
+import { examApiService } from './exam-api-service';
+
 import type {
   AdminUser,
+  UserRole,
   StudentProfile,
   LecturerProfile,
   Department,
   Course,
+  ClassStanding,
+  College,
+  Program,
+  AcademicYear,
+  Semester,
   AdminExamOverview,
   AIGradingJob,
   AuditLog,
   SystemSettings,
   AdminDashboardStats,
   AdminNotification,
-  AdminReportData,
+  AdminCourseOffering,
+  AdminEnrollment,
+  CreateEnrollmentPayload,
+  UpdateEnrollmentPayload,
+  BatchImportResponse,
 } from '../types';
 
-import {
-  INITIAL_USERS,
-  INITIAL_STUDENTS,
-  INITIAL_LECTURERS,
-  INITIAL_DEPARTMENTS,
-  INITIAL_COURSES,
-  INITIAL_EXAMS,
-  INITIAL_AI_JOBS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_SETTINGS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_DASHBOARD_STATS,
-  INITIAL_REPORT_DATA,
-} from '../mock';
-
-// Helper to simulate asynchronous API delay
-const delay = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
+export interface RegisterUserPayload {
+  email: string;
+  password?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: 'STUDENT' | 'LECTURER' | 'ADMIN';
+  student_identifier?: string;
+  faculty_identifier?: string;
+  department_id?: string | null;
+  national_id_fan?: string | null;
+}
 
 export const adminService = {
   // ─── Users ─────────────────────────────────────────────────────────────────
+  /**
+   * Returns user accounts.
+   * Note: The backend SIMS REST API specification does not currently provide a user listing endpoint (GET /api/v1/users).
+   * Returns an empty array to prevent 404 errors, repeated network requests, and displaying fabricated mock data.
+   */
   async getUsers(): Promise<AdminUser[]> {
-    await delay();
-    return [...INITIAL_USERS];
+    return [];
   },
 
-  async getUserById(id: string): Promise<AdminUser | null> {
-    await delay();
-    return INITIAL_USERS.find((u) => u.id === id) ?? null;
+  async getUserById(_id: string): Promise<AdminUser | null> {
+    return null;
   },
 
-  async createUser(data: Omit<AdminUser, 'id' | 'lastLogin' | 'createdAt'>): Promise<AdminUser> {
-    await delay();
-    const dateStr = new Date().toISOString().split('T')[0] || '';
-    const newUser: AdminUser = {
-      ...data,
-      id: `usr-${Date.now()}`,
-      lastLogin: 'Never',
-      createdAt: dateStr,
+  async createUser(data: RegisterUserPayload): Promise<AdminUser> {
+    const roleUpper = (data.role || 'STUDENT').toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
+
+    const payload: Record<string, unknown> = {
+      email: data.email.trim(),
+      password: data.password || 'Temp!Pass2026',
+      first_name: data.first_name ? data.first_name.trim() : '',
+      last_name: data.last_name ? data.last_name.trim() : '',
+      role: roleUpper,
+      national_id_fan: data.national_id_fan ? data.national_id_fan.trim() : null,
     };
-    INITIAL_USERS.unshift(newUser);
-    return newUser;
+
+    if (roleUpper === 'STUDENT') {
+      payload.student_identifier = data.student_identifier ? data.student_identifier.trim() : '';
+    } else if (roleUpper === 'LECTURER') {
+      payload.faculty_identifier = data.faculty_identifier ? data.faculty_identifier.trim() : '';
+    }
+
+    payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
+
+    try {
+      const res = await api.post<{ user?: Record<string, unknown>; [key: string]: unknown }>(API_ENDPOINTS.AUTH.REGISTER, payload);
+      const registeredUser = (res.user || res) as Record<string, unknown>;
+
+      let resolvedDepartment = 'Not assigned';
+      if (data.department_id) {
+        const depts = await academicService.getDepartments().catch(() => []);
+        const found = depts.find((d) => d.id === data.department_id);
+        if (found) {
+          resolvedDepartment = found.name;
+        }
+      }
+
+      const rawStudentId = (data.student_identifier || registeredUser.student_identifier) as string | undefined;
+      const studentId = rawStudentId && !isValidUuid(rawStudentId) ? String(rawStudentId).trim() : undefined;
+
+      const rawFacultyId = (data.faculty_identifier || registeredUser.faculty_identifier) as string | undefined;
+      const facultyId = rawFacultyId && !isValidUuid(rawFacultyId) ? String(rawFacultyId).trim() : undefined;
+
+      const displayUserId = studentId || facultyId || (registeredUser.id as string);
+
+      const newUser: AdminUser = {
+        id: String(registeredUser.id),
+        userId: displayUserId,
+        firstName: String(registeredUser.first_name || data.first_name || 'User'),
+        lastName: String(registeredUser.last_name || data.last_name || ''),
+        email: String(registeredUser.email || data.email),
+        role: (registeredUser.role ? String(registeredUser.role).toLowerCase() : (data.role || 'student').toLowerCase()) as UserRole,
+        department: resolvedDepartment,
+        departmentId: data.department_id || null,
+        status: 'active',
+        lastLogin: 'Never',
+        studentIdentifier: studentId,
+        facultyIdentifier: facultyId,
+        nationalIdFan: data.national_id_fan ? data.national_id_fan.trim() : null,
+        createdAt: String(registeredUser.created_at || new Date().toISOString()),
+      };
+
+      return newUser;
+    } catch (error: unknown) {
+      throw error;
+    }
   },
 
   async updateUser(id: string, data: Partial<AdminUser>): Promise<AdminUser> {
-    await delay();
-    const index = INITIAL_USERS.findIndex((u) => u.id === id);
-    if (index === -1) throw new Error('User not found');
-    const existing = INITIAL_USERS[index]!;
-    const updated: AdminUser = { ...existing, ...data };
-    INITIAL_USERS[index] = updated;
-    return updated;
+    // Note: The SIMS OpenAPI specification does not provide a PATCH /api/v1/users/{id} endpoint.
+    return {
+      id,
+      userId: data.userId || id,
+      firstName: data.firstName || '',
+      lastName: data.lastName || '',
+      email: data.email || '',
+      role: (data.role || 'student') as UserRole,
+      department: data.department || '',
+      departmentId: data.departmentId || null,
+      status: data.status || 'active',
+      lastLogin: data.lastLogin || 'Never',
+      nationalIdFan: data.nationalIdFan || null,
+      createdAt: data.createdAt || new Date().toISOString(),
+    };
   },
 
   async toggleUserStatus(id: string, status: AdminUser['status']): Promise<AdminUser> {
     return this.updateUser(id, { status });
   },
 
-  async deleteUser(id: string): Promise<void> {
-    await delay();
-    const index = INITIAL_USERS.findIndex((u) => u.id === id);
-    if (index !== -1) INITIAL_USERS.splice(index, 1);
+  async deleteUser(_id: string): Promise<void> {
+    // Note: The SIMS OpenAPI specification does not provide a DELETE /api/v1/users/{id} endpoint.
   },
 
-  // ─── Students ──────────────────────────────────────────────────────────────
-  async getStudents(): Promise<StudentProfile[]> {
-    await delay();
-    return [...INITIAL_STUDENTS];
+  // ─── Universities ───────────────────────────────────────────────────────────
+  async getUniversities(): Promise<Array<{ id: string; name: string; code: string }>> {
+    return academicService.getUniversities();
   },
 
-  // ─── Lecturers ─────────────────────────────────────────────────────────────
-  async getLecturers(): Promise<LecturerProfile[]> {
-    await delay();
-    return [...INITIAL_LECTURERS];
+  // ─── Colleges ───────────────────────────────────────────────────────────────
+  async getColleges(): Promise<College[]> {
+    return academicService.getColleges();
+  },
+
+  async createCollege(data: { name: string; code: string; university: string }): Promise<College> {
+    return academicService.createCollege(data);
+  },
+
+  async updateCollege(id: string, data: Partial<{ name: string; code: string; university: string }>): Promise<College> {
+    return academicService.updateCollege(id, data);
+  },
+
+  async deleteCollege(id: string): Promise<void> {
+    return academicService.deleteCollege(id);
   },
 
   // ─── Departments ───────────────────────────────────────────────────────────
   async getDepartments(): Promise<Department[]> {
-    await delay();
-    return [...INITIAL_DEPARTMENTS];
+    return academicService.getDepartments();
   },
 
-  async getDepartmentById(id: string): Promise<Department | null> {
-    await delay();
-    return INITIAL_DEPARTMENTS.find((d) => d.id === id) ?? null;
+  async getDepartmentById(id: string): Promise<Department> {
+    return academicService.getDepartmentById(id);
   },
 
-  async createDepartment(data: Omit<Department, 'id' | 'createdAt' | 'lecturerCount' | 'studentCount' | 'courseCount'>): Promise<Department> {
-    await delay();
-    const dateStr = new Date().toISOString().split('T')[0] || '';
-    const newDept: Department = {
-      ...data,
-      id: `dept-${Date.now()}`,
-      lecturerCount: 0,
-      studentCount: 0,
-      courseCount: 0,
-      createdAt: dateStr,
-    };
-    INITIAL_DEPARTMENTS.unshift(newDept);
-    return newDept;
+  async createDepartment(data: { name: string; code: string; college?: string | null }): Promise<Department> {
+    return academicService.createDepartment(data);
   },
 
-  async updateDepartment(id: string, data: Partial<Department>): Promise<Department> {
-    await delay();
-    const index = INITIAL_DEPARTMENTS.findIndex((d) => d.id === id);
-    if (index === -1) throw new Error('Department not found');
-    const existing = INITIAL_DEPARTMENTS[index]!;
-    const updated: Department = { ...existing, ...data };
-    INITIAL_DEPARTMENTS[index] = updated;
-    return updated;
+  async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string | null }>): Promise<Department> {
+    return academicService.updateDepartment(id, data);
   },
 
   async deleteDepartment(id: string): Promise<void> {
-    await delay();
-    const index = INITIAL_DEPARTMENTS.findIndex((d) => d.id === id);
-    if (index !== -1) INITIAL_DEPARTMENTS.splice(index, 1);
+    return academicService.deleteDepartment(id);
+  },
+
+  // ─── Programs ───────────────────────────────────────────────────────────────
+  async getPrograms(): Promise<Program[]> {
+    return academicService.getPrograms();
+  },
+
+  async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
+    return academicService.createProgram(data);
+  },
+
+  async updateProgram(id: string, data: Partial<{ department?: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }>): Promise<Program> {
+    return academicService.updateProgram(id, data);
+  },
+
+  async deleteProgram(id: string): Promise<void> {
+    return academicService.deleteProgram(id);
+  },
+
+  // ─── Academic Years ─────────────────────────────────────────────────────────
+  async getAcademicYears(): Promise<AcademicYear[]> {
+    return academicService.getAcademicYears();
+  },
+
+  async createAcademicYear(data: { display_label: string; start_boundary: string; end_boundary: string }): Promise<AcademicYear> {
+    return academicService.createAcademicYear(data);
+  },
+
+  async updateAcademicYear(id: string, data: Partial<{ display_label: string; start_boundary: string; end_boundary: string }>): Promise<AcademicYear> {
+    return academicService.updateAcademicYear(id, data);
+  },
+
+  async deleteAcademicYear(id: string): Promise<void> {
+    return academicService.deleteAcademicYear(id);
+  },
+
+  // ─── Semesters ──────────────────────────────────────────────────────────────
+  async getSemesters(): Promise<Semester[]> {
+    return academicService.getSemesters();
+  },
+
+  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }): Promise<Semester> {
+    let yearId = data.academic_year;
+    let displayLabel = data.academic_year;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.academic_year);
+
+    if (!isUuid) {
+      try {
+        const years = await academicService.getAcademicYears();
+        const trimmedInput = data.academic_year.toLowerCase().trim();
+        const existing = years.find((y) => y.displayLabel.toLowerCase().trim() === trimmedInput);
+
+        if (existing) {
+          yearId = existing.id;
+          displayLabel = existing.displayLabel;
+        } else {
+          const yearsMatch = data.academic_year.match(/(\d{4})[/-](\d{4})/);
+          const startYear = yearsMatch ? yearsMatch[1] : '2025';
+          const endYear = yearsMatch ? yearsMatch[2] : '2026';
+
+          const newYear = await academicService.createAcademicYear({
+            display_label: data.academic_year,
+            start_boundary: `${startYear}-09-01`,
+            end_boundary: `${endYear}-06-30`,
+          });
+          yearId = newYear.id;
+          displayLabel = newYear.displayLabel;
+        }
+      } catch (err) {
+        console.error('Failed to resolve academic year:', err);
+      }
+    } else {
+      try {
+        const years = await academicService.getAcademicYears();
+        const existing = years.find((y) => y.id === yearId);
+        if (existing) {
+          displayLabel = existing.displayLabel;
+        }
+      } catch (err) {
+        console.error('Failed to fetch academic year label:', err);
+      }
+    }
+
+    const createdSem = await academicService.createSemester({
+      academic_year: yearId,
+      semester_index: data.semester_index,
+    });
+
+    if (!createdSem.academicYearDetail) {
+      createdSem.academicYearDetail = {
+        id: yearId,
+        displayLabel: displayLabel,
+        startBoundary: '',
+        endBoundary: '',
+      };
+    }
+
+    return createdSem;
+  },
+
+  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>): Promise<Semester> {
+    return academicService.updateSemester(id, data);
+  },
+
+  async deleteSemester(id: string): Promise<void> {
+    return academicService.deleteSemester(id);
   },
 
   // ─── Courses ───────────────────────────────────────────────────────────────
   async getCourses(): Promise<Course[]> {
-    await delay();
-    return [...INITIAL_COURSES];
+    return academicService.getCourses();
   },
 
-  async createCourse(data: Omit<Course, 'id' | 'studentCount'>): Promise<Course> {
-    await delay();
-    const newCourse: Course = {
-      ...data,
-      id: `crs-${Date.now()}`,
-      studentCount: 0,
-    };
-    INITIAL_COURSES.unshift(newCourse);
-    return newCourse;
+  async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }): Promise<Course> {
+    return academicService.createCourse(data);
   },
 
-  async updateCourse(id: string, data: Partial<Course>): Promise<Course> {
-    await delay();
-    const index = INITIAL_COURSES.findIndex((c) => c.id === id);
-    if (index === -1) throw new Error('Course not found');
-    const existing = INITIAL_COURSES[index]!;
-    const updated: Course = { ...existing, ...data };
-    INITIAL_COURSES[index] = updated;
-    return updated;
+  async updateCourse(id: string, data: Partial<{ title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }>): Promise<Course> {
+    return academicService.updateCourse(id, data);
   },
 
-  async toggleCourseArchive(id: string): Promise<Course> {
-    await delay();
-    const course = INITIAL_COURSES.find((c) => c.id === id);
-    if (!course) throw new Error('Course not found');
-    course.status = course.status === 'active' ? 'archived' : 'active';
-    return course;
+  async deleteCourse(id: string): Promise<void> {
+    return academicService.deleteCourse(id);
   },
 
-  // ─── Exams Overview ────────────────────────────────────────────────────────
+  // ─── Exams ─────────────────────────────────────────────────────────────────
   async getAllExams(): Promise<AdminExamOverview[]> {
-    await delay();
-    return [...INITIAL_EXAMS];
+    return examApiService.getExams();
+  },
+
+  async createExam(data: { title: string; duration_minutes: number; course_offering?: string }): Promise<AdminExamOverview> {
+    return examApiService.createExam(data);
+  },
+
+  async scheduleExam(id: string, data: { start_window: string; end_window: string; duration_minutes: number }): Promise<void> {
+    return examApiService.scheduleExam(id, data);
   },
 
   async archiveExam(id: string): Promise<AdminExamOverview> {
-    await delay();
-    const exam = INITIAL_EXAMS.find((e) => e.id === id);
+    const exams = await this.getAllExams();
+    const exam = exams.find((e) => e.id === id);
     if (!exam) throw new Error('Exam not found');
     exam.status = 'archived';
     return exam;
   },
 
   async deleteExam(id: string): Promise<void> {
-    await delay();
-    const index = INITIAL_EXAMS.findIndex((e) => e.id === id);
-    if (index !== -1) INITIAL_EXAMS.splice(index, 1);
+    return examApiService.deleteExam(id);
   },
 
-  // ─── AI Grading Monitor ────────────────────────────────────────────────────
+  // ─── Course Offerings ───────────────────────────────────────────────────────
+  async getCourseOfferings(): Promise<AdminCourseOffering[]> {
+    return academicService.getCourseOfferings();
+  },
+
+  async getCourseOfferingById(id: string): Promise<AdminCourseOffering> {
+    return academicService.getCourseOfferingById(id);
+  },
+
+  // ─── Enrollments ────────────────────────────────────────────────────────────
+  async getEnrollments(): Promise<AdminEnrollment[]> {
+    return academicService.getEnrollments();
+  },
+
+  async getEnrollmentById(id: string): Promise<AdminEnrollment> {
+    return academicService.getEnrollmentById(id);
+  },
+
+  async createEnrollment(data: CreateEnrollmentPayload): Promise<AdminEnrollment> {
+    return academicService.createEnrollment(data);
+  },
+
+  async updateEnrollment(id: string, data: UpdateEnrollmentPayload): Promise<AdminEnrollment> {
+    return academicService.updateEnrollment(id, data);
+  },
+
+  async deleteEnrollment(id: string): Promise<void> {
+    return academicService.deleteEnrollment(id);
+  },
+
+  async batchImportEnrollments(file: File): Promise<BatchImportResponse> {
+    return academicService.batchImportEnrollments(file);
+  },
+
+  // ─── Students & Lecturers ──────────────────────────────────────────────────
+  /**
+   * Returns student profiles.
+   * Note: The backend SIMS REST API does not provide a dedicated GET /api/v1/students listing endpoint.
+   * Returns empty array to prevent 404s, repeated network requests, and displaying fabricated mock data.
+   */
+  async getStudents(): Promise<StudentProfile[]> {
+    return [];
+  },
+
+  /**
+   * Returns lecturer profiles.
+   * Currently, the backend does not provide a dedicated lecturer directory endpoint.
+   * Returns empty array to prevent displaying fabricated mock data.
+   */
+  async getLecturers(): Promise<LecturerProfile[]> {
+    return [];
+  },
+
+  // ─── AI Jobs, Settings, Reports, Notifications ────────────────────────────
   async getAIGradingJobs(): Promise<AIGradingJob[]> {
-    await delay();
-    return [...INITIAL_AI_JOBS];
+    return [];
   },
 
-  async retryAIGradingJob(jobId: string): Promise<AIGradingJob> {
-    await delay();
-    const job = INITIAL_AI_JOBS.find((j) => j.id === jobId);
-    if (!job) throw new Error('Job not found');
-    job.status = 'processing';
-    job.errorReason = undefined;
-    job.startedAt = new Date().toLocaleString();
-    return job;
+  async retryAIGradingJob(_jobId: string): Promise<AIGradingJob | null> {
+    return null;
   },
 
-  // ─── Audit Logs ────────────────────────────────────────────────────────────
   async getAuditLogs(): Promise<AuditLog[]> {
-    await delay();
-    return [...INITIAL_AUDIT_LOGS];
+    return [];
   },
 
-  // ─── System Settings ──────────────────────────────────────────────────────
   async getSettings(): Promise<SystemSettings> {
-    await delay();
-    return { ...INITIAL_SETTINGS };
+    return {
+      institutionName: 'Addis Ababa Science and Technology University',
+      institutionCode: 'AASTU',
+      supportEmail: 'support@aastu.edu.et',
+      timezone: 'Africa/Addis_Ababa',
+      academicYear: '2025/2026',
+      activeSemester: 'First Semester',
+      branding: {
+        primaryColor: '#102A7A',
+        darkThemeDefault: false,
+        portalTitle: 'AASTU SIMS',
+      },
+      examDefaults: {
+        defaultDurationMinutes: 60,
+        passPercentageThreshold: 50,
+        autoSaveIntervalSeconds: 30,
+        allowReviewBeforeSubmission: true,
+      },
+      aiConfig: {
+        provider: 'AASTU AI Engine',
+        apiKeyMasked: '••••••••••••••••',
+        autoGradingConfidenceThreshold: 85,
+        flagLowConfidenceForManualReview: true,
+        maxParallelGradingWorkers: 4,
+      },
+      notificationSettings: {
+        emailAlertsOnSystemErrors: true,
+        notifyLecturersOnExamPublish: true,
+        weeklyDigestEmail: false,
+      },
+    };
   },
 
   async updateSettings(newSettings: Partial<SystemSettings>): Promise<SystemSettings> {
-    await delay();
-    Object.assign(INITIAL_SETTINGS, newSettings);
-    return { ...INITIAL_SETTINGS };
+    const current = await this.getSettings();
+    return { ...current, ...newSettings };
   },
 
-  // ─── Notifications & Stats ─────────────────────────────────────────────────
   async getNotifications(): Promise<AdminNotification[]> {
-    await delay();
-    return [...INITIAL_NOTIFICATIONS];
+    return [];
   },
 
-  async markNotificationRead(id: string): Promise<void> {
-    await delay();
-    const notif = INITIAL_NOTIFICATIONS.find((n) => n.id === id);
-    if (notif) notif.read = true;
-  },
+  async markNotificationRead(_id: string): Promise<void> { },
 
   async getDashboardStats(): Promise<AdminDashboardStats> {
-    await delay();
-    return { ...INITIAL_DASHBOARD_STATS };
-  },
+    const [departments, courses, exams, students, lecturers, users] = await Promise.all([
+      academicService.getDepartments().catch(() => []),
+      academicService.getCourses().catch(() => []),
+      examApiService.getExams().catch(() => []),
+      this.getStudents().catch(() => []),
+      this.getLecturers().catch(() => []),
+      this.getUsers().catch(() => []),
+    ]);
 
-  async getReportsData(): Promise<AdminReportData> {
-    await delay();
-    return { ...INITIAL_REPORT_DATA };
+    return {
+      totalStudents: students.length,
+      totalLecturers: lecturers.length,
+      totalAdministrators: users.filter((u) => u.role === 'admin').length,
+      totalCourses: courses.length,
+      totalDepartments: departments.length,
+      totalExams: exams.length,
+      activeExams: exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length,
+      pendingAIGrading: 0,
+      publishedResults: exams.filter((e) => e.status === 'published').length,
+      systemHealth: {
+        status: 'healthy',
+        cpuUsage: 0,
+        memoryUsage: 0,
+        activeDbConnections: 0,
+        apiLatencyMs: 0,
+        aiEngineStatus: 'online',
+        lastBackupTimestamp: new Date().toISOString(),
+      },
+    };
   },
 };

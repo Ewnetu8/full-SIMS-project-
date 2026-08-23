@@ -115,6 +115,7 @@ class ExamAttemptSerializer(serializers.ModelSerializer):
             "start_time",
             "submission_time",
             "is_disrupted",
+            "grading_status",
             "created_at",
             "updated_at",
         )
@@ -133,6 +134,38 @@ class StudentQuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         fields = ("id", "question_text", "question_type", "total_points", "options")
+
+
+class StudentExaminationSerializer(serializers.ModelSerializer):
+    """Student-facing examination payload.
+
+    Identical to `ExaminationSerializer` but questions are serialized with
+    `StudentQuestionSerializer`, which deliberately omits the `is_correct`
+    flags so the answer key never reaches students.
+    """
+
+    course_offering_detail = CourseOfferingBriefSerializer(
+        source="course_offering", read_only=True
+    )
+    questions = StudentQuestionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Examination
+        fields = (
+            "id",
+            "course_offering",
+            "course_offering_detail",
+            "lecturer",
+            "title",
+            "status",
+            "start_window",
+            "end_window",
+            "duration_minutes",
+            "questions",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
 
 
 class StudentAnswerSerializer(serializers.ModelSerializer):

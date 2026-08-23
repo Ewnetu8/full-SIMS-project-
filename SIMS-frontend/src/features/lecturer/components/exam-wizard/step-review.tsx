@@ -5,8 +5,10 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
+import { toast } from '@/components/feedback';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { lecturerService } from '../../services';
 import { useLecturerStore } from '../../store';
 
@@ -24,37 +26,47 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
 
   async function handleSaveDraft() {
     setSaving(true);
-    const instructions = wizardData.instructions.split('\n').filter(Boolean);
-    await lecturerService.saveExam({
-      ...wizardData,
-      id: editingExamId ?? undefined,
-      instructions,
-      status: 'DRAFT',
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => {
-      resetWizard();
-      router.push(ROUTES.LECTURER.EXAMS);
-    }, 1200);
+    try {
+      const instructions = wizardData.instructions.split('\n').filter(Boolean);
+      await lecturerService.saveExam({
+        ...wizardData,
+        id: editingExamId ?? undefined,
+        instructions,
+        status: 'DRAFT',
+      });
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => {
+        resetWizard();
+        router.push(ROUTES.LECTURER.EXAMS);
+      }, 1200);
+    } catch (err: any) {
+      setSaving(false);
+      toast.error(err?.message || 'Failed to save draft exam.');
+    }
   }
 
   async function handlePublish() {
     setPublishing(true);
-    const instructions = wizardData.instructions.split('\n').filter(Boolean);
-    const exam = await lecturerService.saveExam({
-      ...wizardData,
-      id: editingExamId ?? undefined,
-      instructions,
-      status: 'DRAFT',
-    });
-    await lecturerService.togglePublishExam(exam.id);
-    setPublishing(false);
-    setSaved(true);
-    setTimeout(() => {
-      resetWizard();
-      router.push(ROUTES.LECTURER.EXAMS);
-    }, 1200);
+    try {
+      const instructions = wizardData.instructions.split('\n').filter(Boolean);
+      const exam = await lecturerService.saveExam({
+        ...wizardData,
+        id: editingExamId ?? undefined,
+        instructions,
+        status: 'DRAFT',
+      });
+      await lecturerService.togglePublishExam(exam.id);
+      setPublishing(false);
+      setSaved(true);
+      setTimeout(() => {
+        resetWizard();
+        router.push(ROUTES.LECTURER.EXAMS);
+      }, 1200);
+    } catch (err: any) {
+      setPublishing(false);
+      toast.error(err?.message || 'Failed to publish exam.');
+    }
   }
 
   if (saved) {

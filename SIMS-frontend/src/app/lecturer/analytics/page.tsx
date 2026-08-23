@@ -1,6 +1,8 @@
 import * as React from 'react';
-import type { Metadata } from 'next';
+
 import { LecturerShell, LecturerAnalyticsView } from '@/features/lecturer/components';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Class Analytics — ExamSphere',

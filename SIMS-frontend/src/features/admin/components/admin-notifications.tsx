@@ -13,6 +13,7 @@ import * as React from 'react';
 
 import { toast } from '@/components/feedback';
 import { Badge, Button, Card } from '@/components/ui';
+
 import { useAdminStore } from '../store';
 
 export function AdminNotifications() {
@@ -28,13 +29,13 @@ export function AdminNotifications() {
       case 'ai':
         return <Brain className="h-4 w-4 text-ai-primary" />;
       case 'user':
-        return <UserPlus className="h-4 w-4 text-blue-500" />;
+        return <UserPlus className="h-4 w-4 text-primary" />;
       case 'exam':
-        return <ClipboardCheck className="h-4 w-4 text-emerald-500" />;
+        return <ClipboardCheck className="h-4 w-4 text-success" />;
       case 'security':
-        return <ShieldAlert className="h-4 w-4 text-rose-500" />;
+        return <ShieldAlert className="h-4 w-4 text-destructive" />;
       default:
-        return <Info className="h-4 w-4 text-amber-500" />;
+        return <Info className="h-4 w-4 text-accent" />;
     }
   };
 
@@ -44,7 +45,7 @@ export function AdminNotifications() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Bell className="h-6 w-6 text-amber-500" /> Administrative Notification Center
+            <Bell className="h-6 w-6 text-accent" /> Administrative Notification Center
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             System announcements, AI engine alerts, security warnings, and user registration events.

@@ -10,7 +10,7 @@ const inputVariants = cva(
     'flex w-full rounded-lg border bg-background',
     'text-sm text-foreground placeholder:text-muted-foreground',
     'transition-all duration-200',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
+    'focus-visible:outline-none focus-visible:border-[#102A7A] focus-visible:ring-2 focus-visible:ring-[#B08A00] focus-visible:ring-offset-0 dark:focus-visible:border-primary dark:focus-visible:ring-ring',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
   ],

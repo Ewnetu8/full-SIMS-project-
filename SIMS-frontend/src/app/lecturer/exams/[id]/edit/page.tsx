@@ -1,8 +1,10 @@
 'use client';
 
 import * as React from 'react';
+
 import { LecturerShell, ExamWizard } from '@/features/lecturer/components';
 import { lecturerService } from '@/features/lecturer/services';
+
 import type { LecturerExam } from '@/features/lecturer/types';
 
 interface Props {
@@ -10,7 +12,7 @@ interface Props {
 }
 
 export default function EditExamPage({ params }: Props) {
-  const [exam, setExam] = React.useState<LecturerExam | undefined>(undefined);
+  const [exam, setExam] = React.useState<LecturerExam | null | undefined>(undefined);
   const [loading, setLoading] = React.useState(true);
   const [resolvedId, setResolvedId] = React.useState<string | null>(null);
 
@@ -36,7 +38,7 @@ export default function EditExamPage({ params }: Props) {
 
   return (
     <LecturerShell>
-      <ExamWizard initialExam={exam} />
+      <ExamWizard initialExam={exam ?? undefined} />
     </LecturerShell>
   );
 }

@@ -16,26 +16,45 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   SearchInput,
 } from '@/components/ui';
+
 import { useAdminStore } from '../store';
+
 import type { LecturerProfile } from '../types';
 
 export function LecturerManagement() {
   const {
     lecturers,
     departments,
+    colleges,
     lecturerSearchQuery,
     lecturerDeptFilter,
+    fetchLecturers,
     setLecturerSearchQuery,
     setLecturerDeptFilter,
   } = useAdminStore();
 
+  React.useEffect(() => {
+    fetchLecturers();
+  }, [fetchLecturers]);
+
   const [selectedLecturer, setSelectedLecturer] = React.useState<LecturerProfile | null>(null);
+  const [lecturerCollegeFilter, setLecturerCollegeFilter] = React.useState<string>('ALL');
+
+  const filteredDepartments = React.useMemo(() => {
+    if (!lecturerCollegeFilter || lecturerCollegeFilter === 'ALL') return departments;
+    return departments.filter(
+      (d) =>
+        d.college === lecturerCollegeFilter ||
+        (colleges.find((c) => c.name === lecturerCollegeFilter || c.code === lecturerCollegeFilter)?.id === d.college)
+    );
+  }, [departments, colleges, lecturerCollegeFilter]);
 
   const filteredLecturers = lecturers.filter((l) => {
     const fullName = `${l.firstName} ${l.lastName}`.toLowerCase();
@@ -57,7 +76,7 @@ export function LecturerManagement() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <UserCheck className="h-6 w-6 text-indigo-500" /> Lecturer & Faculty Directory
+          <UserCheck className="h-6 w-6 text-primary" /> Lecturer & Faculty Directory
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           View assigned faculty members, department affiliations, offices, and course responsibilities.
@@ -66,7 +85,7 @@ export function LecturerManagement() {
 
       {/* Filter Bar */}
       <Card className="p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <SearchInput
               placeholder="Search by lecturer name, ID, or email..."
@@ -79,13 +98,31 @@ export function LecturerManagement() {
           <div>
             <select
               className={selectClass}
+              value={lecturerCollegeFilter}
+              onChange={(e) => {
+                setLecturerCollegeFilter(e.target.value);
+                setLecturerDeptFilter('ALL');
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={lecturerDeptFilter}
               onChange={(e) => setLecturerDeptFilter(e.target.value)}
             >
               <option value="ALL">All Departments</option>
-              {departments.map((d) => (
+              {filteredDepartments.map((d) => (
                 <option key={d.id} value={d.name}>
-                  {d.name}
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>
@@ -112,16 +149,16 @@ export function LecturerManagement() {
               {filteredLecturers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No lecturer records found matching filters.
+                    No lecturer records found in the current backend database.
                   </td>
                 </tr>
               ) : (
                 filteredLecturers.map((lec) => (
                   <tr key={lec.id} className="hover:bg-accent/40 transition-colors">
-                    <td className="px-4 py-3.5 font-mono text-xs font-semibold text-indigo-500">{lec.lecturerId}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs font-semibold text-primary">{lec.lecturerId}</td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500 font-bold text-xs shrink-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
                           {lec.firstName[0]}
                           {lec.lastName[0]}
                         </div>
@@ -165,16 +202,16 @@ export function LecturerManagement() {
       {/* Lecturer Profile Modal */}
       {selectedLecturer && (
         <Dialog open={!!selectedLecturer} onOpenChange={() => setSelectedLecturer(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-indigo-500" /> Faculty Member Profile
+                <UserCheck className="h-5 w-5 text-primary" /> Faculty Member Profile
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-3">
+            <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
               <div className="flex items-center gap-4 border-b border-border pb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500 font-bold text-xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl shrink-0">
                   {selectedLecturer.firstName[0]}
                   {selectedLecturer.lastName[0]}
                 </div>
@@ -185,7 +222,7 @@ export function LecturerManagement() {
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Mail className="h-3.5 w-3.5" /> {selectedLecturer.email}
                   </p>
-                  <p className="text-xs font-mono text-indigo-500 mt-1 font-semibold">
+                  <p className="text-xs font-mono text-primary mt-1 font-semibold">
                     ID: {selectedLecturer.lecturerId}
                   </p>
                 </div>
@@ -194,9 +231,9 @@ export function LecturerManagement() {
               <div className="space-y-2.5 text-xs text-foreground">
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Building className="h-3.5 w-3.5" /> Affiliated Department:
+                    <Building className="h-3.5 w-3.5" /> Department:
                   </span>
-                  <span className="font-medium text-right max-w-[200px]">{selectedLecturer.department}</span>
+                  <span className="font-medium text-right max-w-[240px]">{selectedLecturer.department}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
@@ -206,20 +243,20 @@ export function LecturerManagement() {
                   <span className="font-medium">{selectedLecturer.office}</span>
                 </div>
 
-                <div className="space-y-1 py-1">
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    <ClipboardList className="h-3.5 w-3.5" /> Teaching Assignments:
+                <div className="space-y-1.5 py-1">
+                  <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <ClipboardList className="h-3.5 w-3.5" /> Assigned Course Offerings:
                   </span>
-                  <div className="pl-5 space-y-1">
+                  <div className="grid grid-cols-1 gap-1.5">
                     {selectedLecturer.coursesAssigned.map((course) => (
-                      <div key={course} className="p-2 rounded bg-muted/40 font-medium">
+                      <div key={course} className="p-2 rounded-md bg-muted/40 font-medium text-xs border border-border/50">
                         {course}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button onClick={() => setSelectedLecturer(null)}>Close</Button>

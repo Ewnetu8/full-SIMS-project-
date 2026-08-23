@@ -1,5 +1,6 @@
-import type { Metadata } from 'next';
 import { AdminNotifications, AdminShell } from '@/features/admin/components';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Admin Notifications — ExamSphere Admin',

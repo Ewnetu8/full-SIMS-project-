@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+
 import type { ExamWizardStep, ExamWizardData, Question, ExamStatus } from '../types';
 
 interface LecturerStoreState {
@@ -30,7 +31,7 @@ interface LecturerStoreState {
 
 const initialWizardData: ExamWizardData = {
   title: '',
-  courseId: 'course-cs101',
+  courseId: '',
   description: '',
   instructions: 'Ensure a stable internet connection. All answers must be submitted within the time limit.',
   durationMinutes: 60,

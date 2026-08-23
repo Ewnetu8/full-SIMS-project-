@@ -1,12 +1,19 @@
-import type { Metadata } from 'next';
 import { AdminShell, DepartmentDetail } from '@/features/admin/components';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Department Details — ExamSphere Admin',
   description: 'Detailed view of department courses, faculty members, and statistics.',
 };
 
-export default function AdminDepartmentDetailPage() {
+interface Props {
+  params: Promise<{ id: string }>;
+}
+
+export default async function AdminDepartmentDetailPage({ params }: Props) {
+  const { id } = await params;
+
   return (
     <AdminShell
       breadcrumbItems={[
@@ -15,7 +22,7 @@ export default function AdminDepartmentDetailPage() {
         { label: 'Department Details' },
       ]}
     >
-      <DepartmentDetail />
+      <DepartmentDetail departmentId={id} />
     </AdminShell>
   );
 }

@@ -5,32 +5,116 @@ export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface AdminUser {
   id: string;
-  userId: string; // e.g. "USR-1092"
+  userId: string;
   firstName: string;
   lastName: string;
   email: string;
   role: UserRole;
   department: string;
+  departmentId?: string | null;
   status: UserStatus;
   lastLogin: string;
   avatarUrl?: string;
   phone?: string;
+  studentIdentifier?: string;
+  facultyIdentifier?: string;
+  nationalIdFan?: string | null;
   createdAt: string;
 }
 
 export interface StudentProfile {
   id: string;
-  studentId: string; // e.g. "STD-2024-041"
+  studentId: string; // e.g. "ETS-001/2026"
   firstName: string;
   lastName: string;
   email: string;
   department: string;
   program: string;
-  academicYear: string; // e.g. "Year 3 - Semester 2"
+  academicYear: string;
+  classStanding?: ClassStanding;
   status: UserStatus;
   gpa: number;
-  enrolledCoursesCount: number;
+  enrolledCoursesCount?: number;
   avatarUrl?: string;
+}
+
+export type EnrollmentStatus = 'ENROLLED' | 'PASSED' | 'FAILED' | 'DROPPED';
+
+export interface CourseOfferingDetailCourse {
+  id: string;
+  course_code?: string;
+  code?: string;
+  title?: string;
+  name?: string;
+  credit_hours?: number;
+  creditHours?: number;
+  intended_class_standing?: ClassStanding;
+  intendedClassStanding?: ClassStanding;
+  program?: string | null;
+  program_detail?: Program | null;
+  programDetail?: Program | null;
+}
+
+export interface CourseOfferingDetailAcademicYear {
+  id: string;
+  display_label?: string;
+  displayLabel?: string;
+  start_boundary?: string;
+  end_boundary?: string;
+}
+
+export interface CourseOfferingDetailSemester {
+  id: string;
+  academic_year?: string;
+  academicYear?: string;
+  academic_year_detail?: CourseOfferingDetailAcademicYear | null;
+  academicYearDetail?: CourseOfferingDetailAcademicYear | null;
+  semester_index?: 'FIRST' | 'SECOND' | string;
+  semesterIndex?: 'FIRST' | 'SECOND' | string;
+}
+
+export interface AdminCourseOffering {
+  id: string;
+  course: string;
+  course_detail?: CourseOfferingDetailCourse | null;
+  semester: string;
+  semester_detail?: CourseOfferingDetailSemester | null;
+  section: string;
+  capacity?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AdminEnrollment {
+  id: string;
+  student: string;
+  course_offering?: string | null;
+  course_offering_detail?: AdminCourseOffering | null;
+  status: EnrollmentStatus;
+  is_retake: boolean;
+  grade?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateEnrollmentPayload {
+  student: string;
+  course_offering: string;
+  status?: EnrollmentStatus;
+  grade?: string | null;
+}
+
+export interface UpdateEnrollmentPayload {
+  status?: EnrollmentStatus;
+  grade?: string | null;
+  course_offering?: string;
+}
+
+export interface BatchImportResponse {
+  detail?: string;
+  task_id?: string;
+  message?: string;
+  imported_count?: number;
 }
 
 export interface LecturerProfile {
@@ -46,35 +130,94 @@ export interface LecturerProfile {
   avatarUrl?: string;
 }
 
+export interface University {
+  id: string;
+  name: string;
+  code: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface College {
+  id: string;
+  name: string;
+  code: string;
+  university: string;
+  university_detail?: University;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Program {
+  id: string;
+  name: string;
+  code: string;
+  department: string;
+  degreeLevel: string;
+  totalCreditHoursRequired: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AcademicYearItem {
+  id: string;
+  displayLabel: string;
+  startBoundary: string;
+  endBoundary: string;
+  createdAt?: string;
+}
+
+export interface SemesterItem {
+  id: string;
+  academicYear: string;
+  academicYearLabel?: string;
+  semesterIndex: number;
+  createdAt?: string;
+}
+
 export interface Department {
   id: string;
-  code: string; // e.g. "CS"
   name: string; // e.g. "Computer Science & Software Engineering"
-  description: string;
-  headOfDepartment: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  lecturerCount: number;
-  studentCount: number;
-  courseCount: number;
-  createdAt: string;
+  code: string; // e.g. "CS"
+  college?: string | null;
+  college_detail?: College;
+  createdAt?: string;
+  updatedAt?: string;
 }
+
+
+
+export interface AcademicYear {
+  id: string;
+  displayLabel: string;
+  startBoundary: string;
+  endBoundary: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Semester {
+  id: string;
+  academicYear: string;
+  academicYearDetail?: AcademicYear;
+  semesterIndex: 'FIRST' | 'SECOND';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type ClassStanding = 'FRESHMAN' | 'SOPHOMORE' | 'JUNIOR' | 'SENIOR' | 'GRADUATE';
 
 export interface Course {
   id: string;
   code: string; // e.g. "CS301"
   name: string; // e.g. "Data Structures & Algorithms"
+  title?: string;
   creditHours: number;
-  department: string;
-  assignedLecturer: {
-    id: string;
-    name: string;
-  };
-  studentCount: number;
-  status: 'active' | 'archived';
-  semester: string;
+  program?: string | null;
+  programDetail?: Program | null;
+  intendedClassStanding?: ClassStanding;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type AdminExamStatus = 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';

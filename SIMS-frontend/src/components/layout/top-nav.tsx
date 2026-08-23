@@ -10,8 +10,11 @@ import { UserDropdown } from '@/components/navigation';
 import { IconButton, Tooltip } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/store';
 import { cn } from '@/lib';
+import { getUserDisplayName } from '@/utils/string';
+import { ConfirmationDialog, toast } from '@/components/feedback';
+import { ROUTES } from '@/constants';
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TopNavProps {
   /** Called when the mobile menu button is pressed. */
@@ -27,7 +30,7 @@ export interface TopNavProps {
   className?: string;
 }
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Component ────────────────────────────────────────────────────────────────
 
 /**
  * Fixed top navigation bar.
@@ -46,21 +49,46 @@ export function TopNav({
 }: TopNavProps) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = React.useState(false);
 
-  const handleLogout = async () => {
+  const handleConfirmLogout = async () => {
+    setIsLogoutDialogOpen(false);
     await logout();
+    toast.success('You have been signed out successfully.', { id: 'auth-logout' });
     router.replace('/login');
+  };
+
+  const handleProfileNavigation = () => {
+    if (!user) return;
+    if (user.role === 'admin') {
+      router.push(ROUTES.ADMIN.PROFILE);
+    } else if (user.role === 'lecturer') {
+      router.push(ROUTES.LECTURER.PROFILE);
+    } else {
+      router.push(ROUTES.STUDENT.PROFILE);
+    }
+  };
+
+  const handleSettingsNavigation = () => {
+    if (!user) return;
+    if (user.role === 'admin') {
+      router.push(ROUTES.ADMIN.SETTINGS);
+    } else {
+      router.push('/settings');
+    }
   };
 
   const defaultUserMenu = user ? (
     <UserDropdown
       user={{
-        name: `${user.firstName} ${user.lastName}`.trim(),
+        name: getUserDisplayName(user),
         email: user.email,
         role: user.role,
         avatarUrl: user.avatarUrl,
       }}
-      onLogout={handleLogout}
+      onProfile={handleProfileNavigation}
+      onSettings={handleSettingsNavigation}
+      onLogout={() => setIsLogoutDialogOpen(true)}
     />
   ) : null;
 
@@ -88,12 +116,10 @@ export function TopNav({
       <Link
         href="/"
         className="flex items-center gap-2 lg:hidden"
-        aria-label="ExamSphere home"
+        aria-label="AASTU home"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-primary to-ai-primary text-white text-xs font-bold">
-          E
-        </span>
-        <span className="font-semibold text-sm">ExamSphere</span>
+        <img src="/images/aastu-logo.jpg" alt="AASTU Logo" className="h-6 w-auto rounded-md bg-white p-0.5 shrink-0" />
+        <span className="font-semibold text-sm">AASTU Grading</span>
       </Link>
 
       {/* Centre slot */}
@@ -119,6 +145,18 @@ export function TopNav({
 
         {userMenu ?? defaultUserMenu}
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmationDialog
+        open={isLogoutDialogOpen}
+        onOpenChange={setIsLogoutDialogOpen}
+        title="Sign Out"
+        description="Are you sure you want to sign out?"
+        confirmLabel="Sign Out"
+        destructive
+        onConfirm={handleConfirmLogout}
+        onCancel={() => setIsLogoutDialogOpen(false)}
+      />
     </header>
   );
 }

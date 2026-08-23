@@ -11,9 +11,11 @@ import { FormField, FormWrapper } from '@/components/forms';
 import { Button, PasswordInput } from '@/components/ui';
 import { ROUTES } from '@/constants';
 import { AuthShell } from '@/features/auth/components';
-import { mockAuthService } from '@/features/auth/mock';
+import { authApi } from '@/features/auth/services';
 import { getPasswordStrength } from '@/features/auth/utils';
+import { handleAuthError } from '@/features/auth/utils/auth-errors';
 import { resetPasswordSchema, type ResetPasswordFormValues } from '@/features/auth/validation';
+import { toast } from '@/components/feedback';
 
 function ResetPasswordFormContent() {
   const router = useRouter();
@@ -40,20 +42,32 @@ function ResetPasswordFormContent() {
     }
   }, [token]);
 
+  // Clear errors when user types
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      if (errorMessage) {
+        setErrorMessage(null);
+        toast.dismiss('auth-error');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form.watch, errorMessage]);
+
   const onSubmit = async (values: ResetPasswordFormValues) => {
     setErrorMessage(null);
     setSuccessMessage(null);
+    toast.dismiss('auth-error');
 
     try {
-      const response = await mockAuthService.resetPassword({
+      await authApi.resetPassword({
         token,
         password: values.password,
         confirmPassword: values.confirmPassword,
       });
-      setSuccessMessage(response.message);
+      toast.success('Your password has been updated successfully.', { id: 'password-reset-success' });
       window.setTimeout(() => router.replace(ROUTES.LOGIN), 1200);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'We could not reset your password.';
+      const message = handleAuthError(error);
       setErrorMessage(message);
     }
   };
@@ -63,12 +77,6 @@ function ResetPasswordFormContent() {
       {errorMessage ? (
         <Alert variant="destructive" title="Password reset failed" className="mb-4">
           {errorMessage}
-        </Alert>
-      ) : null}
-
-      {successMessage ? (
-        <Alert variant="success" title="Password reset complete" className="mb-4">
-          {successMessage}
         </Alert>
       ) : null}
 

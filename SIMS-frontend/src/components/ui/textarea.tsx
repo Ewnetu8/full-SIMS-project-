@@ -48,7 +48,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             'flex min-h-[80px] w-full rounded-lg border bg-background px-3 py-2',
             'text-sm text-foreground placeholder:text-muted-foreground',
             'transition-all duration-200 resize-y',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'focus-visible:outline-none focus-visible:border-[#102A7A] focus-visible:ring-2 focus-visible:ring-[#B08A00] dark:focus-visible:border-primary dark:focus-visible:ring-ring',
             'disabled:cursor-not-allowed disabled:opacity-50',
             error
               ? 'border-destructive focus-visible:ring-destructive'

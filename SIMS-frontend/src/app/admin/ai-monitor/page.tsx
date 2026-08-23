@@ -1,5 +1,6 @@
-import type { Metadata } from 'next';
 import { AdminShell, AIGradingMonitor } from '@/features/admin/components';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'AI Grading Monitor — ExamSphere Admin',

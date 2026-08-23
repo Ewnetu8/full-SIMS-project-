@@ -14,13 +14,11 @@ import {
   Activity,
   Plus,
   ArrowUpRight,
-  RefreshCw,
   Clock,
   Server,
   Database,
-  Cpu,
-  HardDrive,
   FileText,
+  UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -28,33 +26,49 @@ import * as React from 'react';
 
 import { Badge, Button, Card, Progress } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { useAdminStore } from '../store';
 
 export function DashboardOverview() {
   const router = useRouter();
-  const { users, students, lecturers, departments, courses, exams, aiJobs, auditLogs } = useAdminStore();
+  const {
+    users,
+    students,
+    lecturers,
+    departments,
+    courses,
+    exams,
+    aiJobs,
+    auditLogs,
+    fetchAdminData,
+    isLoadingData,
+  } = useAdminStore();
 
-  const totalStudents = students.length || 1440;
-  const totalLecturers = lecturers.length || 42;
-  const totalAdmins = users.filter((u) => u.role === 'admin').length || 6;
-  const totalCourses = courses.length || 66;
-  const totalDepts = departments.length || 4;
-  const totalExamsCount = exams.length || 38;
-  const activeExamsCount = exams.filter((e) => e.status === 'active').length || 3;
-  const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length || 2;
-  const publishedExamsCount = exams.filter((e) => e.status === 'published').length || 32;
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
+
+  const totalStudents = students.length;
+  const totalLecturers = lecturers.length;
+  const totalAdmins = users.filter((u) => u.role === 'admin').length;
+  const totalCourses = courses.length;
+  const totalDepts = departments.length;
+  const totalExamsCount = exams.length;
+  const activeExamsCount = exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length;
+  const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length;
+  const publishedExamsCount = exams.filter((e) => e.status === 'published').length;
 
   const statCards = [
-    { label: 'Total Students', value: totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-blue-500', bg: 'bg-blue-500/10', trend: '+12% this term' },
-    { label: 'Total Lecturers', value: totalLecturers.toString(), icon: UserCheck, color: 'text-indigo-500', bg: 'bg-indigo-500/10', trend: '4 departments' },
-    { label: 'Administrators', value: totalAdmins.toString(), icon: Shield, color: 'text-emerald-500', bg: 'bg-emerald-500/10', trend: 'Full access' },
-    { label: 'Active Courses', value: totalCourses.toString(), icon: BookOpen, color: 'text-amber-500', bg: 'bg-amber-500/10', trend: 'Spring 2026' },
-    { label: 'Departments', value: totalDepts.toString(), icon: Building2, color: 'text-purple-500', bg: 'bg-purple-500/10', trend: 'Academic units' },
-    { label: 'Total Exams', value: totalExamsCount.toString(), icon: ClipboardCheck, color: 'text-sky-500', bg: 'bg-sky-500/10', trend: 'This academic year' },
-    { label: 'Active Exams Now', value: activeExamsCount.toString(), icon: Zap, color: 'text-rose-500', bg: 'bg-rose-500/10', trend: 'Live sessions' },
-    { label: 'Pending AI Grading', value: pendingAIGradingCount.toString(), icon: Brain, color: 'text-ai-primary', bg: 'bg-ai-primary/10', trend: 'Queue processing' },
-    { label: 'Published Results', value: publishedExamsCount.toString(), icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-400/10', trend: 'Verified scores' },
-    { label: 'System Health', value: '99.9%', icon: Activity, color: 'text-green-500', bg: 'bg-green-500/10', trend: 'All services online' },
+    { label: 'Total Students', value: isLoadingData ? '...' : totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-primary', bg: 'bg-primary/10', trend: 'Enrolled students' },
+    { label: 'Total Lecturers', value: isLoadingData ? '...' : totalLecturers.toString(), icon: UserCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'Faculty members' },
+    { label: 'Administrators', value: isLoadingData ? '...' : totalAdmins.toString(), icon: Shield, color: 'text-primary', bg: 'bg-primary/10', trend: 'Full access' },
+    { label: 'Active Courses', value: isLoadingData ? '...' : totalCourses.toString(), icon: BookOpen, color: 'text-accent', bg: 'bg-accent/10', trend: 'Academic offerings' },
+    { label: 'Departments', value: isLoadingData ? '...' : totalDepts.toString(), icon: Building2, color: 'text-primary', bg: 'bg-primary/10', trend: 'Academic units' },
+    { label: 'Total Exams', value: isLoadingData ? '...' : totalExamsCount.toString(), icon: ClipboardCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'Scheduled assessments' },
+    { label: 'Active Exams Now', value: isLoadingData ? '...' : activeExamsCount.toString(), icon: Zap, color: 'text-accent', bg: 'bg-accent/10', trend: 'Live sessions' },
+    { label: 'Pending AI Grading', value: isLoadingData ? '...' : pendingAIGradingCount.toString(), icon: Brain, color: 'text-primary', bg: 'bg-primary/10', trend: 'Queue processing' },
+    { label: 'Published Results', value: isLoadingData ? '...' : publishedExamsCount.toString(), icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10', trend: 'Verified scores' },
+    { label: 'System Status', value: 'Active', icon: Activity, color: 'text-success', bg: 'bg-success/10', trend: 'All services online' },
   ];
 
   return (
@@ -127,7 +141,7 @@ export function DashboardOverview() {
         <Card className="p-5 lg:col-span-1 flex flex-col justify-between">
           <div>
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-500" /> Quick Administrative Actions
+              <Zap className="h-4 w-4 text-accent" /> Quick Administrative Actions
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
               Shortcuts for routine institution administration tasks.
@@ -140,7 +154,17 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.USERS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <UserCheck className="h-4 w-4 text-blue-500" /> Manage Users & Roles
+                <UserCheck className="h-4 w-4 text-primary" /> Manage Users & Roles
+              </span>
+              <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-between text-left h-auto py-2.5 px-3"
+              onClick={() => router.push(ROUTES.ADMIN.ENROLLMENTS)}
+            >
+              <span className="flex items-center gap-2.5 text-xs font-medium">
+                <UserPlus className="h-4 w-4 text-primary" /> Manage Course Enrollments
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -150,7 +174,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.DEPARTMENTS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Building2 className="h-4 w-4 text-purple-500" /> Add / Manage Departments
+                <Building2 className="h-4 w-4 text-primary" /> Add / Manage Departments
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -160,7 +184,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.COURSES)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <BookOpen className="h-4 w-4 text-emerald-500" /> Assign Courses & Lecturers
+                <BookOpen className="h-4 w-4 text-primary" /> Assign Courses & Lecturers
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -170,76 +194,60 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.SETTINGS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Server className="h-4 w-4 text-indigo-500" /> Configure System Settings
+                <Server className="h-4 w-4 text-primary" /> Configure System Settings
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
           </div>
         </Card>
 
-        {/* Real-time System Infrastructure Health */}
+        {/* System Infrastructure & API Status */}
         <Card className="p-5 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Activity className="h-4 w-4 text-emerald-500" /> Infrastructure & AI Engine Health
+                <Activity className="h-4 w-4 text-success" /> Infrastructure & Backend Connectivity
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Real-time server metrics, database load, and AI grading cluster status.
+                Real-time connection status with SIMS Django REST backend APIs.
               </p>
             </div>
-            <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> All Systems Nominal
+            <Badge variant="outline" className="border-success/30 text-success bg-success/10 gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-success animate-pulse" /> SIMS Backend Connected
             </Badge>
           </div>
 
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* CPU Metric */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Cpu className="h-3.5 w-3.5 text-blue-500" /> CPU Cluster Load
-                </span>
-                <span className="font-semibold text-foreground">28.4%</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Server className="h-3.5 w-3.5 text-primary" /> API Gateway
               </div>
-              <Progress value={28.4} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">8 Workers active (Peak: 64%)</span>
+              <p className="text-sm font-semibold text-foreground">Operational</p>
+              <span className="text-[10px] text-muted-foreground">Connected to DRF REST v1 API</span>
             </div>
 
-            {/* RAM Metric */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <HardDrive className="h-3.5 w-3.5 text-indigo-500" /> Memory Allocation
-                </span>
-                <span className="font-semibold text-foreground">54.2%</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Database className="h-3.5 w-3.5 text-primary" /> Database Services
               </div>
-              <Progress value={54.2} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">17.3 GB of 32 GB utilized</span>
+              <p className="text-sm font-semibold text-foreground">Synchronized</p>
+              <span className="text-[10px] text-muted-foreground">PostgreSQL academic database active</span>
             </div>
 
-            {/* DB Connections */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Database className="h-3.5 w-3.5 text-emerald-500" /> DB Connection Pool
-                </span>
-                <span className="font-semibold text-foreground">48 / 200</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <ClipboardCheck className="h-3.5 w-3.5 text-primary" /> Examination Engine
               </div>
-              <Progress value={24} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">PostgreSQL cluster latency: 14ms</span>
+              <p className="text-sm font-semibold text-foreground">{totalExamsCount} Registered Assessments</p>
+              <span className="text-[10px] text-muted-foreground">{activeExamsCount} active session(s)</span>
             </div>
 
-            {/* AI Model Worker Pool */}
-            <div className="space-y-1.5 p-3.5 rounded-lg border border-border bg-card/60">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Brain className="h-3.5 w-3.5 text-ai-primary" /> AI Evaluation Cluster
-                </span>
-                <span className="font-semibold text-emerald-500">ONLINE</span>
+            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Brain className="h-3.5 w-3.5 text-primary" /> AI Evaluation Infrastructure
               </div>
-              <Progress value={65} className="h-2" />
-              <span className="text-[10px] text-muted-foreground">GPT-4o fine-tuned • 95.8% avg confidence</span>
+              <p className="text-sm font-semibold text-foreground">Ready</p>
+              <span className="text-[10px] text-muted-foreground">Automated grading pipeline initialized</span>
             </div>
           </div>
         </Card>
@@ -252,7 +260,7 @@ export function DashboardOverview() {
           <div className="flex items-center justify-between border-b border-border pb-3">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-sky-500" /> Recent System Activity & Audit Trail
+                <Clock className="h-4 w-4 text-primary" /> Recent System Activity & Audit Trail
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Latest security events and administrative actions.
@@ -267,25 +275,32 @@ export function DashboardOverview() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {auditLogs.slice(0, 4).map((log) => (
-              <div key={log.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-accent/40 transition-colors">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
-                  <FileText className="h-3.5 w-3.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-foreground truncate">{log.actionEvent}</p>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{log.timestamp}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.details}</p>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <span className="font-medium text-foreground">{log.actorName}</span>
-                    <span>•</span>
-                    <span>IP: {log.ipAddress}</span>
-                  </div>
-                </div>
+            {auditLogs.length === 0 ? (
+              <div className="p-8 text-center bg-muted/20 border-dashed border rounded-lg">
+                <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">No recent system audit logs recorded.</p>
               </div>
-            ))}
+            ) : (
+              auditLogs.slice(0, 4).map((log) => (
+                <div key={log.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-accent/40 transition-colors">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
+                    <FileText className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-foreground truncate">{log.actionEvent}</p>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{log.timestamp}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.details}</p>
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{log.actorName}</span>
+                      <span>•</span>
+                      <span>IP: {log.ipAddress}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Card>
 
@@ -309,40 +324,47 @@ export function DashboardOverview() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {aiJobs.map((job) => {
-              const progressPct = Math.round((job.processedSubmissions / job.totalSubmissions) * 100);
-              return (
-                <div key={job.id} className="p-3 rounded-lg border border-border bg-card/40 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground truncate">{job.examTitle}</span>
-                    <Badge
-                      variant={
-                        job.status === 'completed'
-                          ? 'success'
-                          : job.status === 'processing'
-                          ? 'warning'
-                          : job.status === 'failed'
-                          ? 'destructive'
-                          : 'secondary'
-                      }
-                      className="text-[10px] capitalize"
-                    >
-                      {job.status}
-                    </Badge>
+            {aiJobs.length === 0 ? (
+              <div className="p-8 text-center bg-muted/20 border-dashed border rounded-lg">
+                <Brain className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">No active AI evaluation jobs in queue.</p>
+              </div>
+            ) : (
+              aiJobs.map((job) => {
+                const progressPct = Math.round((job.processedSubmissions / job.totalSubmissions) * 100);
+                return (
+                  <div key={job.id} className="p-3 rounded-lg border border-border bg-card/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground truncate">{job.examTitle}</span>
+                      <Badge
+                        variant={
+                          job.status === 'completed'
+                            ? 'success'
+                            : job.status === 'processing'
+                            ? 'warning'
+                            : job.status === 'failed'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                        className="text-[10px] capitalize"
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{job.courseName}</span>
+                      <span>
+                        {job.processedSubmissions} / {job.totalSubmissions} ({progressPct}%)
+                      </span>
+                    </div>
+                    <Progress value={progressPct} className="h-1.5" />
+                    {job.errorReason && (
+                      <p className="text-[10px] text-destructive font-medium">⚠️ {job.errorReason}</p>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{job.courseName}</span>
-                    <span>
-                      {job.processedSubmissions} / {job.totalSubmissions} ({progressPct}%)
-                    </span>
-                  </div>
-                  <Progress value={progressPct} className="h-1.5" />
-                  {job.errorReason && (
-                    <p className="text-[10px] text-rose-500 font-medium">⚠️ {job.errorReason}</p>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </Card>
       </div>

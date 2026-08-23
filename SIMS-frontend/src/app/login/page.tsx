@@ -12,10 +12,12 @@ import { FormField, FormWrapper } from '@/components/forms';
 import { Button, Checkbox, Input, PasswordInput } from '@/components/ui';
 import { ROUTES } from '@/constants';
 import { AuthShell } from '@/features/auth/components';
-import { mockAuthService } from '@/features/auth/mock';
+import { authApi } from '@/features/auth/services';
 import { useAuthStore } from '@/features/auth/store';
-import { getHomeByRole } from '@/features/auth/utils';
 import { loginSchema, type LoginFormValues } from '@/features/auth/validation';
+import { handleAuthError } from '@/features/auth/utils/auth-errors';
+import { getHomeByRole } from '@/features/auth/utils';
+import { toast } from '@/components/feedback';
 
 function LoginFormContent() {
   const router = useRouter();
@@ -24,7 +26,7 @@ function LoginFormContent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const { user, isAuthenticated, isLoading, setError, setLoading, login: storeLogin } = useAuthStore();
+  const { user, isAuthenticated, isLoading, setError, setLoading, login: storeLogin, clearSession } = useAuthStore();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -36,24 +38,62 @@ function LoginFormContent() {
   });
 
   useEffect(() => {
+    if (isLoading) return;
     if (isAuthenticated && user) {
-      router.replace(redirectTo ?? getHomeByRole(user.role));
+      const home = getHomeByRole(user.role);
+      if (home === ROUTES.HOME) {
+        clearSession();
+      } else {
+        router.replace(redirectTo ?? home);
+      }
     }
-  }, [isAuthenticated, redirectTo, router, user]);
+  }, [isAuthenticated, isLoading, redirectTo, router, user, clearSession]);
+
+  // Clear errors when user types
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      if (formError) {
+        setFormError(null);
+        setError(null);
+        toast.dismiss('auth-error');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form.watch, formError, setError]);
 
   const onSubmit = async (values: LoginFormValues) => {
     setFormError(null);
     setSuccessMessage(null);
+    toast.dismiss('auth-error');
     setLoading(true);
     setError(null);
 
     try {
-      const response = await mockAuthService.login(values);
+      console.log('🔐 Login attempt:', { email: values.email, rememberMe: values.rememberMe });
+      console.log('🌐 API Base URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
+      
+      const response = await authApi.login(values);
+      
+      console.log('✅ Login successful:', { user: response.user, hasTokens: !!response.tokens });
+      console.log('👤 User role:', response.user.role);
+      console.log('🏠 Home URL will be:', getHomeByRole(response.user.role));
+      
       storeLogin({ user: response.user, tokens: response.tokens }, values.rememberMe);
-      setSuccessMessage(response.message);
-      router.replace(redirectTo ?? getHomeByRole(response.user.role));
+      
+      console.log('📦 Auth store after login:', {
+        isAuthenticated: useAuthStore.getState().isAuthenticated,
+        user: useAuthStore.getState().user,
+      });
+      
+      const homeUrl = redirectTo ?? getHomeByRole(response.user.role);
+      
+      console.log('🚀 Redirecting to:', homeUrl);
+      
+      toast.success(`Welcome back, ${response.user.firstName}!`, { id: 'auth-success' });
+      router.replace(homeUrl);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to sign in right now.';
+      console.error('❌ Login failed:', error);
+      const message = handleAuthError(error);
       setFormError(message);
       setError(message);
     } finally {
@@ -64,14 +104,8 @@ function LoginFormContent() {
   return (
     <>
       {formError ? (
-        <Alert variant="destructive" title="Unable to sign in" className="mb-4">
+        <Alert variant="destructive" title="Sign in failed" className="mb-4">
           {formError}
-        </Alert>
-      ) : null}
-
-      {successMessage ? (
-        <Alert variant="success" title="Signed in" className="mb-4">
-          {successMessage}
         </Alert>
       ) : null}
 
@@ -130,15 +164,7 @@ function LoginFormContent() {
         </Button>
       </FormWrapper>
 
-      <div className="rounded-2xl border border-border/70 bg-muted/40 p-4 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2 font-medium text-foreground">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          Demo credentials
-        </div>
-        <p className="mt-2">Admin: admin@example.com / Admin123!</p>
-        <p>Lecturer: lecturer@example.com / Lecturer123!</p>
-        <p>Student: student@example.com / Student123!</p>
-      </div>
+
     </>
   );
 }
@@ -160,10 +186,7 @@ export default function LoginPage() {
       description="Sign in to continue to your workspace."
       footer={
         <p className="text-sm text-muted-foreground">
-          New here?{' '}
-          <Link href={ROUTES.HOME} className="font-medium text-primary hover:underline">
-            Explore the platform
-          </Link>
+          Accounts are created and managed by Addis Ababa Science and Technology University. If you do not have an account, please contact your department or the system administrator.
         </p>
       }
     >

@@ -1,4 +1,8 @@
-// ─── User Roles ────────────────────────────────────────────────────────────────
+                            0
+                            
+                            
+                            
+                            // ─── User Roles ────────────────────────────────────────────────────────────────
 
 /**
  * The set of roles that a user may hold within the system.
@@ -16,6 +20,8 @@ export interface BaseUser {
   lastName: string;
   role: UserRole;
   avatarUrl?: string;
+  studentIdentifier?: string;
+  facultyIdentifier?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,8 +31,8 @@ export interface BaseUser {
  */
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
-  expiresAt: number; // Unix timestamp (ms)
+  refreshToken?: string;
+  expiresAt?: number; // Unix timestamp (ms)
 }
 
 /**

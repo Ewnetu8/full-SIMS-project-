@@ -13,11 +13,13 @@ import {
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
+import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import {
   Badge,
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -25,33 +27,57 @@ import {
   Progress,
   SearchInput,
 } from '@/components/ui';
+
 import { useAdminStore } from '../store';
+import { examApiService } from '../services/exam-api-service';
+import { ExamAnalyticsView } from '@/features/analytics/components/exam-analytics-view';
+
 import type { AdminExamOverview } from '../types';
 
 export function ExaminationManagement() {
   const {
     exams,
+    isLoadingExams,
     examSearchQuery,
     examStatusFilter,
+    fetchExams,
+    addExam,
     archiveExam,
     deleteExam,
     setExamSearchQuery,
     setExamStatusFilter,
+    fetchAdminData,
   } = useAdminStore();
+
+  React.useEffect(() => {
+    void fetchAdminData();
+  }, [fetchAdminData]);
 
   const [selectedExam, setSelectedExam] = React.useState<AdminExamOverview | null>(null);
   const [deletingExam, setDeletingExam] = React.useState<AdminExamOverview | null>(null);
 
+  React.useEffect(() => {
+    fetchExams();
+  }, [fetchExams]);
+
   const handleArchive = (exam: AdminExamOverview) => {
-    archiveExam(exam.id);
-    toast.success('Exam archived', { description: `${exam.title} archived.` });
+    try {
+      archiveExam(exam.id);
+      toast.success('Exam archived successfully.');
+    } catch (err: any) {
+      toast.error(getUserFriendlyErrorMessage(err));
+    }
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingExam) {
-      deleteExam(deletingExam.id);
-      toast.success('Exam removed', { description: `${deletingExam.title} deleted.` });
-      setDeletingExam(null);
+      try {
+        await deleteExam(deletingExam.id);
+        toast.success('Exam record deleted successfully.');
+        setDeletingExam(null);
+      } catch (err: any) {
+        toast.error(getUserFriendlyErrorMessage(err));
+      }
     }
   };
 
@@ -74,7 +100,7 @@ export function ExaminationManagement() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6 text-sky-500" /> Institutional Examination Management
+          <ClipboardCheck className="h-6 w-6 text-primary" /> Institutional Examination Management
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Monitor examination sessions, participation metrics, publication statuses, and archive records.
@@ -124,7 +150,7 @@ export function ExaminationManagement() {
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="font-mono text-xs font-bold text-emerald-500">{exam.courseCode}</span>
+                    <span className="font-mono text-xs font-bold text-success">{exam.courseCode}</span>
                     <h3 className="text-base font-semibold text-foreground mt-0.5">{exam.title}</h3>
                     <p className="text-xs text-muted-foreground">{exam.courseName}</p>
                   </div>
@@ -146,15 +172,15 @@ export function ExaminationManagement() {
 
                 <div className="space-y-1.5 text-xs text-muted-foreground pt-1">
                   <div className="flex items-center gap-2">
-                    <UserCheck className="h-3.5 w-3.5 text-indigo-400" />
+                    <UserCheck className="h-3.5 w-3.5 text-primary" />
                     <span>Lecturer: <strong className="text-foreground">{exam.lecturerName}</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 text-sky-400" />
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
                     <span>Window: {exam.startDate} — {exam.endDate}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 text-amber-400" />
+                    <Clock className="h-3.5 w-3.5 text-accent" />
                     <span>Duration: {exam.durationMinutes} Minutes</span>
                   </div>
                 </div>
@@ -180,13 +206,13 @@ export function ExaminationManagement() {
                 </Button>
                 {exam.status !== 'archived' && (
                   <Button variant="outline" size="sm" onClick={() => handleArchive(exam)}>
-                    <Archive className="h-4 w-4 mr-1 text-amber-500" /> Archive
+                    <Archive className="h-4 w-4 mr-1 text-accent" /> Archive
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => setDeletingExam(exam)}
                 >
                   <Trash2 className="h-4 w-4 mr-1" /> Remove
@@ -200,17 +226,19 @@ export function ExaminationManagement() {
       {/* View Exam Details Modal */}
       {selectedExam && (
         <Dialog open={!!selectedExam} onOpenChange={() => setSelectedExam(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <ClipboardCheck className="h-5 w-5 text-sky-500" /> Examination Details
+                <ClipboardCheck className="h-5 w-5 text-primary" /> Examination Details
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-3 text-xs text-foreground">
+            <DialogBody className="space-y-4 py-3 text-xs text-foreground max-h-[75vh] overflow-y-auto">
               <div>
-                <span className="font-mono font-bold text-emerald-500">{selectedExam.courseCode}</span>
-                <h3 className="text-base font-bold text-foreground mt-0.5">{selectedExam.title}</h3>
+                <span className="font-mono font-bold text-success text-xs px-2 py-0.5 rounded bg-success/10 border border-success/20">
+                  {selectedExam.courseCode}
+                </span>
+                <h3 className="text-base font-bold text-foreground mt-2">{selectedExam.title}</h3>
                 <p className="text-muted-foreground">{selectedExam.courseName}</p>
               </div>
 
@@ -237,16 +265,43 @@ export function ExaminationManagement() {
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground">Student Submissions:</span>
-                  <span className="font-bold text-emerald-500">
+                  <span className="font-bold text-success">
                     {selectedExam.participatedStudents} of {selectedExam.totalStudents} Students
                   </span>
                 </div>
               </div>
-            </div>
+
+              {/* Embedded Live Exam Analytics */}
+              <div className="border-t border-border pt-4">
+                <h4 className="font-semibold text-foreground text-sm mb-3">Live Exam Analytics Dashboard</h4>
+                <ExamAnalyticsView examId={selectedExam.id} examTitle={selectedExam.title} />
+              </div>
+            </DialogBody>
 
             <DialogFooter>
-              <Button onClick={() => setSelectedExam(null)}>Close</Button>
+              {selectedExam.status === 'completed' && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await examApiService.publishExam(selectedExam.id);
+                      toast.success('Exam results published successfully.');
+                      fetchExams();
+                      setSelectedExam(null);
+                    } catch (err: any) {
+                      toast.error('Cannot publish examination', {
+                        description: 'Ensure all student attempts are fully graded before publishing.',
+                      });
+                    }
+                  }}
+                >
+                  Publish Results
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setSelectedExam(null)}>Close</Button>
             </DialogFooter>
+
           </DialogContent>
         </Dialog>
       )}

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'results.apps.ResultsConfig',
     'notifications.apps.NotificationsConfig',
     'audit.apps.AuditConfig',
+    'management.apps.ManagementConfig',
 ]
 
 MIDDLEWARE = [
@@ -223,8 +224,27 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
+# Registration domain restriction
+ALLOWED_REGISTRATION_DOMAIN_REGEX = os.environ.get(
+    'ALLOWED_REGISTRATION_DOMAIN_REGEX',
+    r'.*\.?aastu\.edu\.et$',
+)
+
+# MFA (TOTP) settings
+MFA_TOTP_STEP = 30           # TOTP time step in seconds
+MFA_VALID_WINDOW = 1         # Accept codes ±N steps from current
+MFA_TOKEN_LIFETIME = 300     # Short-lived mfa_token JWT lifetime in seconds (5 min)
+MFA_ENCRYPTION_KEY = os.environ.get(
+    'MFA_ENCRYPTION_KEY',
+    'mfa-dev-encryption-key-change-in-prod',
+)
+
 # Celery Beat schedule
 CELERY_BEAT_SCHEDULE = {
+    'exam-expiry-sweep': {
+        'task': 'exams.tasks.close_expired_exams_and_grade',
+        'schedule': 60.0,  # Every minute
+    },
     'archive-old-records': {
         'task': 'notifications.tasks.archive_old_records',
         'schedule': 86400.0,  # Run daily (in seconds)

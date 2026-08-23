@@ -14,7 +14,14 @@ export * from './navigation';
 export * from './ui';
 
 // Forms
-export * from './forms';
+export {
+  FormWrapper, FormField, HelperText, ErrorMessage,
+  FileUpload, DatePicker, MultiSelect,
+} from './forms';
+export type {
+  FormWrapperProps, FormFieldProps, FileUploadProps,
+  DatePickerProps, MultiSelectProps,
+} from './forms';
 
 // Feedback
 export * from './feedback';

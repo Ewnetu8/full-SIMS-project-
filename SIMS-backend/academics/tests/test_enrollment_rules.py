@@ -17,7 +17,7 @@ def setup_enrollment_data():
     dept = Department.objects.create(college=col, name="Enroll Dept", code="ED")
     prog = Program.objects.create(department=dept, name="Enroll Prog", code="EP")
 
-    user = User.objects.create_user(email="std1@example.com", password="pass", role=RoleChoices.STUDENT)
+    user = User.objects.create_user(email="std1@aastu.edu.et", password="pass", role=RoleChoices.STUDENT)
     student = Student.objects.create(user=user, student_identifier="ST1001", class_standing=ClassStandingChoices.FRESHMAN)
 
     c1 = Course.objects.create(program=prog, title="Intro CS", course_code="CS101", credit_hours=3, intended_class_standing=ClassStandingChoices.FRESHMAN)

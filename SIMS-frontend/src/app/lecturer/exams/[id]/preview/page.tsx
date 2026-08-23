@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+
 import { LecturerShell, ExamPreview } from '@/features/lecturer/components';
 
 interface Props {

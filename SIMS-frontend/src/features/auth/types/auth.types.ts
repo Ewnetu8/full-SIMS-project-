@@ -43,17 +43,6 @@ export interface RefreshTokenResponse {
   tokens: AuthTokens;
 }
 
-// ─── Session Cookie Payload ───────────────────────────────────────────────────
-// Stored in an httpOnly cookie so the Edge Middleware can inspect it.
-// Keep this minimal — never include sensitive fields like tokens.
-
-export interface SessionCookiePayload {
-  userId:     string;
-  role:       UserRole;
-  exp:        number;   // Unix timestamp (ms)
-  rememberMe: boolean;
-}
-
 // ─── Auth Store Types ─────────────────────────────────────────────────────────
 
 export interface AuthState {
@@ -81,6 +70,8 @@ export interface AuthActions {
   clearSession:   () => void;
   /** Update tokens after a refresh without changing the user. */
   refreshSession: (tokens: AuthTokens) => void;
+  /** Restore session from HttpOnly refresh cookie during app startup. */
+  initializeAuth: () => Promise<void>;
   /** Apply profile updates from the backend or profile form. */
   updateProfile:  (user: BaseUser) => void;
 }

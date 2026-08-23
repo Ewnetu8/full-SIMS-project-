@@ -14,7 +14,9 @@ import * as React from 'react';
 
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { lecturerService } from '../services';
+
 import type { Course, LecturerExam } from '../types';
 
 interface CourseDetailProps {
@@ -58,7 +60,7 @@ export function CourseDetail({ courseId }: CourseDetailProps) {
     );
   }
 
-  const published = exams.filter((e) => e.status === 'PUBLISHED').length;
+  const published = exams.filter((e) => e.status === 'PUBLISHED' || e.status === 'ACTIVE' || e.status === 'SCHEDULED').length;
   const draft = exams.filter((e) => e.status === 'DRAFT').length;
   const closed = exams.filter((e) => e.status === 'CLOSED').length;
 

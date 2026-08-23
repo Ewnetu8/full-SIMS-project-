@@ -15,7 +15,7 @@ def test_process_batch_enrollment_csv_task():
     dept = Department.objects.create(college=col, name="Batch Dept", code="BD")
     prog = Program.objects.create(department=dept, name="Batch Prog", code="BP")
 
-    user = User.objects.create_user(email="batch_std@example.com", password="pass", role=RoleChoices.STUDENT)
+    user = User.objects.create_user(email="batch_std@aastu.edu.et", password="pass", role=RoleChoices.STUDENT)
     student = Student.objects.create(user=user, student_identifier="BATCH001", class_standing=ClassStandingChoices.FRESHMAN)
 
     course = Course.objects.create(program=prog, title="Batch CS", course_code="CS100", credit_hours=3, intended_class_standing=ClassStandingChoices.FRESHMAN)

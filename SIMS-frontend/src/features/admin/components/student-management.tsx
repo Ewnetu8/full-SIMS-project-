@@ -6,7 +6,6 @@ import {
   BookOpen,
   Award,
   Calendar,
-  CheckCircle,
   Building,
   Mail,
 } from 'lucide-react';
@@ -17,40 +16,61 @@ import {
   Button,
   Card,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   SearchInput,
 } from '@/components/ui';
+
 import { useAdminStore } from '../store';
+
 import type { StudentProfile } from '../types';
 
 export function StudentManagement() {
   const {
     students,
     departments,
+    colleges,
     studentSearchQuery,
     studentDeptFilter,
+    fetchStudents,
     setStudentSearchQuery,
     setStudentDeptFilter,
   } = useAdminStore();
 
+  React.useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
+
   const [selectedStudent, setSelectedStudent] = React.useState<StudentProfile | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
-  const itemsPerPage = 5;
+  const [studentCollegeFilter, setStudentCollegeFilter] = React.useState<string>('ALL');
+  const itemsPerPage = 10;
 
-  const filteredStudents = students.filter((s) => {
-    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
-    const matchesSearch =
-      fullName.includes(studentSearchQuery.toLowerCase()) ||
-      s.email.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
-      s.studentId.toLowerCase().includes(studentSearchQuery.toLowerCase());
+  const filteredDepartments = React.useMemo(() => {
+    if (!studentCollegeFilter || studentCollegeFilter === 'ALL') return departments;
+    return departments.filter(
+      (d) =>
+        d.college === studentCollegeFilter ||
+        (colleges.find((c) => c.name === studentCollegeFilter || c.code === studentCollegeFilter)?.id === d.college)
+    );
+  }, [departments, colleges, studentCollegeFilter]);
 
-    const matchesDept = studentDeptFilter === 'ALL' || s.department === studentDeptFilter;
+  const filteredStudents = React.useMemo(() => {
+    return students.filter((s) => {
+      const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+      const matchesSearch =
+        fullName.includes(studentSearchQuery.toLowerCase()) ||
+        s.email.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+        s.studentId.toLowerCase().includes(studentSearchQuery.toLowerCase());
 
-    return matchesSearch && matchesDept;
-  });
+      const matchesDept = studentDeptFilter === 'ALL' || s.department === studentDeptFilter;
+
+      return matchesSearch && matchesDept;
+    });
+  }, [students, studentSearchQuery, studentDeptFilter]);
 
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
   const paginatedStudents = filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -61,18 +81,20 @@ export function StudentManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-          <GraduationCap className="h-6 w-6 text-blue-500" /> Student Directory
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          View all enrolled student profiles, academic standings, programs, and course enrollments.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
+            <GraduationCap className="h-6 w-6 text-primary" /> Student Directory
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View student profiles, academic standings, and departmental affiliations.
+          </p>
+        </div>
       </div>
 
       {/* Filter Bar */}
       <Card className="p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <SearchInput
               placeholder="Search by student name, ID, or email..."
@@ -88,6 +110,25 @@ export function StudentManagement() {
           <div>
             <select
               className={selectClass}
+              value={studentCollegeFilter}
+              onChange={(e) => {
+                setStudentCollegeFilter(e.target.value);
+                setStudentDeptFilter('ALL');
+                setCurrentPage(1);
+              }}
+            >
+              <option value="ALL">All Colleges</option>
+              {colleges.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {col.name} ({col.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              className={selectClass}
               value={studentDeptFilter}
               onChange={(e) => {
                 setStudentDeptFilter(e.target.value);
@@ -95,9 +136,9 @@ export function StudentManagement() {
               }}
             >
               <option value="ALL">All Academic Departments</option>
-              {departments.map((d) => (
+              {filteredDepartments.map((d) => (
                 <option key={d.id} value={d.name}>
-                  {d.name}
+                  {d.name} ({d.code})
                 </option>
               ))}
             </select>
@@ -115,7 +156,7 @@ export function StudentManagement() {
                 <th className="px-4 py-3.5">Student Name</th>
                 <th className="px-4 py-3.5">Department</th>
                 <th className="px-4 py-3.5">Program</th>
-                <th className="px-4 py-3.5">Academic Year</th>
+                <th className="px-4 py-3.5">Academic Level</th>
                 <th className="px-4 py-3.5">GPA</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5 text-right">Actions</th>
@@ -124,8 +165,14 @@ export function StudentManagement() {
             <tbody className="divide-y divide-border">
               {paginatedStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No student profiles match your search criteria.
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    <GraduationCap className="mx-auto h-10 w-10 text-muted-foreground/40 mb-2" />
+                    <p className="font-medium text-foreground">No student profiles found</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {studentSearchQuery || studentDeptFilter !== 'ALL' || studentCollegeFilter !== 'ALL'
+                        ? 'No student profiles match your search criteria.'
+                        : 'No student profiles are currently available.'}
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -134,9 +181,9 @@ export function StudentManagement() {
                     <td className="px-4 py-3.5 font-mono text-xs font-semibold text-primary">{std.studentId}</td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold text-xs shrink-0">
-                          {std.firstName[0]}
-                          {std.lastName[0]}
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
+                          {std.firstName?.[0] || 'S'}
+                          {std.lastName?.[0] || ''}
                         </div>
                         <div>
                           <p className="font-semibold text-foreground">
@@ -146,12 +193,12 @@ export function StudentManagement() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{std.department}</td>
-                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{std.program}</td>
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{std.academicYear}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground max-w-[180px] truncate">{std.department || '—'}</td>
+                    <td className="px-4 py-3.5 text-xs text-foreground font-medium">{std.program || '—'}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{std.academicYear || std.classStanding || '—'}</td>
                     <td className="px-4 py-3.5">
-                      <Badge variant="outline" className="font-mono font-bold text-emerald-500 bg-emerald-500/10 border-emerald-500/20">
-                        {std.gpa.toFixed(2)}
+                      <Badge variant="outline" className="font-mono font-bold text-success bg-success/10 border-success/20">
+                        {(std.gpa ?? 0).toFixed(2)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3.5">
@@ -202,18 +249,18 @@ export function StudentManagement() {
       {/* Student Profile Modal */}
       {selectedStudent && (
         <Dialog open={!!selectedStudent} onOpenChange={() => setSelectedStudent(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-blue-500" /> Student Profile & Academic Record
+                <GraduationCap className="h-5 w-5 text-primary" /> Student Profile & Academic Record
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-3">
+            <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
               <div className="flex items-center gap-4 border-b border-border pb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold text-xl">
-                  {selectedStudent.firstName[0]}
-                  {selectedStudent.lastName[0]}
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xl shrink-0">
+                  {selectedStudent.firstName?.[0] || 'S'}
+                  {selectedStudent.lastName?.[0] || ''}
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">
@@ -233,38 +280,40 @@ export function StudentManagement() {
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Building className="h-3.5 w-3.5" /> Department:
                   </span>
-                  <span className="font-medium text-right max-w-[200px]">{selectedStudent.department}</span>
+                  <span className="font-medium text-right max-w-[240px]">{selectedStudent.department || 'Not assigned'}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <BookOpen className="h-3.5 w-3.5" /> Program of Study:
                   </span>
-                  <span className="font-medium">{selectedStudent.program}</span>
+                  <span className="font-medium">{selectedStudent.program || 'Not assigned'}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" /> Current Academic Level:
+                    <Calendar className="h-3.5 w-3.5" /> Academic Level:
                   </span>
-                  <span className="font-medium">{selectedStudent.academicYear}</span>
+                  <span className="font-medium">{selectedStudent.academicYear || selectedStudent.classStanding || '—'}</span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
                     <Award className="h-3.5 w-3.5" /> Cumulative GPA:
                   </span>
-                  <span className="font-mono font-bold text-emerald-500">{selectedStudent.gpa.toFixed(2)} / 4.00</span>
+                  <span className="font-mono font-bold text-success">{(selectedStudent.gpa ?? 0).toFixed(2)} / 4.00</span>
                 </div>
 
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <CheckCircle className="h-3.5 w-3.5" /> Enrolled Courses:
+                    Status:
                   </span>
-                  <span className="font-semibold text-foreground">{selectedStudent.enrolledCoursesCount} Courses</span>
+                  <Badge variant={selectedStudent.status === 'active' ? 'success' : 'secondary'} className="capitalize">
+                    {selectedStudent.status}
+                  </Badge>
                 </div>
               </div>
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button onClick={() => setSelectedStudent(null)}>Close</Button>

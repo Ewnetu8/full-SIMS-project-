@@ -103,3 +103,20 @@ export function pluralise(count: number, singular: string, plural?: string): str
   if (count === 1) return singular;
   return plural ?? `${singular}s`;
 }
+
+/**
+ * Safely formats a user's display name, handling backend/frontend naming differences.
+ * Fallbacks to email or "User" if names are not available.
+ */
+export function getUserDisplayName(user: any): string {
+  if (!user) return 'User';
+
+  const displayName =
+    user.full_name ||
+    user.fullName ||
+    `${user.firstName ?? user.first_name ?? ''} ${user.lastName ?? user.last_name ?? ''}`.trim() ||
+    user.email ||
+    'User';
+
+  return displayName;
+}

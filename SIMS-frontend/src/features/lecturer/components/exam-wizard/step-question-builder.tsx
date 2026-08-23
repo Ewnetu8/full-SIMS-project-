@@ -9,6 +9,8 @@ import {
   Plus,
   Trash2,
   X,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -26,7 +28,14 @@ import {
   Switch,
   Textarea,
 } from '@/components/ui';
+
 import { useLecturerStore } from '../../store';
+import { 
+  useExamQuestions,
+  useCreateExamQuestion,
+  useDeleteExamQuestion 
+} from '../../hooks/use-exam-questions';
+
 import type { Question, QuestionOption, QuestionType } from '../../types';
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
@@ -72,6 +81,20 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
     useLecturerStore();
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = React.useState<Question | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  // Backend integration hooks
+  const examinationId = (wizardData as any).examinationId; // ID if editing existing exam
+  const { data: backendQuestions, isLoading: loadingBackend } = useExamQuestions(examinationId);
+  const createQuestion = useCreateExamQuestion();
+  const deleteQuestion = useDeleteExamQuestion();
+
+  // Load backend questions into wizard on mount (if editing existing exam)
+  React.useEffect(() => {
+    if (backendQuestions && backendQuestions.length > 0 && wizardData.questions.length === 0) {
+      backendQuestions.forEach(q => addQuestion(q));
+    }
+  }, [backendQuestions]);
 
   function openNew() {
     const q = createDefaultQuestion();
@@ -79,16 +102,34 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
     setExpandedId(q.id);
   }
 
-  function saveQuestion() {
+  async function saveQuestion() {
     if (!editingQuestion) return;
-    const existingIndex = wizardData.questions.findIndex((q) => q.id === editingQuestion.id);
-    if (existingIndex >= 0) {
-      updateQuestion(existingIndex, editingQuestion);
-    } else {
-      addQuestion(editingQuestion);
+    
+    setIsSaving(true);
+    try {
+      // Save to backend if we have an examination ID
+      if (examinationId) {
+        await createQuestion.mutateAsync({
+          question: editingQuestion,
+          examinationId,
+        });
+      }
+
+      // Update local wizard state
+      const existingIndex = wizardData.questions.findIndex((q) => q.id === editingQuestion.id);
+      if (existingIndex >= 0) {
+        updateQuestion(existingIndex, editingQuestion);
+      } else {
+        addQuestion(editingQuestion);
+      }
+
+      setEditingQuestion(null);
+      setExpandedId(null);
+    } catch (error) {
+      console.error('Failed to save question:', error);
+    } finally {
+      setIsSaving(false);
     }
-    setEditingQuestion(null);
-    setExpandedId(null);
   }
 
   function openEdit(index: number) {
@@ -106,7 +147,21 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       id: generateId(),
       options: q.options?.map((o) => ({ ...o, id: generateOptionId() })),
     };
+    // Note: Duplicated questions are only in local state until manually saved to backend
     addQuestion(copy);
+  }
+
+  async function handleRemoveQuestion(index: number) {
+    const q = wizardData.questions[index];
+    if (!q) return;
+
+    // If question exists in backend (has valid UUID), soft delete it
+    if (examinationId && q.id && !q.id.startsWith('q-')) {
+      await deleteQuestion.mutateAsync(q.id);
+    }
+
+    // Remove from local state
+    removeQuestion(index);
   }
 
   function updateEditingType(type: QuestionType) {
@@ -166,6 +221,16 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
   }
 
   const totalMarksUsed = wizardData.questions.reduce((acc, q) => acc + q.marks, 0);
+
+  // Show loading state while fetching backend questions
+  if (loadingBackend) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-3 text-muted-foreground">Loading questions...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -384,9 +449,10 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                   <Button
                     type="button"
                     onClick={saveQuestion}
-                    disabled={!editingQuestion.prompt.trim()}
+                    disabled={!editingQuestion.prompt.trim() || isSaving}
+                    leftIcon={isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   >
-                    Save Question
+                    {isSaving ? 'Saving...' : 'Save Question'}
                   </Button>
                 </div>
               </CardContent>
@@ -466,7 +532,7 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                         type="button"
                         variant="ghost"
                         size="xs"
-                        onClick={() => removeQuestion(index)}
+                        onClick={() => handleRemoveQuestion(index)}
                         aria-label="Remove question"
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >

@@ -41,12 +41,13 @@ export const defaultNavItems: NavItem[] = [
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface SidebarProps {
-  navItems?:   NavItem[];
-  collapsed?:  boolean;
-  onCollapse?: (v: boolean) => void;
-  className?:  string;
-  logo?:       React.ReactNode;
-  footer?:     React.ReactNode;
+  navItems?:       NavItem[];
+  collapsed?:      boolean;
+  onCollapse?:     (v: boolean) => void;
+  onNavItemClick?: () => void;
+  className?:      string;
+  logo?:           React.ReactNode;
+  footer?:         React.ReactNode;
 }
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
@@ -61,6 +62,7 @@ export function Sidebar({
   navItems = defaultNavItems,
   collapsed = false,
   onCollapse,
+  onNavItemClick,
   className,
   logo,
   footer,
@@ -82,10 +84,8 @@ export function Sidebar({
       {/* Logo / Brand */}
       <div className="flex h-14 items-center border-b border-sidebar-border px-4 shrink-0">
         {logo ?? (
-          <Link href="/" className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-ai-primary text-white text-sm font-bold shadow-sm">
-              E
-            </span>
+          <Link href="/" onClick={onNavItemClick} className="flex items-center gap-3 min-w-0">
+            <img src="/images/aastu-logo.jpg" alt="AASTU Logo" className="h-7 w-auto rounded-md bg-white p-0.5 shrink-0" />
             <AnimatePresence>
               {!collapsed && (
                 <motion.span
@@ -96,7 +96,7 @@ export function Sidebar({
                   transition={{ duration: 0.2 }}
                   className="font-semibold text-sidebar-foreground text-sm overflow-hidden whitespace-nowrap"
                 >
-                  ExamSphere
+                  AASTU Grading
                 </motion.span>
               )}
             </AnimatePresence>
@@ -112,6 +112,7 @@ export function Sidebar({
             item={item}
             isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
             collapsed={collapsed}
+            onNavItemClick={onNavItemClick}
           />
         ))}
       </nav>
@@ -151,21 +152,23 @@ export function Sidebar({
 // ─── Sidebar Nav Item ─────────────────────────────────────────────────────────
 
 interface SidebarNavItemProps {
-  item:      NavItem;
-  isActive:  boolean;
-  collapsed: boolean;
+  item:           NavItem;
+  isActive:       boolean;
+  collapsed:      boolean;
+  onNavItemClick?: () => void;
 }
 
-function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
+function SidebarNavItem({ item, isActive, collapsed, onNavItemClick }: SidebarNavItemProps) {
   const link = (
     <Link
       href={item.href}
+      onClick={onNavItemClick}
       className={cn(
         'group flex items-center gap-3 rounded-lg px-2 py-2 text-sm',
         'transition-all duration-200 relative',
         isActive
-          ? 'bg-sidebar-primary text-white font-medium shadow-sm'
-          : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent',
+          ? 'bg-[#102A7A] dark:bg-sidebar-accent text-white [&_svg]:text-white font-semibold shadow-xs'
+          : 'text-slate-600 dark:text-sidebar-muted [&_svg]:text-slate-500 dark:[&_svg]:text-sidebar-muted hover:bg-blue-50 dark:hover:bg-sidebar-accent/10 hover:text-[#102A7A] dark:hover:text-sidebar-foreground hover:[&_svg]:text-[#102A7A] dark:hover:[&_svg]:text-sidebar-foreground',
       )}
       aria-current={isActive ? 'page' : undefined}
     >
@@ -185,7 +188,14 @@ function SidebarNavItem({ item, isActive, collapsed }: SidebarNavItemProps) {
         )}
       </AnimatePresence>
       {!collapsed && item.badge !== undefined && (
-        <span className="ml-auto rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+        <span
+          className={cn(
+            'ml-auto rounded-full px-1.5 py-0.5 text-xs font-medium',
+            isActive
+              ? 'bg-white/20 text-white'
+              : 'bg-primary/15 text-primary',
+          )}
+        >
           {item.badge}
         </span>
       )}

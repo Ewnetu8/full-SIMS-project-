@@ -17,10 +17,13 @@ import {
   DialogTitle,
 } from '@/components/ui';
 import { ROUTES } from '@/constants';
+
 import { examinationService } from '../services';
 import { useExaminationStore } from '../store';
-import type { ExaminationAnswer, ExaminationSession } from '../types';
+
 import { AutoSaveIndicator, ExaminationQuestionCard } from './question-card';
+
+import type { ExaminationAnswer, ExaminationSession } from '../types';
 
 const hasAnswer = (answer: ExaminationAnswer | undefined): boolean =>
   Array.isArray(answer) ? answer.length > 0 : Boolean(answer?.trim());
@@ -76,18 +79,47 @@ export function ExaminationRunner({ session }: { session: ExaminationSession }) 
     }
   }, [secondsRemaining, sessionState]);
 
+  const handleAnswerChange = async (questionId: string, questionType: string, answerVal: ExaminationAnswer) => {
+    setAnswer(questionId, answerVal);
+    if (session.attemptId) {
+      setSaving();
+      try {
+        await examinationService.saveSingleAnswer(session.attemptId, questionId, questionType, answerVal);
+        setSaved(new Date().toISOString());
+      } catch (e) {
+        console.error('Failed to auto-save answer:', e);
+      }
+    }
+  };
+
   const triggerAutoSave = async () => {
+    if (!session.attemptId) return;
     setSaving();
-    await examinationService.saveAnswers(session.examId, useExaminationStore.getState().answers);
-    setSaved(new Date().toISOString());
+    try {
+      const currentAnswers = useExaminationStore.getState().answers;
+      for (const q of session.questions) {
+        const val = currentAnswers[q.id];
+        if (val !== undefined) {
+          await examinationService.saveSingleAnswer(session.attemptId, q.id, q.type, val);
+        }
+      }
+      setSaved(new Date().toISOString());
+    } catch (e) {
+      console.error('Auto-save sync error:', e);
+    }
   };
 
   const submitExam = async () => {
     setIsSubmitting(true);
-    await triggerAutoSave();
-    const receipt = await examinationService.submit(session, useExaminationStore.getState().answers);
-    setReceipt(receipt);
-    router.replace(ROUTES.STUDENT.EXAM_SUBMITTED(session.examId));
+    try {
+      await triggerAutoSave();
+      const receipt = await examinationService.submit(session, useExaminationStore.getState().answers);
+      setReceipt(receipt);
+      router.replace(ROUTES.STUDENT.EXAM_SUBMITTED(session.examId));
+    } catch (e: any) {
+      setIsSubmitting(false);
+      console.error('Submission failed:', e);
+    }
   };
 
   const activeQuestion = session.questions[currentQuestionIndex] ?? session.questions[0];
@@ -170,7 +202,7 @@ export function ExaminationRunner({ session }: { session: ExaminationSession }) 
                 total={session.questions.length}
                 answer={answers[activeQuestion.id]}
                 flagged={flaggedQuestionIds.includes(activeQuestion.id)}
-                onChange={(ans) => setAnswer(activeQuestion.id, ans)}
+                onChange={(ans) => handleAnswerChange(activeQuestion.id, activeQuestion.type, ans)}
                 onToggleFlag={() => toggleFlag(activeQuestion.id)}
               />
             </motion.div>

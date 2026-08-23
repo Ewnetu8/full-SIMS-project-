@@ -1,19 +1,29 @@
 from django.urls import path
 
 from results.views import (
+    AdvisingReportView,
     AssessmentDetailView,
     AssessmentListCreateView,
     AssessmentMarksView,
+    ExamAnalyticsView,
+    ExamResultsView,
     GradebookView,
     MarkDetailView,
     MyCoursesView,
     PublishCourseResultsView,
     StudentMyMarksView,
+    StudentResultsView,
     TeachingAssignmentDetailView,
     TeachingAssignmentListCreateView,
 )
 
 urlpatterns = [
+    # ── Exam analytics & results (exams pipeline) ──────────────────────
+    path("analytics/exam/<uuid:pk>", ExamAnalyticsView.as_view(), name="exam_analytics"),
+    path("analytics/advising", AdvisingReportView.as_view(), name="advising_report"),
+    path("results/me", StudentResultsView.as_view(), name="student_results"),
+    path("results/exam/<uuid:pk>", ExamResultsView.as_view(), name="exam_results"),
+    # ── Continuous assessment marks (tests / assignments / other) ─────
     path(
         "teaching-assignments",
         TeachingAssignmentListCreateView.as_view(),

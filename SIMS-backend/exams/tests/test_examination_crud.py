@@ -29,7 +29,7 @@ _counter = 0
 def create_lecturer():
     global _counter
     _counter += 1
-    email = f"lecturer{_counter}@example.com"
+    email = f"lecturer{_counter}@aastu.edu.et"
     identifier = f"L{_counter:03d}"
     user = User.objects.create_user(
         email=email, password="strongpass123", role=RoleChoices.LECTURER
@@ -151,7 +151,7 @@ def test_lecturer_sees_only_own_examinations(client):
 
 def test_illegal_transition_rejected(client):
     admin = User.objects.create_user(
-        email="admin@example.com", password="strongpass123", role=RoleChoices.ADMIN
+        email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.ADMIN
     )
     token = auth_client(client, admin)
     exam = create_exam()
@@ -177,7 +177,7 @@ def test_illegal_transition_rejected(client):
 
 def test_state_machine_is_strictly_forward(client):
     admin = User.objects.create_user(
-        email="admin@example.com", password="strongpass123", role=RoleChoices.ADMIN
+        email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.ADMIN
     )
     token = auth_client(client, admin)
     exam = create_exam()
@@ -292,12 +292,12 @@ def test_question_edits_allowed_in_draft(client):
 
 def test_delete_exam_with_attempts_conflicts(client):
     admin = User.objects.create_user(
-        email="admin@example.com", password="strongpass123", role=RoleChoices.ADMIN
+        email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.ADMIN
     )
     token = auth_client(client, admin)
     exam = create_exam()
     student_user = User.objects.create_user(
-        email="student@example.com",
+        email="student@aastu.edu.et",
         password="strongpass123",
         role=RoleChoices.STUDENT,
     )

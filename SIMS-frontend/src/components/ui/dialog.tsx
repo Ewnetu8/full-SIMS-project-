@@ -10,10 +10,10 @@ import { IconButton } from './icon-button';
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-const Dialog        = DialogPrimitive.Root;
+const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
-const DialogClose   = DialogPrimitive.Close;
-const DialogPortal  = DialogPrimitive.Portal;
+const DialogClose = DialogPrimitive.Close;
+const DialogPortal = DialogPrimitive.Portal;
 
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
@@ -44,10 +44,10 @@ export interface DialogContentProps
 }
 
 const sizeClasses = {
-  sm:   'max-w-sm',
-  md:   'max-w-md',
-  lg:   'max-w-lg',
-  xl:   'max-w-2xl',
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-2xl',
   full: 'max-w-[95vw]',
 };
 

@@ -19,13 +19,15 @@ interface AuthShellProps {
 
 export function AuthShell({ title, description, children, footer, className }: AuthShellProps) {
   return (
-    <AppLayout className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(63,94,251,0.16),_transparent_35%),linear-gradient(135deg,_hsl(var(--background))_0%,_hsl(var(--muted))_100%)]">
+    <AppLayout className="min-h-screen bg-[radial-gradient(circle_at_top_left,_color-mix(in_srgb,var(--primary)_16%,transparent),_transparent_35%),linear-gradient(135deg,_var(--background)_0%,_var(--muted)_100%)]">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8">
         <header className="flex items-center justify-between">
-          <Link href="/" className="inline-flex items-center gap-3 rounded-full px-2 py-1 transition hover:bg-accent/60">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-              <LockKeyhole className="h-5 w-5" />
-            </div>
+          <Link href="/" className="inline-flex items-center gap-3 rounded-full px-2 py-1 transition hover:opacity-80">
+            <img 
+              src="/images/aastu-logo.jpg" 
+              alt="AASTU Logo" 
+              className="h-10 w-auto rounded-md bg-white p-1 shrink-0" 
+            />
             <div>
               <p className="text-sm font-semibold tracking-tight">{APP_NAME}</p>
               <p className="text-xs text-muted-foreground">{ORGANIZATION_NAME}</p>
@@ -59,7 +61,12 @@ export function AuthShell({ title, description, children, footer, className }: A
             </section>
 
             <Card className={cn('mx-auto w-full max-w-md border-border/60 shadow-xl', className)}>
-              <CardHeader className="space-y-2">
+              <CardHeader className="space-y-2 text-center flex flex-col items-center">
+                <img 
+                  src="/images/aastu-logo.jpg" 
+                  alt="AASTU Logo" 
+                  className="mb-2 h-16 w-auto rounded-xl bg-white p-2 shadow-sm" 
+                />
                 <CardTitle className="text-2xl">{title}</CardTitle>
                 <CardDescription>{description}</CardDescription>
               </CardHeader>
