@@ -247,6 +247,26 @@ class EnrollmentOverride(BaseModel):
         return f"Override [{self.override_type}] for {self.student.student_identifier} ({self.semester})"
 
 
+class TeachingAssignment(BaseModel):
+    lecturer = models.ForeignKey(
+        'accounts.Lecturer',
+        on_delete=models.CASCADE,
+        related_name='teaching_assignments'
+    )
+    course_offering = models.ForeignKey(
+        CourseOffering,
+        on_delete=models.CASCADE,
+        related_name='teaching_assignments'
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('lecturer', 'course_offering')
+
+    def __str__(self):
+        return f"{self.lecturer.faculty_identifier} → {self.course_offering}"
+
+
 class EnrollmentStatusChoices(models.TextChoices):
     ENROLLED = 'ENROLLED', 'Enrolled'
     PASSED = 'PASSED', 'Passed'
