@@ -340,10 +340,10 @@ export function DashboardOverview() {
             <Button
               variant="outline"
               className="justify-between text-left h-auto py-2.5 px-3"
-              onClick={() => router.push(ROUTES.ADMIN.SETTINGS)}
+              onClick={() => router.push(ROUTES.ADMIN.EXAMS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Server className="h-4 w-4 text-primary" /> Institution System Settings
+                <ClipboardCheck className="h-4 w-4 text-primary" /> Exams & Assessments Overview
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>

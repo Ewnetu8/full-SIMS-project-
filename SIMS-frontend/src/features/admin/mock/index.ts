@@ -4,7 +4,6 @@ import type {
   Department,
   Course,
   AdminExamOverview,
-  SystemSettings,
   AdminDashboardStats,
   AdminReportData,
 } from '../types';
@@ -284,38 +283,6 @@ export const INITIAL_EXAMS: AdminExamOverview[] = [
     participatedStudents: 0,
   },
 ];
-
-export const INITIAL_SETTINGS: SystemSettings = {
-  institutionName: 'Apex Institute of Technology & Science',
-  institutionCode: 'AITS-2026',
-  supportEmail: 'support@apex-tech.edu',
-  timezone: 'UTC+03:00 (East Africa Time)',
-  academicYear: '2025-2026',
-  activeSemester: 'Semester 2 (Spring)',
-  branding: {
-    primaryColor: '#102A7A',
-    darkThemeDefault: true,
-    portalTitle: 'ExamSphere Institutional Portal',
-  },
-  examDefaults: {
-    defaultDurationMinutes: 90,
-    passPercentageThreshold: 50,
-    autoSaveIntervalSeconds: 30,
-    allowReviewBeforeSubmission: true,
-  },
-  aiConfig: {
-    provider: 'OpenAI GPT-4o (Fine-Tuned Academic Model)',
-    apiKeyMasked: 'sk-proj-••••••••••••••••3A9x',
-    autoGradingConfidenceThreshold: 85,
-    flagLowConfidenceForManualReview: true,
-    maxParallelGradingWorkers: 4,
-  },
-  notificationSettings: {
-    emailAlertsOnSystemErrors: true,
-    notifyLecturersOnExamPublish: true,
-    weeklyDigestEmail: true,
-  },
-};
 
 export const INITIAL_DASHBOARD_STATS: AdminDashboardStats = {
   totalStudents: 1440,

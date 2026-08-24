@@ -1,5 +1,6 @@
 export * from './admin-shell';
 export * from './dashboard-overview';
+export * from './university-management';
 export * from './user-management';
 export * from './student-management';
 export * from './lecturer-management';
@@ -9,7 +10,6 @@ export * from './course-management';
 export * from './enrollment-management';
 export * from './examination-management';
 export * from './reports-analytics';
-export * from './system-settings';
 export * from './college-management';
 export * from './academic-year-management';
 export * from './program-management';

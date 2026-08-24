@@ -16,7 +16,6 @@ import type {
   CreateExaminationPayload,
   UpdateExaminationPayload,
   ScheduleExaminationPayload,
-  SystemSettings,
   College,
   Program,
   AcademicYear,
@@ -67,7 +66,6 @@ interface AdminStoreState {
   courseOfferings: AdminCourseOffering[];
   enrollments: AdminEnrollment[];
   exams: AdminExamOverview[];
-  settings: SystemSettings;
   tags: Tag[];
   isLoadingData: boolean;
 
@@ -288,9 +286,6 @@ interface AdminStoreState {
   setStudentClassStandingFilter: (standing: string) => void;
   setLecturerSearchQuery: (q: string) => void;
   setLecturerDeptFilter: (dept: string) => void;
-
-  // Actions - Settings
-  updateSettings: (settings: Partial<SystemSettings>) => void;
 }
 
 export const useAdminStore = create<AdminStoreState>((set, get) => ({
@@ -310,37 +305,6 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courseOfferings: [],
   enrollments: [],
   exams: [],
-  settings: {
-    institutionName: 'Addis Ababa Science and Technology University',
-    institutionCode: 'AASTU',
-    supportEmail: 'support@aastu.edu.et',
-    timezone: 'Africa/Addis_Ababa',
-    academicYear: '2025/2026',
-    activeSemester: 'First Semester',
-    branding: {
-      primaryColor: '#102A7A',
-      darkThemeDefault: false,
-      portalTitle: 'AASTU SIMS',
-    },
-    examDefaults: {
-      defaultDurationMinutes: 60,
-      passPercentageThreshold: 50,
-      autoSaveIntervalSeconds: 30,
-      allowReviewBeforeSubmission: true,
-    },
-    aiConfig: {
-      provider: 'AASTU AI Engine',
-      apiKeyMasked: '••••••••••••••••',
-      autoGradingConfidenceThreshold: 85,
-      flagLowConfidenceForManualReview: true,
-      maxParallelGradingWorkers: 4,
-    },
-    notificationSettings: {
-      emailAlertsOnSystemErrors: true,
-      notifyLecturersOnExamPublish: true,
-      weeklyDigestEmail: false,
-    },
-  },
   tags: [],
   isLoadingData: false,
 
@@ -1025,10 +989,4 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     await adminService.deleteTag(id);
     set((state) => ({ tags: state.tags.filter((t) => t.id !== id) }));
   },
-
-  // Actions - Settings
-  updateSettings: (newSettings) =>
-    set((state) => ({
-      settings: { ...state.settings, ...newSettings },
-    })),
 }));

@@ -247,8 +247,20 @@ export interface University {
   id: string;
   name: string;
   code: string;
+  created_at?: string;
+  updated_at?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface UniversityRequest {
+  name: string;
+  code: string;
+}
+
+export interface PatchedUniversityRequest {
+  name?: string;
+  code?: string;
 }
 
 export interface College {
@@ -514,38 +526,6 @@ export interface ScheduleExaminationPayload {
   start_window: string;
   end_window: string;
   duration_minutes: number;
-}
-
-export interface SystemSettings {
-  institutionName: string;
-  institutionCode: string;
-  supportEmail: string;
-  timezone: string;
-  academicYear: string;
-  activeSemester: string;
-  branding: {
-    primaryColor: string;
-    darkThemeDefault: boolean;
-    portalTitle: string;
-  };
-  examDefaults: {
-    defaultDurationMinutes: number;
-    passPercentageThreshold: number;
-    autoSaveIntervalSeconds: number;
-    allowReviewBeforeSubmission: boolean;
-  };
-  aiConfig: {
-    provider: string; // e.g. "OpenAI GPT-4o", "Claude 3.5 Sonnet", "Local LLM Server"
-    apiKeyMasked: string;
-    autoGradingConfidenceThreshold: number; // e.g. 85%
-    flagLowConfidenceForManualReview: boolean;
-    maxParallelGradingWorkers: number;
-  };
-  notificationSettings: {
-    emailAlertsOnSystemErrors: boolean;
-    notifyLecturersOnExamPublish: boolean;
-    weeklyDigestEmail: boolean;
-  };
 }
 
 export interface AdminDashboardStats {

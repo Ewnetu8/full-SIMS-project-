@@ -6,13 +6,13 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { ThemeToggle } from '@/components/common/theme-toggle';
+import { ConfirmationDialog, toast } from '@/components/feedback';
 import { UserDropdown } from '@/components/navigation';
 import { IconButton, Tooltip } from '@/components/ui';
+import { ROUTES } from '@/constants';
 import { useAuthStore } from '@/features/auth/store';
 import { cn } from '@/lib';
 import { getUserDisplayName } from '@/utils/string';
-import { ConfirmationDialog, toast } from '@/components/feedback';
-import { ROUTES } from '@/constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,10 +71,8 @@ export function TopNav({
 
   const handleSettingsNavigation = () => {
     if (!user) return;
-    if (user.role === 'admin') {
-      router.push(ROUTES.ADMIN.SETTINGS);
-    } else {
-      router.push('/settings');
+    if (user.role === 'lecturer') {
+      router.push(ROUTES.LECTURER.SETTINGS);
     }
   };
 
@@ -87,7 +85,7 @@ export function TopNav({
         avatarUrl: user.avatarUrl,
       }}
       onProfile={handleProfileNavigation}
-      onSettings={handleSettingsNavigation}
+      onSettings={user.role === 'lecturer' ? handleSettingsNavigation : undefined}
       onLogout={() => setIsLogoutDialogOpen(true)}
     />
   ) : null;

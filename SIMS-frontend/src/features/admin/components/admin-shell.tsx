@@ -9,7 +9,6 @@ import {
   BookOpen,
   ClipboardCheck,
   BarChart3,
-  Settings,
   Landmark,
   Layers,
   Calendar,
@@ -22,6 +21,7 @@ import {
   Scale,
   ShieldCheck,
   Award,
+  School,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -41,6 +41,7 @@ const adminNavigation: NavItem[] = [
   { label: 'Student Directory', href: ROUTES.ADMIN.STUDENTS, icon: <GraduationCap className="h-4 w-4" /> },
   { label: 'Enrollment Management', href: ROUTES.ADMIN.ENROLLMENTS, icon: <UserPlus className="h-4 w-4" /> },
   { label: 'Lecturer Directory', href: ROUTES.ADMIN.LECTURERS, icon: <UserCheck className="h-4 w-4" /> },
+  { label: 'Universities', href: ROUTES.ADMIN.UNIVERSITIES, icon: <School className="h-4 w-4" /> },
   { label: 'Colleges', href: ROUTES.ADMIN.COLLEGES, icon: <Landmark className="h-4 w-4" /> },
   { label: 'Departments', href: ROUTES.ADMIN.DEPARTMENTS, icon: <Building2 className="h-4 w-4" /> },
   { label: 'Programs', href: ROUTES.ADMIN.PROGRAMS, icon: <Layers className="h-4 w-4" /> },
@@ -55,7 +56,6 @@ const adminNavigation: NavItem[] = [
   { label: 'Exams Overview', href: ROUTES.ADMIN.EXAMS, icon: <ClipboardCheck className="h-4 w-4" /> },
   { label: 'Results & Grades', href: ROUTES.ADMIN.RESULTS, icon: <Award className="h-4 w-4" /> },
   { label: 'Reports & Analytics', href: ROUTES.ADMIN.REPORTS, icon: <BarChart3 className="h-4 w-4" /> },
-  { label: 'System Settings', href: ROUTES.ADMIN.SETTINGS, icon: <Settings className="h-4 w-4" /> },
   { label: 'Notifications', href: ROUTES.ADMIN.NOTIFICATIONS, icon: <Bell className="h-4 w-4" /> },
 ];
 

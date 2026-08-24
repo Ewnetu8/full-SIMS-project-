@@ -23,7 +23,6 @@ import type {
   CreateExaminationPayload,
   UpdateExaminationPayload,
   ScheduleExaminationPayload,
-  SystemSettings,
   AdminDashboardStats,
   AdminCourseOffering,
   CreateCourseOfferingPayload,
@@ -456,46 +455,6 @@ export const adminService = {
 
   async deleteTag(id: string): Promise<void> {
     return academicService.deleteTag(id);
-  },
-
-  // ─── Settings, Reports, Notifications ─────────────────────────────────────
-  async getSettings(): Promise<SystemSettings> {
-    return {
-      institutionName: 'Addis Ababa Science and Technology University',
-      institutionCode: 'AASTU',
-      supportEmail: 'support@aastu.edu.et',
-      timezone: 'Africa/Addis_Ababa',
-      academicYear: '2025/2026',
-      activeSemester: 'First Semester',
-      branding: {
-        primaryColor: '#102A7A',
-        darkThemeDefault: false,
-        portalTitle: 'AASTU SIMS',
-      },
-      examDefaults: {
-        defaultDurationMinutes: 60,
-        passPercentageThreshold: 50,
-        autoSaveIntervalSeconds: 30,
-        allowReviewBeforeSubmission: true,
-      },
-      aiConfig: {
-        provider: 'AASTU AI Engine',
-        apiKeyMasked: '••••••••••••••••',
-        autoGradingConfidenceThreshold: 85,
-        flagLowConfidenceForManualReview: true,
-        maxParallelGradingWorkers: 4,
-      },
-      notificationSettings: {
-        emailAlertsOnSystemErrors: true,
-        notifyLecturersOnExamPublish: true,
-        weeklyDigestEmail: false,
-      },
-    };
-  },
-
-  async updateSettings(newSettings: Partial<SystemSettings>): Promise<SystemSettings> {
-    const current = await this.getSettings();
-    return { ...current, ...newSettings };
   },
 
   async getAdminAnalytics(): Promise<AdminAnalyticsResponse> {
