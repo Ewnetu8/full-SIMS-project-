@@ -422,6 +422,38 @@ export interface CreditHourPolicyPayload {
   max_credit_hours?: number;
 }
 
+export type OverrideType =
+  | 'PREREQUISITE'
+  | 'STANDING'
+  | 'CREDIT_LIMIT'
+  | 'DUPLICATE';
+
+export interface EnrollmentOverride {
+  id: string;
+  student: string;
+  student_detail?: ApiStudentListItem | null;
+  semester: string;
+  semester_detail?: Semester | null;
+  override_type?: OverrideType;
+  approved_by?: string | null;
+  approved_by_detail?: UserCompact | null;
+  reason?: string;
+  is_active?: boolean;
+  created_at: string;
+  updated_at: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateEnrollmentOverridePayload {
+  student: string;
+  semester: string;
+  override_type?: OverrideType;
+  approved_by?: string | null;
+  reason?: string;
+  is_active?: boolean;
+}
+
 export type AdminExamStatus = 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';
 
 export interface AdminExamOverview {

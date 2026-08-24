@@ -48,6 +48,8 @@ import type {
   CreateCoursePrerequisitePayload,
   CreditHourPolicy,
   CreditHourPolicyPayload,
+  EnrollmentOverride,
+  CreateEnrollmentOverridePayload,
 } from '../types';
 
 export interface RegisterUserPayload {
@@ -307,6 +309,23 @@ export const adminService = {
 
   async deleteCreditHourPolicy(id: string): Promise<void> {
     return academicService.deleteCreditHourPolicy(id);
+  },
+
+  // ─── Enrollment Overrides ───────────────────────────────────────────────────
+  async getEnrollmentOverrides(): Promise<EnrollmentOverride[]> {
+    return academicService.getEnrollmentOverrides();
+  },
+
+  async getEnrollmentOverrideById(id: string): Promise<EnrollmentOverride> {
+    return academicService.getEnrollmentOverrideById(id);
+  },
+
+  async createEnrollmentOverride(data: CreateEnrollmentOverridePayload): Promise<EnrollmentOverride> {
+    return academicService.createEnrollmentOverride(data);
+  },
+
+  async deleteEnrollmentOverride(id: string): Promise<void> {
+    return academicService.deleteEnrollmentOverride(id);
   },
 
   // ─── Exams ─────────────────────────────────────────────────────────────────

@@ -33,6 +33,9 @@ import type {
   CreateCoursePrerequisitePayload,
   CreditHourPolicy,
   CreditHourPolicyPayload,
+  EnrollmentOverride,
+  CreateEnrollmentOverridePayload,
+  OverrideType,
 } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -721,6 +724,73 @@ export const academicService = {
 
   async deleteCreditHourPolicy(id: string): Promise<void> {
     await api.delete(API_ENDPOINTS.CREDIT_POLICIES.BY_ID(id));
+  },
+
+  // ── Enrollment Overrides ───────────────────────────────────────────────────
+  mapApiEnrollmentOverrideToOverride(p: Record<string, unknown>): EnrollmentOverride {
+    return {
+      id: String(p.id || ''),
+      student: String(p.student || ''),
+      student_detail: (p.student_detail as any) || (p.studentDetail as any) || null,
+      semester: String(p.semester || ''),
+      semester_detail: (p.semester_detail as any) || (p.semesterDetail as any) || null,
+      override_type: (p.override_type || p.overrideType) as OverrideType | undefined,
+      approved_by: p.approved_by ? String(p.approved_by) : p.approvedBy ? String(p.approvedBy) : null,
+      approved_by_detail: (p.approved_by_detail as any) || (p.approvedByDetail as any) || null,
+      reason: typeof p.reason === 'string' ? p.reason : '',
+      is_active: typeof p.is_active === 'boolean' ? p.is_active : typeof p.isActive === 'boolean' ? p.isActive : true,
+      created_at: String(p.created_at || p.createdAt || ''),
+      updated_at: String(p.updated_at || p.updatedAt || ''),
+      createdAt: String(p.created_at || p.createdAt || ''),
+      updatedAt: String(p.updated_at || p.updatedAt || ''),
+    };
+  },
+
+  async getEnrollmentOverrides(): Promise<EnrollmentOverride[]> {
+    const data = await api.get<
+      EnrollmentOverride[] | { results?: Record<string, unknown>[]; data?: Record<string, unknown>[] } | Record<string, unknown>[]
+    >(API_ENDPOINTS.ENROLLMENT_OVERRIDES.ROOT);
+
+    const list: Record<string, unknown>[] = Array.isArray(data)
+      ? (data as Record<string, unknown>[])
+      : Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+    return list.map((item) => this.mapApiEnrollmentOverrideToOverride(item));
+  },
+
+  async getEnrollmentOverrideById(id: string): Promise<EnrollmentOverride> {
+    const raw = await api.get<Record<string, unknown>>(API_ENDPOINTS.ENROLLMENT_OVERRIDES.BY_ID(id));
+    return this.mapApiEnrollmentOverrideToOverride(raw);
+  },
+
+  async createEnrollmentOverride(payload: CreateEnrollmentOverridePayload): Promise<EnrollmentOverride> {
+    const body: Record<string, unknown> = {
+      student: payload.student.trim(),
+      semester: payload.semester.trim(),
+    };
+    if (payload.override_type) {
+      body.override_type = payload.override_type;
+    }
+    if (payload.approved_by && payload.approved_by.trim()) {
+      body.approved_by = payload.approved_by.trim();
+    }
+    if (payload.reason !== undefined && payload.reason.trim()) {
+      body.reason = payload.reason.trim();
+    }
+    if (payload.is_active !== undefined) {
+      body.is_active = payload.is_active;
+    }
+
+    const res = await api.post<Record<string, unknown>>(API_ENDPOINTS.ENROLLMENT_OVERRIDES.ROOT, body);
+    return this.mapApiEnrollmentOverrideToOverride(res);
+  },
+
+  async deleteEnrollmentOverride(id: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.ENROLLMENT_OVERRIDES.BY_ID(id));
   },
 
   // ── Course Offerings ─────────────────────────────────────────────────────────

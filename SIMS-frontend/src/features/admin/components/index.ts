@@ -21,3 +21,4 @@ export * from './profile';
 export * from './tag-management';
 export * from './course-prerequisite-management';
 export * from './credit-hour-policy-management';
+export * from './enrollment-override-management';

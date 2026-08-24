@@ -44,6 +44,9 @@ import type {
   CreateCoursePrerequisitePayload,
   CreditHourPolicy,
   CreditHourPolicyPayload,
+  EnrollmentOverride,
+  CreateEnrollmentOverridePayload,
+  OverrideType,
 } from '../types';
 import type { AdminAnalyticsResponse } from '@/types/api';
 
@@ -61,6 +64,7 @@ interface AdminStoreState {
   courses: Course[];
   coursePrerequisites: CoursePrerequisite[];
   creditHourPolicies: CreditHourPolicy[];
+  enrollmentOverrides: EnrollmentOverride[];
   courseOfferings: AdminCourseOffering[];
   enrollments: AdminEnrollment[];
   exams: AdminExamOverview[];
@@ -97,6 +101,8 @@ interface AdminStoreState {
   coursePrerequisitesError: string | null;
   isLoadingCreditHourPolicies: boolean;
   creditHourPoliciesError: string | null;
+  isLoadingEnrollmentOverrides: boolean;
+  enrollmentOverridesError: string | null;
   isLoadingCourseOfferings: boolean;
   courseOfferingsError: string | null;
   isLoadingEnrollments: boolean;
@@ -132,6 +138,7 @@ interface AdminStoreState {
   courseDeptFilter: string;
   coursePrerequisiteSearchQuery: string;
   creditHourPolicySearchQuery: string;
+  enrollmentOverrideSearchQuery: string;
 
   enrollmentSearchQuery: string;
   enrollmentStatusFilter: string;
@@ -182,6 +189,8 @@ interface AdminStoreState {
   fetchCoursePrerequisiteById: (id: string) => Promise<CoursePrerequisite>;
   fetchCreditHourPolicies: () => Promise<void>;
   fetchCreditHourPolicyById: (id: string) => Promise<CreditHourPolicy>;
+  fetchEnrollmentOverrides: () => Promise<void>;
+  fetchEnrollmentOverrideById: (id: string) => Promise<EnrollmentOverride>;
   fetchCourseOfferings: () => Promise<void>;
   fetchCourseOfferingById: (id: string) => Promise<AdminCourseOffering>;
   fetchEnrollments: () => Promise<void>;
@@ -245,6 +254,11 @@ interface AdminStoreState {
   updateCreditHourPolicy: (id: string, data: CreditHourPolicyPayload) => Promise<CreditHourPolicy>;
   deleteCreditHourPolicy: (id: string) => Promise<void>;
 
+  // Actions - Enrollment Overrides
+  setEnrollmentOverrideSearchQuery: (q: string) => void;
+  addEnrollmentOverride: (data: CreateEnrollmentOverridePayload) => Promise<EnrollmentOverride>;
+  deleteEnrollmentOverride: (id: string) => Promise<void>;
+
   // Actions - Course Offerings & Enrollments
   addCourseOffering: (data: CreateCourseOfferingPayload) => Promise<AdminCourseOffering>;
   updateCourseOffering: (id: string, data: UpdateCourseOfferingPayload) => Promise<AdminCourseOffering>;
@@ -295,6 +309,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courses: [],
   coursePrerequisites: [],
   creditHourPolicies: [],
+  enrollmentOverrides: [],
   courseOfferings: [],
   enrollments: [],
   exams: [],
@@ -360,6 +375,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   coursePrerequisitesError: null,
   isLoadingCreditHourPolicies: false,
   creditHourPoliciesError: null,
+  isLoadingEnrollmentOverrides: false,
+  enrollmentOverridesError: null,
   isLoadingCourseOfferings: false,
   courseOfferingsError: null,
   isLoadingEnrollments: false,
@@ -394,6 +411,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courseDeptFilter: 'ALL',
   coursePrerequisiteSearchQuery: '',
   creditHourPolicySearchQuery: '',
+  enrollmentOverrideSearchQuery: '',
 
   enrollmentSearchQuery: '',
   enrollmentStatusFilter: 'ALL',
@@ -411,12 +429,13 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [analytics, departments, courses, coursePrerequisites, creditHourPolicies, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
+      const [analytics, departments, courses, coursePrerequisites, creditHourPolicies, enrollmentOverrides, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
         adminService.getAdminAnalytics().catch(() => null),
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
         adminService.getCoursePrerequisites().catch(() => []),
         adminService.getCreditHourPolicies().catch(() => []),
+        adminService.getEnrollmentOverrides().catch(() => []),
         adminService.getAllExams().catch(() => []),
         adminService.getStudents().catch(() => []),
         adminService.getUsers().catch(() => []),
@@ -436,6 +455,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         courses,
         coursePrerequisites,
         creditHourPolicies,
+        enrollmentOverrides,
         exams,
         students,
         users,
@@ -662,6 +682,20 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     return adminService.getCreditHourPolicyById(id);
   },
 
+  fetchEnrollmentOverrides: async () => {
+    set({ isLoadingEnrollmentOverrides: true, enrollmentOverridesError: null });
+    try {
+      const enrollmentOverrides = await adminService.getEnrollmentOverrides();
+      set({ enrollmentOverrides, isLoadingEnrollmentOverrides: false, enrollmentOverridesError: null });
+    } catch (err: unknown) {
+      set({ enrollmentOverrides: [], isLoadingEnrollmentOverrides: false, enrollmentOverridesError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchEnrollmentOverrideById: async (id) => {
+    return adminService.getEnrollmentOverrideById(id);
+  },
+
   fetchCourseOfferings: async () => {
     set({ isLoadingCourseOfferings: true, courseOfferingsError: null });
     try {
@@ -874,6 +908,18 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   deleteCreditHourPolicy: async (id) => {
     await adminService.deleteCreditHourPolicy(id);
     set((state) => ({ creditHourPolicies: state.creditHourPolicies.filter((p) => p.id !== id) }));
+  },
+
+  // Actions - Enrollment Overrides
+  setEnrollmentOverrideSearchQuery: (enrollmentOverrideSearchQuery) => set({ enrollmentOverrideSearchQuery }),
+  addEnrollmentOverride: async (data) => {
+    const newOverride = await adminService.createEnrollmentOverride(data);
+    set((state) => ({ enrollmentOverrides: [newOverride, ...state.enrollmentOverrides.filter((p) => p.id !== newOverride.id)] }));
+    return newOverride;
+  },
+  deleteEnrollmentOverride: async (id) => {
+    await adminService.deleteEnrollmentOverride(id);
+    set((state) => ({ enrollmentOverrides: state.enrollmentOverrides.filter((p) => p.id !== id) }));
   },
 
   // Actions - Course Offerings & Enrollments
