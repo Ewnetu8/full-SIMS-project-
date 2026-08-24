@@ -176,62 +176,46 @@ export const academicService = {
 
   // ── Departments ──────────────────────────────────────────────────────────────
   async getDepartments(): Promise<Department[]> {
-    try {
-      const raw = await api.get<ApiDepartment[]>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS);
-      if (Array.isArray(raw)) {
-        return raw.map((d) => ({
-          id: d.id,
-          code: d.code,
-          name: d.name,
-          college: d.college || null,
-          college_detail: d.college_detail,
-          createdAt: d.created_at,
-          updatedAt: d.updated_at,
-        }));
-      }
-      return [];
-    } catch {
-      return [];
-    }
+    const raw = await api.get<ApiDepartment[]>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS);
+    return raw.map((d) => this.mapApiDepartmentToDepartment(d));
   },
 
   async getDepartmentById(id: string): Promise<Department> {
     const res = await api.get<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id));
+    return this.mapApiDepartmentToDepartment(res);
+  },
+
+  mapApiDepartmentToDepartment(d: ApiDepartment): Department {
     return {
-      id: res.id,
-      code: res.code,
-      name: res.name,
-      college: res.college || null,
-      college_detail: res.college_detail,
-      createdAt: res.created_at,
-      updatedAt: res.updated_at,
+      id: d.id,
+      code: d.code,
+      name: d.name,
+      college: d.college || null,
+      college_detail: d.college_detail
+        ? {
+            id: d.college_detail.id,
+            name: d.college_detail.name,
+            code: d.college_detail.code,
+            university: d.college_detail.university,
+            university_detail: d.college_detail.university_detail,
+            createdAt: d.college_detail.created_at,
+            updatedAt: d.college_detail.updated_at,
+          }
+        : null,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
     };
   },
 
   async createDepartment(data: { name: string; code: string; college?: string | null }): Promise<Department> {
-    const payload: Record<string, unknown> = {
+    const payload: { name: string; code: string; college?: string | null } = {
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
       college: data.college && isValidUuid(data.college) ? data.college : null,
     };
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENTS;
-
-    try {
-      const res = await api.post<ApiDepartment>(endpoint, payload);
-
-      return {
-        id: res.id,
-        code: res.code,
-        name: res.name,
-        college: res.college || null,
-        college_detail: res.college_detail,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      throw err;
-    }
+    const res = await api.post<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS, payload);
+    return this.mapApiDepartmentToDepartment(res);
   },
 
   async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string | null }>): Promise<Department> {
@@ -242,23 +226,8 @@ export const academicService = {
       payload.college = data.college && isValidUuid(data.college) ? data.college : null;
     }
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id);
-
-    try {
-      const res = await api.patch<ApiDepartment>(endpoint, payload);
-
-      return {
-        id: res.id,
-        code: res.code,
-        name: res.name,
-        college: res.college || null,
-        college_detail: res.college_detail,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      throw err;
-    }
+    const res = await api.patch<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id), payload);
+    return this.mapApiDepartmentToDepartment(res);
   },
 
   async deleteDepartment(id: string): Promise<void> {

@@ -102,6 +102,7 @@ interface AdminStoreState {
 
   collegeSearchQuery: string;
   departmentSearchQuery: string;
+  departmentCollegeFilter: string;
   programSearchQuery: string;
   programDeptFilter: string;
   programDegreeFilter: string;
@@ -145,6 +146,7 @@ interface AdminStoreState {
   setTagSearchQuery: (q: string) => void;
   fetchColleges: () => Promise<void>;
   fetchDepartments: () => Promise<void>;
+  fetchDepartmentById: (id: string) => Promise<Department>;
   fetchPrograms: () => Promise<void>;
   fetchProgramById: (id: string) => Promise<Program>;
   fetchAcademicYears: () => Promise<void>;
@@ -179,6 +181,7 @@ interface AdminStoreState {
 
   // Actions - Departments
   setDepartmentSearchQuery: (q: string) => void;
+  setDepartmentCollegeFilter: (collegeId: string) => void;
   addDepartment: (data: { name: string; code: string; college?: string | null }) => Promise<Department>;
   updateDepartment: (id: string, data: Partial<{ name: string; code: string; college?: string | null }>) => Promise<Department>;
   deleteDepartment: (id: string) => Promise<void>;
@@ -330,6 +333,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   collegeSearchQuery: '',
   departmentSearchQuery: '',
+  departmentCollegeFilter: 'ALL',
   programSearchQuery: '',
   programDeptFilter: 'ALL',
   programDegreeFilter: 'ALL',
@@ -513,6 +517,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
+  fetchDepartmentById: async (id) => {
+    return adminService.getDepartmentById(id);
+  },
+
   fetchPrograms: async () => {
     set({ isLoadingPrograms: true, programsError: null });
     try {
@@ -648,9 +656,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   // Actions - Departments
   setDepartmentSearchQuery: (departmentSearchQuery) => set({ departmentSearchQuery }),
+  setDepartmentCollegeFilter: (departmentCollegeFilter) => set({ departmentCollegeFilter }),
   addDepartment: async (data) => {
     const newDept = await adminService.createDepartment(data);
-    set((state) => ({ departments: [newDept, ...state.departments] }));
+    set((state) => ({ departments: [newDept, ...state.departments.filter((d) => d.id !== newDept.id)] }));
     return newDept;
   },
   updateDepartment: async (id, data) => {

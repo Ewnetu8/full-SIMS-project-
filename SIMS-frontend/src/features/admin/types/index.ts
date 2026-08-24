@@ -296,9 +296,21 @@ export interface Department {
   name: string; // e.g. "Computer Science & Software Engineering"
   code: string; // e.g. "CS"
   college?: string | null;
-  college_detail?: College;
+  college_detail?: College | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface CreateDepartmentPayload {
+  name: string;
+  code: string;
+  college?: string | null;
+}
+
+export interface UpdateDepartmentPayload {
+  name?: string;
+  code?: string;
+  college?: string | null;
 }
 
 export interface AcademicYear {
