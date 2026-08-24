@@ -174,6 +174,7 @@ export const API_ENDPOINTS = {
   },
 
   ANALYTICS: {
+    ADMIN: '/api/v1/analytics/admin',
     OVERVIEW: '/analytics/overview',
     EXAM: (id: string) => `/analytics/exams/${id}`,
     EXAM_ANALYTICS: (id: string) => `/api/v1/analytics/exam/${id}`,

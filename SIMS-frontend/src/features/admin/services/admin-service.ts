@@ -4,6 +4,8 @@ import { api } from '@/services/api-client';
 
 import { academicService } from './academic-service';
 import { examApiService } from './exam-api-service';
+import { analyticsApiService } from '@/features/analytics/services/analytics-api';
+import type { AdminAnalyticsResponse } from '@/types/api';
 
 import type {
   UserCompact,
@@ -431,23 +433,24 @@ export const adminService = {
 
   async markNotificationRead(_id: string): Promise<void> { },
 
+  async getAdminAnalytics(): Promise<AdminAnalyticsResponse> {
+    return analyticsApiService.getAdminAnalytics();
+  },
+
   async getDashboardStats(): Promise<AdminDashboardStats> {
-    const [departments, courses, exams, students, lecturers, users] = await Promise.all([
-      academicService.getDepartments().catch(() => []),
-      academicService.getCourses().catch(() => []),
+    const [analytics, exams, users] = await Promise.all([
+      this.getAdminAnalytics().catch(() => null),
       examApiService.getExams().catch(() => []),
-      this.getStudents().catch(() => []),
-      this.getLecturers().catch(() => []),
       this.getUsers().catch(() => []),
     ]);
 
     return {
-      totalStudents: students.length,
-      totalLecturers: lecturers.length,
+      totalStudents: analytics ? analytics.total_students : 0,
+      totalLecturers: analytics ? analytics.total_lecturers : 0,
       totalAdministrators: users.filter((u) => (u.role || '').toUpperCase() === 'ADMIN').length,
-      totalCourses: courses.length,
-      totalDepartments: departments.length,
-      totalExams: exams.length,
+      totalCourses: analytics ? analytics.total_courses : 0,
+      totalDepartments: analytics ? analytics.total_departments : 0,
+      totalExams: analytics ? analytics.total_exams : exams.length,
       activeExams: exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length,
       pendingAIGrading: 0,
       publishedResults: exams.filter((e) => e.status === 'published').length,

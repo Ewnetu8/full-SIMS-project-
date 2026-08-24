@@ -39,9 +39,11 @@ import type {
   CreateTagPayload,
   UpdateTagPayload,
 } from '../types';
+import type { AdminAnalyticsResponse } from '@/types/api';
 
 interface AdminStoreState {
   // Datasets
+  adminAnalytics: AdminAnalyticsResponse | null;
   users: UserCompact[];
   students: StudentProfile[];
   lecturers: ApiLecturerListItem[];
@@ -62,6 +64,8 @@ interface AdminStoreState {
   isLoadingData: boolean;
 
   // Loading states
+  isLoadingAnalytics: boolean;
+  analyticsError: string | null;
   isLoadingUsers: boolean;
   usersError: string | null;
   isLoadingStudents: boolean;
@@ -130,6 +134,7 @@ interface AdminStoreState {
 
   // Fetch Actions
   fetchAdminData: () => Promise<void>;
+  fetchAdminAnalytics: () => Promise<void>;
   fetchUsers: (params?: { search?: string; role?: string }) => Promise<void>;
   fetchUserById: (id: string) => Promise<UserDetail>;
   fetchStudents: (params?: StudentFilterParams) => Promise<void>;
@@ -245,6 +250,7 @@ interface AdminStoreState {
 }
 
 export const useAdminStore = create<AdminStoreState>((set, get) => ({
+  adminAnalytics: null,
   users: [],
   students: [],
   lecturers: [],
@@ -259,7 +265,6 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   exams: [],
   aiJobs: [],
   auditLogs: [],
-  tags: [],
   settings: {
     institutionName: 'Addis Ababa Science and Technology University',
     institutionCode: 'AASTU',
@@ -292,8 +297,11 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     },
   },
   notifications: [],
+  tags: [],
   isLoadingData: false,
 
+  isLoadingAnalytics: false,
+  analyticsError: null,
   isLoadingUsers: false,
   usersError: null,
   isLoadingStudents: false,
@@ -362,7 +370,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
+      const [analytics, departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
+        adminService.getAdminAnalytics().catch(() => null),
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
         adminService.getAllExams().catch(() => []),
@@ -379,6 +388,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       ]);
 
       set({
+        adminAnalytics: analytics,
         departments,
         courses,
         exams,
@@ -396,6 +406,16 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       });
     } catch {
       set({ isLoadingData: false });
+    }
+  },
+
+  fetchAdminAnalytics: async () => {
+    set({ isLoadingAnalytics: true, analyticsError: null });
+    try {
+      const adminAnalytics = await adminService.getAdminAnalytics();
+      set({ adminAnalytics, isLoadingAnalytics: false, analyticsError: null });
+    } catch (err: unknown) {
+      set({ adminAnalytics: null, isLoadingAnalytics: false, analyticsError: getUserFriendlyErrorMessage(err) });
     }
   },
 

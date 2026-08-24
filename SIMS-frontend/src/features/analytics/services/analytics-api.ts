@@ -1,6 +1,14 @@
 import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
-import type { AdvisingReportResponse, ExamAnalyticsResponse, ExamResults } from '@/types/api';
+import type { AdminAnalyticsResponse, AdvisingReportResponse, ExamAnalyticsResponse, ExamResults } from '@/types/api';
+
+/**
+ * Fetch admin dashboard aggregate counts.
+ * Endpoint: GET /api/v1/analytics/admin
+ */
+export async function getAdminAnalytics(): Promise<AdminAnalyticsResponse> {
+  return api.get<AdminAnalyticsResponse>(API_ENDPOINTS.ANALYTICS.ADMIN);
+}
 
 /**
  * Fetch advising report for a semester.
@@ -35,6 +43,7 @@ export async function getExamResults(examId: string): Promise<ExamResults> {
 }
 
 export const analyticsApiService = {
+  getAdminAnalytics,
   getAdvisingReport,
   getExamAnalytics,
   getExamResults,
