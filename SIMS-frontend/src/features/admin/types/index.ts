@@ -250,6 +250,7 @@ export interface Program {
   name: string;
   code: string;
   department: string;
+  department_detail?: Department | null;
   degreeLevel: string;
   totalCreditHoursRequired: number;
   createdAt?: string;
@@ -282,8 +283,6 @@ export interface Department {
   updatedAt?: string;
 }
 
-
-
 export interface AcademicYear {
   id: string;
   displayLabel: string;
@@ -293,7 +292,7 @@ export interface AcademicYear {
   updatedAt?: string;
 }
 
-export type SemesterTerm = 'FIRST' | 'SECOND' | 'SUMMER';
+export type SemesterTerm = 'FIRST' | 'SECOND';
 
 export interface Semester {
   id: string;
@@ -318,15 +317,31 @@ export type ClassStanding = 'FRESHMAN' | 'SOPHOMORE' | 'JUNIOR' | 'SENIOR' | 'GR
 
 export interface Course {
   id: string;
-  code: string; // e.g. "CS301"
-  name: string; // e.g. "Data Structures & Algorithms"
+  code: string; // e.g. "CS301" (mapped from course_code)
+  name: string; // e.g. "Data Structures & Algorithms" (mapped from title)
   title?: string;
-  creditHours: number;
+  creditHours: number; // mapped from credit_hours
   program?: string | null;
   programDetail?: Program | null;
   intendedClassStanding?: ClassStanding;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface CreateCoursePayload {
+  title: string;
+  course_code: string;
+  credit_hours: number;
+  program?: string | null;
+  intended_class_standing?: ClassStanding;
+}
+
+export interface UpdateCoursePayload {
+  title?: string;
+  course_code?: string;
+  credit_hours?: number;
+  program?: string | null;
+  intended_class_standing?: ClassStanding;
 }
 
 export type AdminExamStatus = 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';

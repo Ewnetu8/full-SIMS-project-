@@ -79,6 +79,7 @@ interface AdminStoreState {
   isLoadingSemesters: boolean;
   semestersError: string | null;
   isLoadingCourses: boolean;
+  coursesError: string | null;
   isLoadingCourseOfferings: boolean;
   courseOfferingsError: string | null;
   isLoadingEnrollments: boolean;
@@ -151,6 +152,7 @@ interface AdminStoreState {
   setSemesterSearchQuery: (q: string) => void;
   setSemesterYearFilter: (yearId: string) => void;
   fetchCourses: () => Promise<void>;
+  fetchCourseById: (id: string) => Promise<Course>;
   fetchCourseOfferings: () => Promise<void>;
   fetchEnrollments: () => Promise<void>;
   fetchExams: () => Promise<void>;
@@ -300,6 +302,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   isLoadingSemesters: false,
   semestersError: null,
   isLoadingCourses: false,
+  coursesError: null,
   isLoadingCourseOfferings: false,
   courseOfferingsError: null,
   isLoadingEnrollments: false,
@@ -532,13 +535,17 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   fetchCourses: async () => {
-    set({ isLoadingCourses: true });
+    set({ isLoadingCourses: true, coursesError: null });
     try {
       const courses = await adminService.getCourses();
-      set({ courses, isLoadingCourses: false });
-    } catch {
-      set({ isLoadingCourses: false });
+      set({ courses, isLoadingCourses: false, coursesError: null });
+    } catch (err: unknown) {
+      set({ courses: [], isLoadingCourses: false, coursesError: getUserFriendlyErrorMessage(err) });
     }
+  },
+
+  fetchCourseById: async (id) => {
+    return adminService.getCourseById(id);
   },
 
   fetchCourseOfferings: async () => {
@@ -705,7 +712,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   setCourseDeptFilter: (courseDeptFilter) => set({ courseDeptFilter }),
   addCourse: async (data) => {
     const course = await adminService.createCourse(data);
-    set((state) => ({ courses: [course, ...state.courses] }));
+    set((state) => ({ courses: [course, ...state.courses.filter((c) => c.id !== course.id)] }));
     return course;
   },
   updateCourse: async (id, data) => {

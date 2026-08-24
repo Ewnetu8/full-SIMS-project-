@@ -520,10 +520,20 @@ export const academicService = {
   // ── Courses ──────────────────────────────────────────────────────────────────
   async getCourses(): Promise<Course[]> {
     const raw = await api.get<ApiCourse[]>(API_ENDPOINTS.ACADEMICS.COURSES);
-    return raw.map((c) => ({
+    return raw.map((c) => this.mapApiCourseToCourse(c));
+  },
+
+  async getCourseById(id: string): Promise<Course> {
+    const raw = await api.get<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id));
+    return this.mapApiCourseToCourse(raw);
+  },
+
+  mapApiCourseToCourse(c: ApiCourse): Course {
+    return {
       id: c.id,
       code: c.course_code,
       name: c.title,
+      title: c.title,
       creditHours: c.credit_hours,
       program: c.program || c.program_detail?.id || null,
       programDetail: c.program_detail
@@ -532,14 +542,27 @@ export const academicService = {
             name: c.program_detail.name,
             code: c.program_detail.code,
             department: c.program_detail.department,
+            department_detail: c.program_detail.department_detail
+              ? {
+                  id: c.program_detail.department_detail.id,
+                  name: c.program_detail.department_detail.name,
+                  code: c.program_detail.department_detail.code,
+                  college: c.program_detail.department_detail.college,
+                  college_detail: c.program_detail.department_detail.college_detail,
+                  createdAt: c.program_detail.department_detail.created_at,
+                  updatedAt: c.program_detail.department_detail.updated_at,
+                }
+              : null,
             degreeLevel: c.program_detail.degree_level,
             totalCreditHoursRequired: c.program_detail.total_credit_hours_required,
+            createdAt: c.program_detail.created_at,
+            updatedAt: c.program_detail.updated_at,
           }
         : null,
       intendedClassStanding: c.intended_class_standing,
       createdAt: c.created_at,
       updatedAt: c.updated_at,
-    }));
+    };
   },
 
   async createCourse(data: {
@@ -566,26 +589,7 @@ export const academicService = {
     }
 
     const res = await api.post<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSES, payload);
-    return {
-      id: res.id,
-      code: res.course_code,
-      name: res.title,
-      creditHours: res.credit_hours,
-      program: res.program || res.program_detail?.id || null,
-      programDetail: res.program_detail
-        ? {
-            id: res.program_detail.id,
-            name: res.program_detail.name,
-            code: res.program_detail.code,
-            department: res.program_detail.department,
-            degreeLevel: res.program_detail.degree_level,
-            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
-          }
-        : null,
-      intendedClassStanding: res.intended_class_standing,
-      createdAt: res.created_at,
-      updatedAt: res.updated_at,
-    };
+    return this.mapApiCourseToCourse(res);
   },
 
   async updateCourse(
@@ -612,26 +616,7 @@ export const academicService = {
     if (data.intended_class_standing !== undefined) payload.intended_class_standing = data.intended_class_standing;
 
     const res = await api.patch<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id), payload);
-    return {
-      id: res.id,
-      code: res.course_code,
-      name: res.title,
-      creditHours: res.credit_hours,
-      program: res.program || res.program_detail?.id || null,
-      programDetail: res.program_detail
-        ? {
-            id: res.program_detail.id,
-            name: res.program_detail.name,
-            code: res.program_detail.code,
-            department: res.program_detail.department,
-            degreeLevel: res.program_detail.degree_level,
-            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
-          }
-        : null,
-      intendedClassStanding: res.intended_class_standing,
-      createdAt: res.created_at,
-      updatedAt: res.updated_at,
-    };
+    return this.mapApiCourseToCourse(res);
   },
 
   async deleteCourse(id: string): Promise<void> {

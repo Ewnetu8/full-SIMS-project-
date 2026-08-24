@@ -243,6 +243,10 @@ export const adminService = {
     return academicService.getCourses();
   },
 
+  async getCourseById(id: string): Promise<Course> {
+    return academicService.getCourseById(id);
+  },
+
   async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }): Promise<Course> {
     return academicService.createCourse(data);
   },
