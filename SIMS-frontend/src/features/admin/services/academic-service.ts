@@ -12,6 +12,8 @@ import type {
   Course,
   ClassStanding,
   AdminCourseOffering,
+  CreateCourseOfferingPayload,
+  UpdateCourseOfferingPayload,
   AdminEnrollment,
   CreateEnrollmentPayload,
   UpdateEnrollmentPayload,
@@ -594,6 +596,33 @@ export const academicService = {
 
   async getCourseOfferingById(id: string): Promise<AdminCourseOffering> {
     return api.get<AdminCourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
+  },
+
+  async createCourseOffering(payload: CreateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    const body: Record<string, unknown> = {
+      course: payload.course.trim(),
+      semester: payload.semester.trim(),
+    };
+    if (payload.section !== undefined && payload.section !== null && payload.section.trim() !== '') {
+      body.section = payload.section.trim().toUpperCase();
+    }
+    if (payload.capacity !== undefined && payload.capacity !== null) {
+      body.capacity = Number(payload.capacity);
+    }
+    return api.post<AdminCourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.ROOT, body);
+  },
+
+  async updateCourseOffering(id: string, payload: UpdateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    const body: Record<string, unknown> = {};
+    if (payload.course !== undefined) body.course = payload.course.trim();
+    if (payload.semester !== undefined) body.semester = payload.semester.trim();
+    if (payload.section !== undefined) body.section = payload.section.trim().toUpperCase();
+    if (payload.capacity !== undefined) body.capacity = Number(payload.capacity);
+    return api.patch<AdminCourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id), body);
+  },
+
+  async deleteCourseOffering(id: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
   },
 
   // ── Enrollments ──────────────────────────────────────────────────────────────

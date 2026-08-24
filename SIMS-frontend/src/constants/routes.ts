@@ -62,6 +62,7 @@ export const ROUTES = {
     ACADEMIC_YEARS: '/admin/academic-years',
     SEMESTERS: '/admin/semesters',
     COURSES: '/admin/courses',
+    COURSE_OFFERINGS: '/admin/courses?tab=offerings',
     ENROLLMENTS: '/admin/enrollments',
     EXAMS: '/admin/exams',
     AI_MONITOR: '/admin/ai-monitor',

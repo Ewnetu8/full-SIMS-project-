@@ -24,6 +24,8 @@ import type {
   CreateSemesterPayload,
   UpdateSemesterPayload,
   AdminCourseOffering,
+  CreateCourseOfferingPayload,
+  UpdateCourseOfferingPayload,
   AdminEnrollment,
   CreateEnrollmentPayload,
   UpdateEnrollmentPayload,
@@ -165,6 +167,7 @@ interface AdminStoreState {
   fetchCourses: () => Promise<void>;
   fetchCourseById: (id: string) => Promise<Course>;
   fetchCourseOfferings: () => Promise<void>;
+  fetchCourseOfferingById: (id: string) => Promise<AdminCourseOffering>;
   fetchEnrollments: () => Promise<void>;
   fetchExams: () => Promise<void>;
 
@@ -216,6 +219,9 @@ interface AdminStoreState {
   toggleCourseArchive: (id: string) => void;
 
   // Actions - Course Offerings & Enrollments
+  addCourseOffering: (data: CreateCourseOfferingPayload) => Promise<AdminCourseOffering>;
+  updateCourseOffering: (id: string, data: UpdateCourseOfferingPayload) => Promise<AdminCourseOffering>;
+  deleteCourseOffering: (id: string) => Promise<void>;
   setEnrollmentSearchQuery: (q: string) => void;
   setEnrollmentStatusFilter: (status: string) => void;
   setEnrollmentSemesterFilter: (semesterId: string) => void;
@@ -599,6 +605,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
+  fetchCourseOfferingById: async (id) => {
+    return adminService.getCourseOfferingById(id);
+  },
+
   fetchEnrollments: async () => {
     set({ isLoadingEnrollments: true, enrollmentsError: null });
     try {
@@ -771,6 +781,23 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   toggleCourseArchive: (_id) => {},
 
   // Actions - Course Offerings & Enrollments
+  addCourseOffering: async (data) => {
+    const newOffering = await adminService.createCourseOffering(data);
+    await get().fetchCourseOfferings();
+    return newOffering;
+  },
+
+  updateCourseOffering: async (id, data) => {
+    const updated = await adminService.updateCourseOffering(id, data);
+    await get().fetchCourseOfferings();
+    return updated;
+  },
+
+  deleteCourseOffering: async (id) => {
+    await adminService.deleteCourseOffering(id);
+    await get().fetchCourseOfferings();
+  },
+
   setEnrollmentSearchQuery: (enrollmentSearchQuery) => set({ enrollmentSearchQuery }),
   setEnrollmentStatusFilter: (enrollmentStatusFilter) => set({ enrollmentStatusFilter }),
   setEnrollmentSemesterFilter: (enrollmentSemesterFilter) => set({ enrollmentSemesterFilter }),

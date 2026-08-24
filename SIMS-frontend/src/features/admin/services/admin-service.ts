@@ -27,6 +27,8 @@ import type {
   AdminDashboardStats,
   AdminNotification,
   AdminCourseOffering,
+  CreateCourseOfferingPayload,
+  UpdateCourseOfferingPayload,
   AdminEnrollment,
   CreateEnrollmentPayload,
   UpdateEnrollmentPayload,
@@ -297,6 +299,18 @@ export const adminService = {
 
   async getCourseOfferingById(id: string): Promise<AdminCourseOffering> {
     return academicService.getCourseOfferingById(id);
+  },
+
+  async createCourseOffering(data: CreateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    return academicService.createCourseOffering(data);
+  },
+
+  async updateCourseOffering(id: string, data: UpdateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    return academicService.updateCourseOffering(id, data);
+  },
+
+  async deleteCourseOffering(id: string): Promise<void> {
+    return academicService.deleteCourseOffering(id);
   },
 
   // ─── Enrollments ────────────────────────────────────────────────────────────

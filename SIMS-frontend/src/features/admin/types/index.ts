@@ -157,6 +157,20 @@ export interface AdminCourseOffering {
   updated_at?: string;
 }
 
+export interface CreateCourseOfferingPayload {
+  course: string;
+  semester: string;
+  section?: string;
+  capacity?: number;
+}
+
+export interface UpdateCourseOfferingPayload {
+  course?: string;
+  semester?: string;
+  section?: string;
+  capacity?: number;
+}
+
 export interface AdminEnrollment {
   id: string;
   student: string;
