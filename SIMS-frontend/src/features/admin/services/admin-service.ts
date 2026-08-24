@@ -188,6 +188,10 @@ export const adminService = {
     return academicService.getPrograms();
   },
 
+  async getProgramById(id: string): Promise<Program> {
+    return academicService.getProgramById(id);
+  },
+
   async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
     return academicService.createProgram(data);
   },

@@ -245,16 +245,34 @@ export interface College {
   updatedAt?: string;
 }
 
+export type DegreeLevel = 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA' | 'CERTIFICATE';
+
 export interface Program {
   id: string;
   name: string;
   code: string;
   department: string;
   department_detail?: Department | null;
-  degreeLevel: string;
+  degreeLevel: DegreeLevel | string;
   totalCreditHoursRequired: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface CreateProgramPayload {
+  department: string;
+  name: string;
+  code: string;
+  degree_level?: DegreeLevel | string;
+  total_credit_hours_required?: number;
+}
+
+export interface UpdateProgramPayload {
+  department?: string;
+  name?: string;
+  code?: string;
+  degree_level?: DegreeLevel | string;
+  total_credit_hours_required?: number;
 }
 
 export interface AcademicYearItem {

@@ -75,6 +75,7 @@ interface AdminStoreState {
   isLoadingDepartments: boolean;
   departmentsError: string | null;
   isLoadingPrograms: boolean;
+  programsError: string | null;
   isLoadingAcademicYears: boolean;
   isLoadingSemesters: boolean;
   semestersError: string | null;
@@ -102,6 +103,8 @@ interface AdminStoreState {
   collegeSearchQuery: string;
   departmentSearchQuery: string;
   programSearchQuery: string;
+  programDeptFilter: string;
+  programDegreeFilter: string;
   academicYearSearchQuery: string;
   semesterSearchQuery: string;
   semesterYearFilter: string;
@@ -143,6 +146,7 @@ interface AdminStoreState {
   fetchColleges: () => Promise<void>;
   fetchDepartments: () => Promise<void>;
   fetchPrograms: () => Promise<void>;
+  fetchProgramById: (id: string) => Promise<Program>;
   fetchAcademicYears: () => Promise<void>;
   fetchSemesters: () => Promise<void>;
   fetchSemesterById: (id: string) => Promise<Semester>;
@@ -181,6 +185,8 @@ interface AdminStoreState {
 
   // Actions - Programs
   setProgramSearchQuery: (q: string) => void;
+  setProgramDeptFilter: (deptId: string) => void;
+  setProgramDegreeFilter: (degree: string) => void;
   addProgram: (data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }) => Promise<Program>;
   updateProgram: (id: string, data: Partial<{ department?: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }>) => Promise<Program>;
   deleteProgram: (id: string) => Promise<void>;
@@ -298,6 +304,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   isLoadingDepartments: false,
   departmentsError: null,
   isLoadingPrograms: false,
+  programsError: null,
   isLoadingAcademicYears: false,
   isLoadingSemesters: false,
   semestersError: null,
@@ -324,6 +331,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   collegeSearchQuery: '',
   departmentSearchQuery: '',
   programSearchQuery: '',
+  programDeptFilter: 'ALL',
+  programDegreeFilter: 'ALL',
   academicYearSearchQuery: '',
   semesterSearchQuery: '',
   semesterYearFilter: 'ALL',
@@ -505,13 +514,17 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   fetchPrograms: async () => {
-    set({ isLoadingPrograms: true });
+    set({ isLoadingPrograms: true, programsError: null });
     try {
       const programs = await adminService.getPrograms();
-      set({ programs, isLoadingPrograms: false });
-    } catch {
-      set({ isLoadingPrograms: false });
+      set({ programs, isLoadingPrograms: false, programsError: null });
+    } catch (err: unknown) {
+      set({ programs: [], isLoadingPrograms: false, programsError: getUserFriendlyErrorMessage(err) });
     }
+  },
+
+  fetchProgramById: async (id) => {
+    return adminService.getProgramById(id);
   },
 
   fetchAcademicYears: async () => {
@@ -652,9 +665,11 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   // Actions - Programs
   setProgramSearchQuery: (programSearchQuery) => set({ programSearchQuery }),
+  setProgramDeptFilter: (programDeptFilter) => set({ programDeptFilter }),
+  setProgramDegreeFilter: (programDegreeFilter) => set({ programDegreeFilter }),
   addProgram: async (data) => {
     const program = await adminService.createProgram(data);
-    set((state) => ({ programs: [program, ...state.programs] }));
+    set((state) => ({ programs: [program, ...state.programs.filter((p) => p.id !== program.id)] }));
     return program;
   },
   updateProgram: async (id, data) => {

@@ -268,103 +268,92 @@ export const academicService = {
   // ── Programs ─────────────────────────────────────────────────────────────────
   async getPrograms(): Promise<Program[]> {
     const raw = await api.get<ApiProgram[]>(API_ENDPOINTS.ACADEMICS.PROGRAMS);
-    return raw.map((p) => ({
+    return raw.map((p) => this.mapApiProgramToProgram(p));
+  },
+
+  async getProgramById(id: string): Promise<Program> {
+    const raw = await api.get<ApiProgram>(API_ENDPOINTS.ACADEMICS.PROGRAM_BY_ID(id));
+    return this.mapApiProgramToProgram(raw);
+  },
+
+  mapApiProgramToProgram(p: ApiProgram): Program {
+    return {
       id: p.id,
       department: p.department,
+      department_detail: p.department_detail
+        ? {
+          id: p.department_detail.id,
+          name: p.department_detail.name,
+          code: p.department_detail.code,
+          college: p.department_detail.college,
+          college_detail: p.department_detail.college_detail
+            ? {
+              id: p.department_detail.college_detail.id,
+              name: p.department_detail.college_detail.name,
+              code: p.department_detail.college_detail.code,
+              university: p.department_detail.college_detail.university,
+              createdAt: p.department_detail.college_detail.created_at,
+              updatedAt: p.department_detail.college_detail.updated_at,
+            }
+            : undefined,
+          createdAt: p.department_detail.created_at,
+          updatedAt: p.department_detail.updated_at,
+        }
+        : null,
       name: p.name,
       code: p.code,
       degreeLevel: p.degree_level,
       totalCreditHoursRequired: p.total_credit_hours_required,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
-    }));
+    };
   },
 
-  async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
-    const departmentId = data.department;
-
-    const payload: Record<string, unknown> = {
-      department: departmentId,
+  async createProgram(data: {
+    department: string;
+    name: string;
+    code: string;
+    degree_level?: string;
+    total_credit_hours_required?: number;
+  }): Promise<Program> {
+    const payload: {
+      department: string;
+      name: string;
+      code: string;
+      degree_level?: string;
+      total_credit_hours_required?: number;
+    } = {
+      department: data.department,
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
       degree_level: data.degree_level || 'BACHELOR',
       total_credit_hours_required: Number(data.total_credit_hours_required ?? 120),
     };
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.PROGRAMS;
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[DEBUG] Program Creation Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
-    try {
-      const res = await api.post<ApiProgram>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[DEBUG] Program Creation Response (201 Created):', res);
-      }
-
-      return {
-        id: res.id,
-        department: res.department,
-        name: res.name,
-        code: res.code,
-        degreeLevel: res.degree_level,
-        totalCreditHoursRequired: res.total_credit_hours_required,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Program Creation Error:', err);
-      }
-      throw err;
-    }
+    const res = await api.post<ApiProgram>(API_ENDPOINTS.ACADEMICS.PROGRAMS, payload);
+    return this.mapApiProgramToProgram(res);
   },
 
-  async updateProgram(id: string, data: Partial<{ department?: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }>): Promise<Program> {
+  async updateProgram(
+    id: string,
+    data: Partial<{
+      department?: string;
+      name: string;
+      code: string;
+      degree_level?: string;
+      total_credit_hours_required?: number;
+    }>
+  ): Promise<Program> {
     const payload: Record<string, unknown> = {};
     if (data.department !== undefined) payload.department = data.department;
     if (data.name !== undefined) payload.name = data.name.trim();
     if (data.code !== undefined) payload.code = data.code.trim().toUpperCase();
     if (data.degree_level !== undefined) payload.degree_level = data.degree_level;
-    if (data.total_credit_hours_required !== undefined) payload.total_credit_hours_required = Number(data.total_credit_hours_required);
+    if (data.total_credit_hours_required !== undefined)
+      payload.total_credit_hours_required = Number(data.total_credit_hours_required);
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.PROGRAM_BY_ID(id);
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[DEBUG] Program Update Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
-    try {
-      const res = await api.patch<ApiProgram>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[DEBUG] Program Update Response:', res);
-      }
-
-      return {
-        id: res.id,
-        department: res.department,
-        name: res.name,
-        code: res.code,
-        degreeLevel: res.degree_level,
-        totalCreditHoursRequired: res.total_credit_hours_required,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Program Update Error:', err);
-      }
-      throw err;
-    }
+    const res = await api.patch<ApiProgram>(API_ENDPOINTS.ACADEMICS.PROGRAM_BY_ID(id), payload);
+    return this.mapApiProgramToProgram(res);
   },
 
   async deleteProgram(id: string): Promise<void> {
@@ -538,26 +527,26 @@ export const academicService = {
       program: c.program || c.program_detail?.id || null,
       programDetail: c.program_detail
         ? {
-            id: c.program_detail.id,
-            name: c.program_detail.name,
-            code: c.program_detail.code,
-            department: c.program_detail.department,
-            department_detail: c.program_detail.department_detail
-              ? {
-                  id: c.program_detail.department_detail.id,
-                  name: c.program_detail.department_detail.name,
-                  code: c.program_detail.department_detail.code,
-                  college: c.program_detail.department_detail.college,
-                  college_detail: c.program_detail.department_detail.college_detail,
-                  createdAt: c.program_detail.department_detail.created_at,
-                  updatedAt: c.program_detail.department_detail.updated_at,
-                }
-              : null,
-            degreeLevel: c.program_detail.degree_level,
-            totalCreditHoursRequired: c.program_detail.total_credit_hours_required,
-            createdAt: c.program_detail.created_at,
-            updatedAt: c.program_detail.updated_at,
-          }
+          id: c.program_detail.id,
+          name: c.program_detail.name,
+          code: c.program_detail.code,
+          department: c.program_detail.department,
+          department_detail: c.program_detail.department_detail
+            ? {
+              id: c.program_detail.department_detail.id,
+              name: c.program_detail.department_detail.name,
+              code: c.program_detail.department_detail.code,
+              college: c.program_detail.department_detail.college,
+              college_detail: c.program_detail.department_detail.college_detail,
+              createdAt: c.program_detail.department_detail.created_at,
+              updatedAt: c.program_detail.department_detail.updated_at,
+            }
+            : null,
+          degreeLevel: c.program_detail.degree_level,
+          totalCreditHoursRequired: c.program_detail.total_credit_hours_required,
+          createdAt: c.program_detail.created_at,
+          updatedAt: c.program_detail.updated_at,
+        }
         : null,
       intendedClassStanding: c.intended_class_standing,
       createdAt: c.created_at,
