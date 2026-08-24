@@ -68,6 +68,7 @@ export const ROUTES = {
     ENROLLMENT_OVERRIDES: '/admin/enrollment-overrides',
     ENROLLMENTS: '/admin/enrollments',
     EXAMS: '/admin/exams',
+    RESULTS: '/admin/results',
     AI_MONITOR: '/admin/ai-monitor',
     REPORTS: '/admin/reports',
     PROFILE: '/admin/profile',

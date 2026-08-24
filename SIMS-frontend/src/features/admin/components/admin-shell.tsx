@@ -23,6 +23,7 @@ import {
   GitFork,
   Scale,
   ShieldCheck,
+  Award,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -55,6 +56,7 @@ const adminNavigation: NavItem[] = [
   { label: 'Enrollment Overrides', href: ROUTES.ADMIN.ENROLLMENT_OVERRIDES, icon: <ShieldCheck className="h-4 w-4" /> },
   { label: 'Tags Management', href: ROUTES.ADMIN.TAGS, icon: <Tag className="h-4 w-4" /> },
   { label: 'Exams Overview', href: ROUTES.ADMIN.EXAMS, icon: <ClipboardCheck className="h-4 w-4" /> },
+  { label: 'Results & Grades', href: ROUTES.ADMIN.RESULTS, icon: <Award className="h-4 w-4" /> },
   { label: 'AI Grading Monitor', href: ROUTES.ADMIN.AI_MONITOR, icon: <Brain className="h-4 w-4" /> },
   { label: 'Reports & Analytics', href: ROUTES.ADMIN.REPORTS, icon: <BarChart3 className="h-4 w-4" /> },
   { label: 'System Settings', href: ROUTES.ADMIN.SETTINGS, icon: <Settings className="h-4 w-4" /> },

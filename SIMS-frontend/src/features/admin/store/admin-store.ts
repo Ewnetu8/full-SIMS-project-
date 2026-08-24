@@ -199,7 +199,6 @@ interface AdminStoreState {
   fetchCourseOfferings: () => Promise<void>;
   fetchCourseOfferingById: (id: string) => Promise<AdminCourseOffering>;
   fetchEnrollments: () => Promise<void>;
-  fetchExams: () => Promise<void>;
 
   // Actions - Users
   setUsers: (users: UserCompact[]) => void;
