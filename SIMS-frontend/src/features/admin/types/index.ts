@@ -148,6 +148,8 @@ export interface CourseOfferingDetailSemester {
 export interface AdminCourseOffering {
   id: string;
   course: string;
+  course_code?: string;
+  course_title?: string;
   course_detail?: CourseOfferingDetailCourse | null;
   semester: string;
   semester_detail?: CourseOfferingDetailSemester | null;
@@ -454,21 +456,64 @@ export interface CreateEnrollmentOverridePayload {
   is_active?: boolean;
 }
 
-export type AdminExamStatus = 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';
+export type ExaminationStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
+export type ExamStatus = ExaminationStatus;
+export type AdminExamStatus = ExaminationStatus | 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';
+
+export interface CourseOfferingBrief {
+  id: string;
+  course_code: string;
+  course_title: string;
+  semester: string;
+  semester_index: 'FIRST' | 'SECOND' | 'SUMMER' | string;
+  section: string;
+}
 
 export interface AdminExamOverview {
   id: string;
+  course_offering?: string;
+  course_offering_detail?: CourseOfferingBrief | null;
+  lecturer?: string;
+  lecturerName?: string;
   title: string;
-  courseCode: string;
-  courseName: string;
-  department: string;
-  lecturerName: string;
-  status: AdminExamStatus;
-  startDate: string;
-  endDate: string;
-  durationMinutes: number;
-  totalStudents: number;
-  participatedStudents: number;
+  status: ExaminationStatus;
+  start_window?: string | null;
+  end_window?: string | null;
+  duration_minutes: number;
+  questions?: any[];
+  created_at?: string;
+  updated_at?: string;
+  courseCode?: string;
+  courseName?: string;
+  department?: string;
+  startDate?: string;
+  endDate?: string;
+  durationMinutes?: number;
+  totalStudents?: number;
+  participatedStudents?: number;
+}
+
+export interface CreateExaminationPayload {
+  course_offering: string;
+  title: string;
+  start_window: string;
+  end_window: string;
+  duration_minutes: number;
+}
+
+export interface UpdateExaminationPayload {
+  course_offering?: string;
+  title?: string;
+  start_window?: string;
+  end_window?: string;
+  duration_minutes?: number;
+  status?: ExaminationStatus;
+}
+
+export interface ScheduleExaminationPayload {
+  start_window: string;
+  end_window: string;
+  duration_minutes: number;
 }
 
 export type AIGradingJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -584,6 +629,6 @@ export interface CreateTagPayload {
 }
 
 export interface UpdateTagPayload {
-  name: string;
+  name?: string;
 }
 

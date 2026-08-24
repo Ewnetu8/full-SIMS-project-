@@ -1012,9 +1012,11 @@ export const academicService = {
   },
 
   async updateTag(id: string, payload: UpdateTagPayload): Promise<Tag> {
-    return api.put<Tag>(API_ENDPOINTS.TAGS.BY_ID(id), {
-      name: payload.name.trim(),
-    });
+    const body: Record<string, unknown> = {};
+    if (payload.name !== undefined) {
+      body.name = payload.name.trim();
+    }
+    return api.patch<Tag>(API_ENDPOINTS.TAGS.BY_ID(id), body);
   },
 
   async patchTag(id: string, payload: Partial<UpdateTagPayload>): Promise<Tag> {

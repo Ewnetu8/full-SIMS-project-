@@ -83,6 +83,12 @@ export interface CreateTagRequest {
   name: string;
 }
 
+export type CreateTagPayload = CreateTagRequest;
+
+export interface UpdateTagPayload {
+  name?: string;
+}
+
 // ─── Examination Types ────────────────────────────────────────────────────────
 
 export type ExamStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';

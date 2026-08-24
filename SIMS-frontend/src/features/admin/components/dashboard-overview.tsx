@@ -68,9 +68,9 @@ export function DashboardOverview() {
   const totalExamsCount = adminAnalytics ? adminAnalytics.total_exams : exams.length;
   const totalAdmins = users.filter((u) => (u.role || '').toUpperCase() === 'ADMIN').length;
 
-  const activeExamsCount = exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length;
+  const activeExamsCount = exams.filter((e) => e.status === 'ACTIVE' || e.status === 'SCHEDULED').length;
   const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length;
-  const publishedExamsCount = exams.filter((e) => e.status === 'published').length;
+  const publishedExamsCount = exams.filter((e) => e.status === 'PUBLISHED').length;
 
   const isLoading = isLoadingData || isLoadingAnalytics;
 

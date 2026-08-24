@@ -13,6 +13,9 @@ import type {
   Course,
   ClassStanding,
   AdminExamOverview,
+  CreateExaminationPayload,
+  UpdateExaminationPayload,
+  ScheduleExaminationPayload,
   AIGradingJob,
   AuditLog,
   SystemSettings,
@@ -108,6 +111,7 @@ interface AdminStoreState {
   isLoadingEnrollments: boolean;
   enrollmentsError: string | null;
   isLoadingExams: boolean;
+  examsError: string | null;
 
   // Search & Filter States
   userSearchQuery: string;
@@ -147,6 +151,7 @@ interface AdminStoreState {
 
   examSearchQuery: string;
   examStatusFilter: string;
+  examCourseOfferingFilter: string;
 
   auditSearchQuery: string;
   auditCategoryFilter: string;
@@ -275,9 +280,14 @@ interface AdminStoreState {
   // Actions - Exams
   setExamSearchQuery: (q: string) => void;
   setExamStatusFilter: (status: string) => void;
-  addExam: (data: { title: string; duration_minutes: number; course_offering?: string }) => Promise<AdminExamOverview>;
-  scheduleExam: (id: string, data: { start_window: string; end_window: string; duration_minutes: number }) => Promise<void>;
-  archiveExam: (id: string) => void;
+  setExamCourseOfferingFilter: (offeringId: string) => void;
+  fetchExams: (params?: { status?: string; course_offering?: string }) => Promise<void>;
+  fetchExamById: (id: string) => Promise<AdminExamOverview>;
+  addExam: (data: CreateExaminationPayload) => Promise<AdminExamOverview>;
+  createExam: (data: CreateExaminationPayload) => Promise<AdminExamOverview>;
+  updateExam: (id: string, data: UpdateExaminationPayload) => Promise<AdminExamOverview>;
+  scheduleExam: (id: string, data: ScheduleExaminationPayload) => Promise<AdminExamOverview>;
+  publishExam: (id: string) => Promise<AdminExamOverview>;
   deleteExam: (id: string) => Promise<void>;
 
   // Actions - Students & Lecturers
@@ -382,6 +392,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   isLoadingEnrollments: false,
   enrollmentsError: null,
   isLoadingExams: false,
+  examsError: null,
 
   userSearchQuery: '',
   userRoleFilter: 'ALL',
@@ -420,6 +431,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   examSearchQuery: '',
   examStatusFilter: 'ALL',
+  examCourseOfferingFilter: 'ALL',
 
   auditSearchQuery: '',
   auditCategoryFilter: 'ALL',
@@ -720,14 +732,18 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
-  fetchExams: async () => {
-    set({ isLoadingExams: true });
+  fetchExams: async (params) => {
+    set({ isLoadingExams: true, examsError: null });
     try {
-      const exams = await adminService.getAllExams();
-      set({ exams, isLoadingExams: false });
-    } catch {
-      set({ isLoadingExams: false });
+      const exams = await adminService.getAllExams(params);
+      set({ exams, isLoadingExams: false, examsError: null });
+    } catch (err: unknown) {
+      set({ exams: [], isLoadingExams: false, examsError: getUserFriendlyErrorMessage(err) });
     }
+  },
+
+  fetchExamById: async (id) => {
+    return adminService.getExamById(id);
   },
 
   // Actions - Users
@@ -971,19 +987,32 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   // Actions - Exams
   setExamSearchQuery: (examSearchQuery) => set({ examSearchQuery }),
   setExamStatusFilter: (examStatusFilter) => set({ examStatusFilter }),
+  setExamCourseOfferingFilter: (examCourseOfferingFilter) => set({ examCourseOfferingFilter }),
   addExam: async (data) => {
     const exam = await adminService.createExam(data);
     set((state) => ({ exams: [exam, ...state.exams] }));
     return exam;
   },
-  scheduleExam: async (id, data) => {
-    await adminService.scheduleExam(id, data);
-    get().fetchExams();
+  createExam: async (data) => {
+    const exam = await adminService.createExam(data);
+    set((state) => ({ exams: [exam, ...state.exams] }));
+    return exam;
   },
-  archiveExam: (id) =>
-    set((state) => ({
-      exams: state.exams.map((e) => (e.id === id ? { ...e, status: 'archived' } : e)),
-    })),
+  updateExam: async (id, data) => {
+    const updated = await adminService.updateExam(id, data);
+    set((state) => ({ exams: state.exams.map((e) => (e.id === id ? updated : e)) }));
+    return updated;
+  },
+  scheduleExam: async (id, data) => {
+    const updated = await adminService.scheduleExam(id, data);
+    set((state) => ({ exams: state.exams.map((e) => (e.id === id ? updated : e)) }));
+    return updated;
+  },
+  publishExam: async (id) => {
+    const updated = await adminService.publishExam(id);
+    set((state) => ({ exams: state.exams.map((e) => (e.id === id ? updated : e)) }));
+    return updated;
+  },
   deleteExam: async (id) => {
     await adminService.deleteExam(id);
     set((state) => ({ exams: state.exams.filter((e) => e.id !== id) }));

@@ -21,6 +21,9 @@ import type {
   CreateSemesterPayload,
   UpdateSemesterPayload,
   AdminExamOverview,
+  CreateExaminationPayload,
+  UpdateExaminationPayload,
+  ScheduleExaminationPayload,
   AIGradingJob,
   AuditLog,
   SystemSettings,
@@ -329,24 +332,32 @@ export const adminService = {
   },
 
   // ─── Exams ─────────────────────────────────────────────────────────────────
-  async getAllExams(): Promise<AdminExamOverview[]> {
-    return examApiService.getExams();
+  async getAllExams(params?: { status?: string; course_offering?: string }): Promise<AdminExamOverview[]> {
+    return examApiService.getExams(params);
   },
 
-  async createExam(data: { title: string; duration_minutes: number; course_offering?: string }): Promise<AdminExamOverview> {
+  async getExams(params?: { status?: string; course_offering?: string }): Promise<AdminExamOverview[]> {
+    return examApiService.getExams(params);
+  },
+
+  async getExamById(id: string): Promise<AdminExamOverview> {
+    return examApiService.getExamById(id);
+  },
+
+  async createExam(data: CreateExaminationPayload): Promise<AdminExamOverview> {
     return examApiService.createExam(data);
   },
 
-  async scheduleExam(id: string, data: { start_window: string; end_window: string; duration_minutes: number }): Promise<void> {
+  async updateExam(id: string, data: UpdateExaminationPayload): Promise<AdminExamOverview> {
+    return examApiService.updateExam(id, data);
+  },
+
+  async scheduleExam(id: string, data: ScheduleExaminationPayload): Promise<AdminExamOverview> {
     return examApiService.scheduleExam(id, data);
   },
 
-  async archiveExam(id: string): Promise<AdminExamOverview> {
-    const exams = await this.getAllExams();
-    const exam = exams.find((e) => e.id === id);
-    if (!exam) throw new Error('Exam not found');
-    exam.status = 'archived';
-    return exam;
+  async publishExam(id: string): Promise<AdminExamOverview> {
+    return examApiService.publishExam(id);
   },
 
   async deleteExam(id: string): Promise<void> {
@@ -526,9 +537,9 @@ export const adminService = {
       totalCourses: analytics ? analytics.total_courses : 0,
       totalDepartments: analytics ? analytics.total_departments : 0,
       totalExams: analytics ? analytics.total_exams : exams.length,
-      activeExams: exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length,
+      activeExams: exams.filter((e) => e.status === 'ACTIVE' || e.status === 'SCHEDULED').length,
       pendingAIGrading: 0,
-      publishedResults: exams.filter((e) => e.status === 'published').length,
+      publishedResults: exams.filter((e) => e.status === 'PUBLISHED').length,
       systemHealth: {
         status: 'healthy',
         cpuUsage: 0,
