@@ -19,3 +19,5 @@ export * from './semester-management';
 export * from './admin-notifications';
 export * from './profile';
 export * from './tag-management';
+export * from './course-prerequisite-management';
+export * from './credit-hour-policy-management';

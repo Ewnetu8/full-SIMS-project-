@@ -63,6 +63,8 @@ export const ROUTES = {
     SEMESTERS: '/admin/semesters',
     COURSES: '/admin/courses',
     COURSE_OFFERINGS: '/admin/courses?tab=offerings',
+    COURSE_PREREQUISITES: '/admin/course-prerequisites',
+    CREDIT_HOUR_POLICIES: '/admin/credit-hour-policies',
     ENROLLMENTS: '/admin/enrollments',
     EXAMS: '/admin/exams',
     AI_MONITOR: '/admin/ai-monitor',

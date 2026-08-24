@@ -29,6 +29,10 @@ import type {
   Tag,
   CreateTagPayload,
   UpdateTagPayload,
+  CoursePrerequisite,
+  CreateCoursePrerequisitePayload,
+  CreditHourPolicy,
+  CreditHourPolicyPayload,
 } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -581,6 +585,142 @@ export const academicService = {
 
   async deleteCourse(id: string): Promise<void> {
     await api.delete(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id));
+  },
+
+  // ── Course Prerequisites ───────────────────────────────────────────────────
+  mapApiPrerequisiteToPrerequisite(p: Record<string, unknown>): CoursePrerequisite {
+    const rawCourseDetail = p.course_detail as (ApiCourse & Course) | undefined;
+    const rawPrereqDetail = p.prerequisite_course_detail as (ApiCourse & Course) | undefined;
+
+    const courseDetail: Course | null = rawCourseDetail
+      ? ('course_code' in rawCourseDetail
+        ? this.mapApiCourseToCourse(rawCourseDetail as ApiCourse)
+        : (rawCourseDetail as Course))
+      : null;
+
+    const prereqDetail: Course | null = rawPrereqDetail
+      ? ('course_code' in rawPrereqDetail
+        ? this.mapApiCourseToCourse(rawPrereqDetail as ApiCourse)
+        : (rawPrereqDetail as Course))
+      : null;
+
+    const createdAt = (p.created_at || p.createdAt) as string | undefined;
+    const updatedAt = (p.updated_at || p.updatedAt) as string | undefined;
+
+    return {
+      id: p.id as string,
+      course: p.course as string,
+      course_detail: courseDetail,
+      prerequisite_course: p.prerequisite_course as string,
+      prerequisite_course_detail: prereqDetail,
+      created_at: createdAt,
+      updated_at: updatedAt,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    };
+  },
+
+  async getCoursePrerequisites(): Promise<CoursePrerequisite[]> {
+    const data = await api.get<
+      Record<string, unknown>[] | { results?: Record<string, unknown>[]; data?: Record<string, unknown>[] }
+    >(API_ENDPOINTS.COURSES.PREREQUISITES);
+
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+    return list.map((item) => this.mapApiPrerequisiteToPrerequisite(item));
+  },
+
+  async getCoursePrerequisiteById(id: string): Promise<CoursePrerequisite> {
+    const raw = await api.get<Record<string, unknown>>(API_ENDPOINTS.COURSES.PREREQUISITE_BY_ID(id));
+    return this.mapApiPrerequisiteToPrerequisite(raw);
+  },
+
+  async createCoursePrerequisite(payload: CreateCoursePrerequisitePayload): Promise<CoursePrerequisite> {
+    const body = {
+      course: payload.course.trim(),
+      prerequisite_course: payload.prerequisite_course.trim(),
+    };
+    const res = await api.post<Record<string, unknown>>(API_ENDPOINTS.COURSES.PREREQUISITES, body);
+    return this.mapApiPrerequisiteToPrerequisite(res);
+  },
+
+  async deleteCoursePrerequisite(id: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.COURSES.PREREQUISITE_BY_ID(id));
+  },
+
+  // ── Credit Hour Policies ───────────────────────────────────────────────────
+  mapApiCreditHourPolicyToPolicy(p: Record<string, unknown>): CreditHourPolicy {
+    return {
+      id: String(p.id || ''),
+      class_standing: p.class_standing as ClassStanding,
+      min_credit_hours: typeof p.min_credit_hours === 'number' ? p.min_credit_hours : undefined,
+      max_credit_hours: typeof p.max_credit_hours === 'number' ? p.max_credit_hours : undefined,
+      created_at: String(p.created_at || p.createdAt || ''),
+      updated_at: String(p.updated_at || p.updatedAt || ''),
+      createdAt: String(p.created_at || p.createdAt || ''),
+      updatedAt: String(p.updated_at || p.updatedAt || ''),
+    };
+  },
+
+  async getCreditHourPolicies(): Promise<CreditHourPolicy[]> {
+    const data = await api.get<
+      CreditHourPolicy[] | { results?: Record<string, unknown>[]; data?: Record<string, unknown>[] } | Record<string, unknown>[]
+    >(API_ENDPOINTS.CREDIT_POLICIES.ROOT);
+
+    const list: Record<string, unknown>[] = Array.isArray(data)
+      ? (data as Record<string, unknown>[])
+      : Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+    return list.map((item) => this.mapApiCreditHourPolicyToPolicy(item));
+  },
+
+  async getCreditHourPolicyById(id: string): Promise<CreditHourPolicy> {
+    const raw = await api.get<Record<string, unknown>>(API_ENDPOINTS.CREDIT_POLICIES.BY_ID(id));
+    return this.mapApiCreditHourPolicyToPolicy(raw);
+  },
+
+  async createCreditHourPolicy(payload: CreditHourPolicyPayload): Promise<CreditHourPolicy> {
+    const body: Record<string, unknown> = {
+      class_standing: payload.class_standing,
+    };
+    if (payload.min_credit_hours !== undefined) {
+      body.min_credit_hours = payload.min_credit_hours;
+    }
+    if (payload.max_credit_hours !== undefined) {
+      body.max_credit_hours = payload.max_credit_hours;
+    }
+
+    const res = await api.post<Record<string, unknown>>(API_ENDPOINTS.CREDIT_POLICIES.ROOT, body);
+    return this.mapApiCreditHourPolicyToPolicy(res);
+  },
+
+  async updateCreditHourPolicy(id: string, payload: CreditHourPolicyPayload): Promise<CreditHourPolicy> {
+    const body: Record<string, unknown> = {
+      class_standing: payload.class_standing,
+    };
+    if (payload.min_credit_hours !== undefined) {
+      body.min_credit_hours = payload.min_credit_hours;
+    }
+    if (payload.max_credit_hours !== undefined) {
+      body.max_credit_hours = payload.max_credit_hours;
+    }
+
+    const res = await api.put<Record<string, unknown>>(API_ENDPOINTS.CREDIT_POLICIES.BY_ID(id), body);
+    return this.mapApiCreditHourPolicyToPolicy(res);
+  },
+
+  async deleteCreditHourPolicy(id: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.CREDIT_POLICIES.BY_ID(id));
   },
 
   // ── Course Offerings ─────────────────────────────────────────────────────────

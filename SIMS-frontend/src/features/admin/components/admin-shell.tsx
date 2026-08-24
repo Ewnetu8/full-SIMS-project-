@@ -20,6 +20,8 @@ import {
   UserPlus,
   Tag,
   Layers3,
+  GitFork,
+  Scale,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -47,6 +49,8 @@ const adminNavigation: NavItem[] = [
   { label: 'Semesters', href: ROUTES.ADMIN.SEMESTERS, icon: <Clock className="h-4 w-4" /> },
   { label: 'Courses', href: ROUTES.ADMIN.COURSES, icon: <BookOpen className="h-4 w-4" /> },
   { label: 'Course Offerings', href: ROUTES.ADMIN.COURSE_OFFERINGS, icon: <Layers3 className="h-4 w-4" /> },
+  { label: 'Course Prerequisites', href: ROUTES.ADMIN.COURSE_PREREQUISITES, icon: <GitFork className="h-4 w-4" /> },
+  { label: 'Credit Hour Policies', href: ROUTES.ADMIN.CREDIT_HOUR_POLICIES, icon: <Scale className="h-4 w-4" /> },
   { label: 'Tags Management', href: ROUTES.ADMIN.TAGS, icon: <Tag className="h-4 w-4" /> },
   { label: 'Exams Overview', href: ROUTES.ADMIN.EXAMS, icon: <ClipboardCheck className="h-4 w-4" /> },
   { label: 'AI Grading Monitor', href: ROUTES.ADMIN.AI_MONITOR, icon: <Brain className="h-4 w-4" /> },
