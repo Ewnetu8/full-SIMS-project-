@@ -16,8 +16,9 @@ import {
   Layers,
   GraduationCap,
   RefreshCw,
-  Download,
   FileText,
+  Building2,
+  Search,
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -49,10 +50,13 @@ export function EnrollmentManagement() {
     courseOfferings,
     courses,
     semesters,
+    students,
     isLoadingEnrollments,
     enrollmentsError,
     isLoadingCourseOfferings,
     courseOfferingsError,
+    isLoadingStudents,
+    studentsError,
     enrollmentSearchQuery,
     enrollmentStatusFilter,
     enrollmentSemesterFilter,
@@ -61,6 +65,7 @@ export function EnrollmentManagement() {
     fetchCourseOfferings,
     fetchCourses,
     fetchSemesters,
+    fetchStudents,
     addEnrollment,
     updateEnrollment,
     deleteEnrollment,
@@ -72,11 +77,12 @@ export function EnrollmentManagement() {
   } = useAdminStore();
 
   React.useEffect(() => {
-    fetchEnrollments();
-    fetchCourseOfferings();
-    fetchCourses();
-    fetchSemesters();
-  }, [fetchEnrollments, fetchCourseOfferings, fetchCourses, fetchSemesters]);
+    void fetchEnrollments();
+    void fetchCourseOfferings();
+    void fetchCourses();
+    void fetchSemesters();
+    void fetchStudents();
+  }, [fetchEnrollments, fetchCourseOfferings, fetchCourses, fetchSemesters, fetchStudents]);
 
   // Dialog States
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
@@ -110,6 +116,30 @@ export function EnrollmentManagement() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
 
+  // Student Resolver Map
+  const getStudentDisplay = React.useCallback(
+    (studentId: string) => {
+      const st = students.find((s) => s.id === studentId);
+      if (st) {
+        return {
+          identifier: st.student_identifier,
+          fullName: st.user_full_name || st.user_email || 'Student',
+          classStanding: st.class_standing,
+          department: st.department_detail?.name || 'Department',
+          email: st.user_email,
+        };
+      }
+      return {
+        identifier: studentId,
+        fullName: 'Student',
+        classStanding: undefined,
+        department: undefined,
+        email: undefined,
+      };
+    },
+    [students]
+  );
+
   // Stats Calculations from real backend data
   const stats = React.useMemo(() => {
     const total = enrollments.length;
@@ -125,6 +155,10 @@ export function EnrollmentManagement() {
     return enrollments.filter((e) => {
       const q = enrollmentSearchQuery.toLowerCase().trim();
       const studentId = String(e.student || '').toLowerCase();
+      const studentInfo = getStudentDisplay(e.student);
+      const studentIdent = studentInfo.identifier.toLowerCase();
+      const studentName = studentInfo.fullName.toLowerCase();
+
       const courseCode = String(
         e.course_offering_detail?.course_detail?.course_code ||
         e.course_offering_detail?.course_detail?.code ||
@@ -145,6 +179,8 @@ export function EnrollmentManagement() {
       const matchesSearch =
         !q ||
         studentId.includes(q) ||
+        studentIdent.includes(q) ||
+        studentName.includes(q) ||
         courseCode.includes(q) ||
         courseName.includes(q) ||
         semesterLabel.includes(q) ||
@@ -153,15 +189,17 @@ export function EnrollmentManagement() {
       const matchesStatus =
         enrollmentStatusFilter === 'ALL' || e.status === enrollmentStatusFilter;
 
+      const semId =
+        e.course_offering_detail?.semester ||
+        e.course_offering_detail?.semester_detail?.id;
       const matchesSemester =
-        enrollmentSemesterFilter === 'ALL' ||
-        e.course_offering_detail?.semester === enrollmentSemesterFilter ||
-        e.course_offering_detail?.semester_detail?.id === enrollmentSemesterFilter;
+        enrollmentSemesterFilter === 'ALL' || semId === enrollmentSemesterFilter;
 
+      const crsId =
+        e.course_offering_detail?.course ||
+        e.course_offering_detail?.course_detail?.id;
       const matchesCourse =
-        enrollmentCourseFilter === 'ALL' ||
-        e.course_offering_detail?.course === enrollmentCourseFilter ||
-        e.course_offering_detail?.course_detail?.id === enrollmentCourseFilter;
+        enrollmentCourseFilter === 'ALL' || crsId === enrollmentCourseFilter;
 
       return matchesSearch && matchesStatus && matchesSemester && matchesCourse;
     });
@@ -171,69 +209,70 @@ export function EnrollmentManagement() {
     enrollmentStatusFilter,
     enrollmentSemesterFilter,
     enrollmentCourseFilter,
+    getStudentDisplay,
   ]);
 
+  // Paginated List
   const totalPages = Math.ceil(filteredEnrollments.length / itemsPerPage) || 1;
-  const paginatedEnrollments = filteredEnrollments.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedEnrollments = React.useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredEnrollments.slice(start, start + itemsPerPage);
+  }, [filteredEnrollments, currentPage, itemsPerPage]);
 
-  // Helper for Status Badges
   const getStatusBadge = (status: EnrollmentStatus) => {
     switch (status) {
       case 'ENROLLED':
-        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Enrolled</Badge>;
+        return (
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs">
+            <Clock className="mr-1 h-3 w-3" /> Enrolled
+          </Badge>
+        );
       case 'PASSED':
-        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">Passed</Badge>;
+        return (
+          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs">
+            <CheckCircle2 className="mr-1 h-3 w-3" /> Passed
+          </Badge>
+        );
       case 'FAILED':
-        return <Badge variant="destructive">Failed</Badge>;
+        return (
+          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 text-xs">
+            <XCircle className="mr-1 h-3 w-3" /> Failed
+          </Badge>
+        );
       case 'DROPPED':
-        return <Badge variant="secondary">Dropped</Badge>;
+        return (
+          <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-xs">
+            <AlertCircle className="mr-1 h-3 w-3" /> Dropped
+          </Badge>
+        );
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  // Open Create Modal
   const handleOpenCreate = () => {
-    setFieldErrors({});
-    setGeneralError(null);
-    if (courseOfferings.length === 0) {
-      void fetchCourseOfferings();
-    }
     setCreateFormData({
       student: '',
-      course_offering: courseOfferings[0]?.id || '',
+      course_offering: '',
       status: 'ENROLLED',
       grade: '',
     });
+    setFieldErrors({});
+    setGeneralError(null);
     setIsCreateOpen(true);
   };
 
-  // Open Edit Modal
-  const handleOpenEdit = (enrollment: AdminEnrollment) => {
-    setFieldErrors({});
-    setGeneralError(null);
-    setEditingEnrollment(enrollment);
-    setEditFormData({
-      status: enrollment.status,
-      grade: enrollment.grade || '',
-    });
-  };
-
-  // Handle Create Submit
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFieldErrors({});
     setGeneralError(null);
+    setFieldErrors({});
 
     const errors: Record<string, string> = {};
     if (!createFormData.student.trim()) {
-      errors.student = 'Student identifier / UUID is required.';
+      errors.student = 'Please select a student.';
     }
     if (!createFormData.course_offering.trim()) {
-      errors.course_offering = 'Course Offering selection is required.';
+      errors.course_offering = 'Please select a course offering.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -247,134 +286,105 @@ export function EnrollmentManagement() {
         student: createFormData.student.trim(),
         course_offering: createFormData.course_offering.trim(),
         status: createFormData.status,
-        grade: createFormData.grade.trim() || null,
+        grade: createFormData.grade ? createFormData.grade.trim() : null,
       });
-      toast.success('Enrollment created successfully.');
+
+      toast.success('Student enrolled successfully.');
       setIsCreateOpen(false);
     } catch (err: unknown) {
-      const parsed = parseFieldErrors(err);
-      const friendlyMsg = getUserFriendlyErrorMessage(err);
-      setFieldErrors(parsed);
-      setGeneralError(friendlyMsg);
-      toast.error('Failed to create enrollment', { description: friendlyMsg });
+      const fieldErrs = parseFieldErrors(err);
+      if (Object.keys(fieldErrs).length > 0) {
+        setFieldErrors(fieldErrs);
+      }
+      const msg = getUserFriendlyErrorMessage(err);
+      setGeneralError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle Edit Submit
+  const handleOpenEdit = (enrollment: AdminEnrollment) => {
+    setEditingEnrollment(enrollment);
+    setEditFormData({
+      status: enrollment.status,
+      grade: enrollment.grade || '',
+    });
+    setFieldErrors({});
+    setGeneralError(null);
+  };
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEnrollment) return;
 
-    setFieldErrors({});
-    setGeneralError(null);
     setIsSubmitting(true);
+    setGeneralError(null);
+    setFieldErrors({});
+
     try {
       await updateEnrollment(editingEnrollment.id, {
         status: editFormData.status,
-        grade: editFormData.grade.trim() || null,
+        grade: editFormData.grade ? editFormData.grade.trim() : null,
       });
-      toast.success('Enrollment updated successfully.');
+
+      toast.success('Enrollment status updated successfully.');
       setEditingEnrollment(null);
     } catch (err: unknown) {
-      const parsed = parseFieldErrors(err);
-      const friendlyMsg = getUserFriendlyErrorMessage(err);
-      setFieldErrors(parsed);
-      setGeneralError(friendlyMsg);
-      toast.error('Failed to update enrollment', { description: friendlyMsg });
+      const fieldErrs = parseFieldErrors(err);
+      if (Object.keys(fieldErrs).length > 0) {
+        setFieldErrors(fieldErrs);
+      }
+      const msg = getUserFriendlyErrorMessage(err);
+      setGeneralError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle Delete Confirmation
-  const handleDeleteConfirm = async () => {
+  const handleDelete = async () => {
     if (!deletingEnrollment) return;
     try {
       await deleteEnrollment(deletingEnrollment.id);
-      toast.success('Enrollment removed / dropped successfully.');
+      toast.success('Enrollment record removed successfully.');
       setDeletingEnrollment(null);
     } catch (err: unknown) {
-      toast.error('Failed to remove enrollment', {
-        description: getUserFriendlyErrorMessage(err),
-      });
+      toast.error(getUserFriendlyErrorMessage(err));
     }
   };
 
-  // Open Batch Import Modal
-  const handleOpenBatchImport = () => {
-    setImportFile(null);
+  const handleBatchImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setImportValidationError(null);
     setImportResult(null);
-    setIsBatchImportOpen(true);
-  };
 
-  // Handle CSV File Selection with client-side validations
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setImportValidationError(null);
-    setImportResult(null);
-    const file = e.target.files?.[0] || null;
-    if (!file) {
-      setImportFile(null);
-      return;
-    }
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setImportValidationError('Please upload a valid .csv file.');
-      setImportFile(null);
-      return;
-    }
-    if (file.size === 0) {
-      setImportValidationError('The selected file is empty. Please select a valid CSV file.');
-      setImportFile(null);
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setImportValidationError('The CSV file is too large to upload. Maximum allowed size is 10 MB.');
-      setImportFile(null);
-      return;
-    }
-    setImportFile(file);
-  };
-
-  // Download Sample CSV Template
-  const handleDownloadTemplate = () => {
-    const sampleSemId = semesters[0]?.id || '31bd7164-0c69-4bba-a63d-36f9a3d9d043';
-    const sampleCsv = `student_identifier,course_code,semester_id,section\nSTU001,SW12,${sampleSemId},A\nSTU002,FR5,${sampleSemId},A\nSTU003,WS123,${sampleSemId},A\n`;
-    const blob = new Blob([sampleCsv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'batch_student_enrollment_template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  // Handle Batch CSV Import Submission
-  const handleBatchImportSubmit = async () => {
     if (!importFile) {
-      setImportValidationError('Please select a CSV file to import.');
+      setImportValidationError('Please select a CSV file to upload.');
       return;
     }
+
+    if (!importFile.name.endsWith('.csv')) {
+      setImportValidationError('Only CSV files are supported (.csv).');
+      return;
+    }
+
     setIsImporting(true);
-    setImportValidationError(null);
     try {
       const res = await batchImportEnrollments(importFile);
-      const taskId = res.task_id;
-      const message = res.detail || res.message || 'Batch enrollment import task dispatched successfully.';
-      setImportResult({ taskId, message });
-      toast.success('Batch enrollment import dispatched', {
-        description: taskId ? `Background Task ID: ${taskId}` : message,
+      setImportResult({
+        taskId: res.task_id,
+        message:
+          res.detail ||
+          res.message ||
+          'Batch enrollment import task dispatched successfully. Processing in background.',
       });
-      void fetchEnrollments();
+      toast.success('Batch enrollment file uploaded successfully.');
+      setImportFile(null);
     } catch (err: unknown) {
-      const friendlyMsg = getUserFriendlyErrorMessage(err);
-      setImportValidationError(friendlyMsg);
-      toast.error('Batch import failed', {
-        description: friendlyMsg,
-      });
+      const msg = getUserFriendlyErrorMessage(err);
+      setImportValidationError(msg);
+      toast.error(msg);
     } finally {
       setIsImporting(false);
     }
@@ -385,81 +395,126 @@ export function EnrollmentManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header Banner */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <UserPlus className="h-6 w-6 text-primary" /> Enrollment Management
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              Course Enrollment Management
+            </h1>
+            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/10">
+              Institutional Admin
+            </Badge>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage course enrollments, student registrations, grading outcomes, and batch imports.
+            Manage student course enrollments, grade outcomes, credit limits, and batch CSV imports.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleOpenBatchImport} leftIcon={<Upload className="h-4 w-4" />}>
-            Batch Import CSV
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void fetchEnrollments();
+              void fetchCourseOfferings();
+              void fetchStudents();
+            }}
+            disabled={isLoadingEnrollments}
+            className="flex items-center gap-1.5"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoadingEnrollments ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-          <Button onClick={handleOpenCreate} leftIcon={<UserPlus className="h-4 w-4" />}>
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Upload className="h-4 w-4" />}
+            onClick={() => {
+              setImportFile(null);
+              setImportValidationError(null);
+              setImportResult(null);
+              setIsBatchImportOpen(true);
+            }}
+          >
+            Batch CSV Import
+          </Button>
+          <Button size="sm" leftIcon={<UserPlus className="h-4 w-4" />} onClick={handleOpenCreate}>
             Create Enrollment
           </Button>
         </div>
       </div>
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card className="p-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-            <FileSpreadsheet className="h-5 w-5" />
+      {/* KPI Stats Grid (5 Cards) */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <Card className="p-4 border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Total Enrollments</span>
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <FileSpreadsheet className="h-4 w-4" />
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground font-medium">Total Enrollments</p>
-            <p className="text-xl font-bold text-foreground">{stats.total}</p>
-          </div>
+          <p className="mt-2 text-2xl font-bold text-foreground">{stats.total}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">All registered records</p>
         </Card>
 
-        <Card className="p-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-            <Clock className="h-5 w-5" />
+        <Card className="p-4 border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Active (Enrolled)</span>
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600">
+              <Clock className="h-4 w-4" />
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground font-medium">Active Enrolled</p>
-            <p className="text-xl font-bold text-primary">{stats.active}</p>
-          </div>
+          <p className="mt-2 text-2xl font-bold text-blue-600">{stats.active}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">In-progress sessions</p>
         </Card>
 
-        <Card className="p-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-            <CheckCircle2 className="h-5 w-5" />
+        <Card className="p-4 border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Passed</span>
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground font-medium">Passed</p>
-            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats.passed}</p>
-          </div>
+          <p className="mt-2 text-2xl font-bold text-emerald-600">{stats.passed}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Satisfied course credit</p>
         </Card>
 
-        <Card className="p-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive shrink-0">
-            <XCircle className="h-5 w-5" />
+        <Card className="p-4 border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Failed</span>
+            <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+              <XCircle className="h-4 w-4" />
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground font-medium">Dropped / Failed</p>
-            <p className="text-xl font-bold text-destructive">{stats.failed + stats.dropped}</p>
+          <p className="mt-2 text-2xl font-bold text-destructive">{stats.failed}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Retake eligible</p>
+        </Card>
+
+        <Card className="p-4 border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Dropped</span>
+            <div className="p-2 rounded-lg bg-muted text-muted-foreground">
+              <AlertCircle className="h-4 w-4" />
+            </div>
           </div>
+          <p className="mt-2 text-2xl font-bold text-muted-foreground">{stats.dropped}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Withdrawn from offering</p>
         </Card>
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+      <Card className="p-4 border-border space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <SearchInput
-              placeholder="Search student ID, course, semester..."
+              placeholder="Search student, course code, section..."
               value={enrollmentSearchQuery}
               onChange={(e) => {
                 setEnrollmentSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              onClear={() => setEnrollmentSearchQuery('')}
+              className="w-full"
             />
           </div>
 
@@ -490,9 +545,9 @@ export function EnrollmentManagement() {
               }}
             >
               <option value="ALL">All Semesters</option>
-              {semesters.map((sem) => (
-                <option key={sem.id} value={sem.id}>
-                  {sem.academicYearDetail?.displayLabel || 'Academic Year'} - {sem.semesterIndex} Semester
+              {semesters.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.academicYearDetail?.displayLabel || 'Academic Year'} - {s.semesterIndex} Sem
                 </option>
               ))}
             </select>
@@ -519,7 +574,7 @@ export function EnrollmentManagement() {
       </Card>
 
       {/* Enrollment Table */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-border">
         {isLoadingEnrollments ? (
           <div className="p-12 text-center text-sm text-muted-foreground">
             <Clock className="mx-auto h-8 w-8 animate-spin text-primary mb-2" />
@@ -530,7 +585,7 @@ export function EnrollmentManagement() {
             <AlertCircle className="mx-auto h-8 w-8 mb-2" />
             <p className="font-semibold">Error loading enrollments</p>
             <p className="text-xs text-muted-foreground mt-1">{enrollmentsError}</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => fetchEnrollments()}>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => void fetchEnrollments()}>
               Retry
             </Button>
           </div>
@@ -567,17 +622,23 @@ export function EnrollmentManagement() {
                     const offering = enrollment.course_offering_detail;
                     const course = offering?.course_detail;
                     const sem = offering?.semester_detail;
+                    const studentInfo = getStudentDisplay(enrollment.student);
 
                     return (
                       <tr key={enrollment.id} className="hover:bg-accent/40 transition-colors">
                         <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
                               <GraduationCap className="h-4 w-4" />
                             </div>
-                            <span className="font-mono text-xs font-semibold text-primary">
-                              {enrollment.student}
-                            </span>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-foreground text-xs truncate">
+                                {studentInfo.identifier}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {studentInfo.fullName}
+                              </p>
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3.5">
@@ -652,9 +713,9 @@ export function EnrollmentManagement() {
                             <Button
                               variant="ghost"
                               size="xs"
-                              className="text-destructive hover:bg-destructive/10"
                               onClick={() => setDeletingEnrollment(enrollment)}
-                              title="Drop / Delete Enrollment"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Delete / Drop Enrollment"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -669,11 +730,13 @@ export function EnrollmentManagement() {
           </div>
         )}
 
-        {/* Pagination controls */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3">
-            <span className="text-xs text-muted-foreground">
-              Page {currentPage} of {totalPages} ({filteredEnrollments.length} total records)
+        {/* Pagination Bar */}
+        {filteredEnrollments.length > itemsPerPage && (
+          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-muted-foreground">
+            <span>
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, filteredEnrollments.length)} of{' '}
+              {filteredEnrollments.length} enrollments
             </span>
             <div className="flex items-center gap-2">
               <Button
@@ -705,7 +768,7 @@ export function EnrollmentManagement() {
               <UserPlus className="h-5 w-5 text-primary" /> Create Student Enrollment
             </DialogTitle>
             <DialogDescription>
-              Enroll a student in a course offering. The backend will validate duplicate, prerequisite, class standing, and credit hour rules.
+              Enroll a student in a course offering. The backend automatically validates duplicate, prerequisite, class standing, and credit hour rules.
             </DialogDescription>
           </DialogHeader>
 
@@ -718,29 +781,72 @@ export function EnrollmentManagement() {
                 </div>
               )}
 
-              {/* Student UUID / Identifier */}
+              {/* Student Selector */}
               <div className="space-y-1.5">
-                <Label htmlFor="studentIdInput" required>
-                  Student UUID / Identifier
-                </Label>
-                <Input
-                  id="studentIdInput"
-                  placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
-                  value={createFormData.student}
-                  onChange={(e) => {
-                    setCreateFormData({ ...createFormData, student: e.target.value });
-                    if (fieldErrors.student) {
-                      setFieldErrors((prev) => ({ ...prev, student: '' }));
-                    }
-                  }}
-                  className={fieldErrors.student ? 'border-destructive' : ''}
-                />
-                {fieldErrors.student ? (
-                  <p className="text-xs text-destructive">{fieldErrors.student}</p>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="studentSelect" required>
+                    Student
+                  </Label>
+                  {students.length > 0 && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {students.length} available
+                    </span>
+                  )}
+                </div>
+
+                {isLoadingStudents ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+                    <Clock className="h-4 w-4 animate-spin text-primary shrink-0" />
+                    <span>Loading students directory...</span>
+                  </div>
+                ) : studentsError ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
+                    <span className="truncate">Unable to load students directory.</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs shrink-0"
+                      onClick={() => void fetchStudents()}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                    </Button>
+                  </div>
+                ) : students.length === 0 ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border bg-muted/20 p-2.5 text-xs text-muted-foreground">
+                    <span>No students found in directory.</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs shrink-0"
+                      onClick={() => void fetchStudents()}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+                    </Button>
+                  </div>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground">
-                    Provide the student profile UUID registered in the backend.
-                  </p>
+                  <select
+                    id="studentSelect"
+                    className={`${selectClass} ${fieldErrors.student ? 'border-destructive' : ''}`}
+                    value={createFormData.student}
+                    onChange={(e) => {
+                      setCreateFormData({ ...createFormData, student: e.target.value });
+                      if (fieldErrors.student) {
+                        setFieldErrors((prev) => ({ ...prev, student: '' }));
+                      }
+                    }}
+                  >
+                    <option value="">Select a Registered Student</option>
+                    {students.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.student_identifier} — {st.user_full_name || st.user_email} ({st.class_standing})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {fieldErrors.student && (
+                  <p className="text-xs text-destructive">{fieldErrors.student}</p>
                 )}
               </div>
 
@@ -896,17 +1002,31 @@ export function EnrollmentManagement() {
             </DialogHeader>
 
             <DialogBody className="space-y-4 py-3 max-h-[75vh] overflow-y-auto">
-              <div className="border-b border-border pb-3">
-                <p className="text-xs text-muted-foreground">Student UUID / Reference</p>
-                <p className="font-mono text-sm font-bold text-primary mt-0.5">
-                  {selectedEnrollment.student}
-                </p>
-              </div>
+              {(() => {
+                const stInfo = getStudentDisplay(selectedEnrollment.student);
+                return (
+                  <div className="border-b border-border pb-3">
+                    <p className="text-xs text-muted-foreground">Student Identifier & Details</p>
+                    <p className="text-base font-bold text-foreground mt-0.5">
+                      {stInfo.identifier} — {stInfo.fullName}
+                    </p>
+                    {stInfo.department && (
+                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 text-primary" /> {stInfo.department}{' '}
+                        {stInfo.classStanding ? `(${stInfo.classStanding})` : ''}
+                      </p>
+                    )}
+                    <p className="font-mono text-[10px] text-muted-foreground mt-1">
+                      UUID: {selectedEnrollment.student}
+                    </p>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2.5 text-xs text-foreground">
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <BookOpen className="h-3.5 w-3.5" /> Course:
+                    <BookOpen className="h-3.5 w-3.5 text-primary" /> Course:
                   </span>
                   <span className="font-medium text-right">
                     {selectedEnrollment.course_offering_detail?.course_detail?.course_code ||
@@ -921,7 +1041,7 @@ export function EnrollmentManagement() {
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Layers className="h-3.5 w-3.5" /> Section & Capacity:
+                    <Layers className="h-3.5 w-3.5 text-primary" /> Section & Capacity:
                   </span>
                   <span className="font-medium">
                     Section {selectedEnrollment.course_offering_detail?.section || 'A'}{' '}
@@ -933,7 +1053,7 @@ export function EnrollmentManagement() {
 
                 <div className="flex justify-between py-1 border-b border-border/50">
                   <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" /> Academic Period:
+                    <Calendar className="h-3.5 w-3.5 text-primary" /> Academic Period:
                   </span>
                   <span className="font-medium">
                     {selectedEnrollment.course_offering_detail?.semester_detail?.academic_year_detail?.display_label ||
@@ -980,15 +1100,13 @@ export function EnrollmentManagement() {
                     Grade:
                   </span>
                   <span className="font-mono font-bold">
-                    {selectedEnrollment.grade || 'Not Graded Yet'}
+                    {selectedEnrollment.grade || '—'}
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1 border-b border-border/50">
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    Date Created:
-                  </span>
-                  <span className="font-medium">
+                  <span className="text-muted-foreground">Enrolled At:</span>
+                  <span>
                     {selectedEnrollment.created_at
                       ? new Date(selectedEnrollment.created_at).toLocaleString()
                       : '—'}
@@ -996,18 +1114,20 @@ export function EnrollmentManagement() {
                 </div>
 
                 <div className="flex justify-between py-1">
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    Enrollment ID:
-                  </span>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {selectedEnrollment.id}
+                  <span className="text-muted-foreground">Last Updated:</span>
+                  <span>
+                    {selectedEnrollment.updated_at
+                      ? new Date(selectedEnrollment.updated_at).toLocaleString()
+                      : '—'}
                   </span>
                 </div>
               </div>
             </DialogBody>
 
             <DialogFooter>
-              <Button onClick={() => setSelectedEnrollment(null)}>Close</Button>
+              <Button variant="outline" onClick={() => setSelectedEnrollment(null)}>
+                Close
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1019,10 +1139,10 @@ export function EnrollmentManagement() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Edit2 className="h-5 w-5 text-primary" /> Update Enrollment
+                <Edit2 className="h-5 w-5 text-primary" /> Update Enrollment Status
               </DialogTitle>
               <DialogDescription>
-                Update enrollment status and grade outcome for this student.
+                Modify academic completion status and recorded grade letter for this enrollment.
               </DialogDescription>
             </DialogHeader>
 
@@ -1035,13 +1155,28 @@ export function EnrollmentManagement() {
                   </div>
                 )}
 
-                <div className="space-y-1 text-xs">
-                  <p className="text-muted-foreground">Student:</p>
-                  <p className="font-mono font-semibold text-primary">{editingEnrollment.student}</p>
-                </div>
+                {(() => {
+                  const st = getStudentDisplay(editingEnrollment.student);
+                  return (
+                    <div className="p-3 bg-muted/40 border border-border rounded-lg text-xs space-y-1">
+                      <p className="font-semibold text-foreground">
+                        {st.identifier} — {st.fullName}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {editingEnrollment.course_offering_detail?.course_detail?.title ||
+                          editingEnrollment.course_offering_detail?.course_detail?.name ||
+                          'Course Offering'}{' '}
+                        (Section {editingEnrollment.course_offering_detail?.section || 'A'})
+                      </p>
+                    </div>
+                  );
+                })()}
 
+                {/* Status Selection */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="editStatusSelect">Enrollment Status</Label>
+                  <Label htmlFor="editStatusSelect" required>
+                    Enrollment Status
+                  </Label>
                   <select
                     id="editStatusSelect"
                     className={selectClass}
@@ -1060,16 +1195,21 @@ export function EnrollmentManagement() {
                   </select>
                 </div>
 
+                {/* Grade Input */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="editGradeInput">Grade</Label>
+                  <Label htmlFor="editGradeInput">Recorded Grade Letter</Label>
                   <Input
                     id="editGradeInput"
-                    placeholder="e.g. A, B+, C, etc."
+                    placeholder="e.g. A, A-, B+, B, C, F, etc."
                     value={editFormData.grade}
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, grade: e.target.value })
                     }
+                    className={fieldErrors.grade ? 'border-destructive' : ''}
                   />
+                  {fieldErrors.grade && (
+                    <p className="text-xs text-destructive">{fieldErrors.grade}</p>
+                  )}
                 </div>
               </DialogBody>
 
@@ -1078,7 +1218,7 @@ export function EnrollmentManagement() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                  {isSubmitting ? 'Updating...' : 'Save Changes'}
                 </Button>
               </DialogFooter>
             </form>
@@ -1086,53 +1226,40 @@ export function EnrollmentManagement() {
         </Dialog>
       )}
 
-      {/* ── DROP / DELETE CONFIRMATION DIALOG ───────────────────────────────── */}
+      {/* ── DELETE ENROLLMENT CONFIRMATION ──────────────────────────────────── */}
       <ConfirmationDialog
         open={!!deletingEnrollment}
         onOpenChange={(open) => {
           if (!open) setDeletingEnrollment(null);
         }}
-        onConfirm={handleDeleteConfirm}
-        title="Drop / Remove Enrollment"
-        description="Are you sure you want to remove this course enrollment record? This action will permanently drop the student from the course offering on the backend."
-        confirmLabel="Drop Enrollment"
+        title="Drop / Delete Enrollment"
+        description={
+          deletingEnrollment
+            ? `Are you sure you want to drop enrollment record for ${
+                getStudentDisplay(deletingEnrollment.student).identifier
+              }? This action removes the student from this course offering session.`
+            : ''
+        }
+        confirmLabel="Yes, Drop Enrollment"
+        cancelLabel="Cancel"
         destructive
+        onConfirm={handleDelete}
+        onCancel={() => setDeletingEnrollment(null)}
       />
 
-      {/* ── BATCH CSV IMPORT DIALOG ─────────────────────────────────────────── */}
+      {/* ── BATCH CSV IMPORT DIALOG (FR-004) ────────────────────────────────── */}
       <Dialog open={isBatchImportOpen} onOpenChange={setIsBatchImportOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-primary" /> Batch Student Enrollment CSV Import
+              <Upload className="h-5 w-5 text-primary" /> Batch Import Student Enrollments
             </DialogTitle>
             <DialogDescription>
-              Upload a CSV file containing student enrollment records. The backend will asynchronously process the import.
+              Upload a bulk CSV file of student enrollments. The system dispatches an asynchronous background task.
             </DialogDescription>
           </DialogHeader>
 
-          {importResult ? (
-            <DialogBody className="space-y-4 py-4">
-              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 text-center space-y-2">
-                <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-                <h4 className="text-base font-semibold text-foreground">Import Started</h4>
-                <p className="text-xs text-muted-foreground">
-                  The CSV file was successfully submitted for processing.
-                </p>
-                {importResult.taskId && (
-                  <div className="pt-2">
-                    <p className="text-[11px] text-muted-foreground uppercase font-semibold">Celery Task ID:</p>
-                    <code className="text-xs font-mono text-primary bg-background px-2.5 py-1 rounded border border-border inline-block mt-1">
-                      {importResult.taskId}
-                    </code>
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground text-center">
-                Your enrollment import has been queued for processing.
-              </p>
-            </DialogBody>
-          ) : (
+          <form onSubmit={handleBatchImportSubmit}>
             <DialogBody className="space-y-4 py-3">
               {importValidationError && (
                 <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive flex items-start gap-2">
@@ -1141,94 +1268,85 @@ export function EnrollmentManagement() {
                 </div>
               )}
 
-              <div className="rounded-lg bg-muted/50 p-3 text-xs space-y-2 text-muted-foreground border border-border">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-foreground">Required CSV Column Headers:</p>
+              {importResult && (
+                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>Import Task Dispatched</span>
+                  </div>
+                  <p>{importResult.message}</p>
+                  {importResult.taskId && (
+                    <p className="font-mono text-[11px] opacity-80">Task ID: {importResult.taskId}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-lg border-2 border-dashed border-border p-6 text-center hover:bg-muted/20 transition-colors">
+                <FileSpreadsheet className="h-10 w-10 text-muted-foreground/60 mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground">
+                  {importFile ? importFile.name : 'Select CSV File to Upload'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {importFile
+                    ? `${(importFile.size / 1024).toFixed(1)} KB`
+                    : 'CSV format required with student and course offering identifiers'}
+                </p>
+
+                <input
+                  type="file"
+                  id="csvFileInput"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setImportFile(file);
+                      setImportValidationError(null);
+                    }
+                  }}
+                />
+
+                <div className="mt-4 flex items-center justify-center gap-2">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-6 text-[11px] px-2 text-primary"
-                    onClick={handleDownloadTemplate}
+                    onClick={() => document.getElementById('csvFileInput')?.click()}
                   >
-                    <Download className="h-3 w-3 mr-1" /> Template
+                    Browse CSV
                   </Button>
-                </div>
-                <code className="block text-[11px] font-mono text-primary bg-background p-2 rounded border border-border">
-                  student_identifier,course_code,semester_id,section
-                </code>
-                <div className="text-[11px] space-y-0.5 pt-1 text-muted-foreground">
-                  <p>• <span className="font-semibold text-foreground">student_identifier</span>: Registered student ID</p>
-                  <p>• <span className="font-semibold text-foreground">course_code</span>: Code of the academic course (e.g. SW12)</p>
-                  <p>• <span className="font-semibold text-foreground">semester_id</span>: UUID of the academic semester</p>
-                  <p>• <span className="font-semibold text-foreground">section</span>: Offering section letter (e.g. A, B)</p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="enrollmentCsvFile" required>
-                  Select CSV File
-                </Label>
-                <Input
-                  id="enrollmentCsvFile"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleFileSelect}
-                  disabled={isImporting}
-                />
-                {importFile && (
-                  <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg p-2 text-xs mt-1.5">
-                    <div className="flex items-center gap-2 truncate">
-                      <FileText className="h-4 w-4 text-primary shrink-0" />
-                      <span className="font-medium text-foreground truncate">{importFile.name}</span>
-                      <span className="text-[11px] text-muted-foreground">({(importFile.size / 1024).toFixed(1)} KB)</span>
-                    </div>
+                  {importFile && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 text-xs text-muted-foreground hover:text-destructive"
                       onClick={() => setImportFile(null)}
-                      disabled={isImporting}
+                      className="text-xs text-destructive hover:bg-destructive/10"
                     >
                       Remove
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground space-y-1 border border-border">
+                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-primary" /> Expected CSV Format
+                </p>
+                <p>Header: <code>student_identifier,course_code,academic_year,semester,section</code></p>
+                <p>Example: <code>AASTU/1234/14,CS301,2025/2026,FIRST,A</code></p>
               </div>
             </DialogBody>
-          )}
 
-          <DialogFooter>
-            {importResult ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setImportResult(null);
-                    setImportFile(null);
-                  }}
-                >
-                  Import Another File
-                </Button>
-                <Button onClick={() => setIsBatchImportOpen(false)}>
-                  Done
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => setIsBatchImportOpen(false)} disabled={isImporting}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleBatchImportSubmit}
-                  disabled={isImporting || !importFile}
-                >
-                  {isImporting ? 'Uploading CSV...' : 'Import Enrollments'}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setIsBatchImportOpen(false)}>
+                Close
+              </Button>
+              <Button type="submit" disabled={isImporting || !importFile}>
+                {isImporting ? 'Uploading...' : 'Start Batch Import'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

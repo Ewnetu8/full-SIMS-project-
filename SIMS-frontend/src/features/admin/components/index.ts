@@ -18,3 +18,4 @@ export * from './program-management';
 export * from './semester-management';
 export * from './admin-notifications';
 export * from './profile';
+export * from './tag-management';

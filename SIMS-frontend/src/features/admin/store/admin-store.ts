@@ -5,9 +5,10 @@ import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import { adminService, type RegisterUserPayload } from '../services/admin-service';
 
 import type {
-  AdminUser,
+  UserCompact,
+  UserDetail,
+  UpdateUserPayload,
   StudentProfile,
-  LecturerProfile,
   Department,
   Course,
   ClassStanding,
@@ -20,18 +21,34 @@ import type {
   Program,
   AcademicYear,
   Semester,
+  CreateSemesterPayload,
+  UpdateSemesterPayload,
   AdminCourseOffering,
+  CreateCourseOfferingPayload,
+  UpdateCourseOfferingPayload,
   AdminEnrollment,
   CreateEnrollmentPayload,
   UpdateEnrollmentPayload,
   BatchImportResponse,
+  ApiStudentDetail,
+  StudentFilterParams,
+  UpdateStudentPayload,
+  ApiLecturerListItem,
+  ApiLecturerDetail,
+  LecturerFilterParams,
+  UpdateLecturerPayload,
+  Tag,
+  CreateTagPayload,
+  UpdateTagPayload,
 } from '../types';
+import type { AdminAnalyticsResponse } from '@/types/api';
 
 interface AdminStoreState {
   // Datasets
-  users: AdminUser[];
+  adminAnalytics: AdminAnalyticsResponse | null;
+  users: UserCompact[];
   students: StudentProfile[];
-  lecturers: LecturerProfile[];
+  lecturers: ApiLecturerListItem[];
   colleges: College[];
   departments: Department[];
   programs: Program[];
@@ -45,19 +62,31 @@ interface AdminStoreState {
   auditLogs: AuditLog[];
   settings: SystemSettings;
   notifications: AdminNotification[];
+  tags: Tag[];
   isLoadingData: boolean;
 
   // Loading states
+  isLoadingAnalytics: boolean;
+  analyticsError: string | null;
   isLoadingUsers: boolean;
   usersError: string | null;
+  isLoadingStudents: boolean;
+  studentsError: string | null;
+  isLoadingLecturers: boolean;
+  lecturersError: string | null;
+  isLoadingTags: boolean;
+  tagsError: string | null;
   isLoadingColleges: boolean;
   collegesError: string | null;
   isLoadingDepartments: boolean;
   departmentsError: string | null;
   isLoadingPrograms: boolean;
+  programsError: string | null;
   isLoadingAcademicYears: boolean;
   isLoadingSemesters: boolean;
+  semestersError: string | null;
   isLoadingCourses: boolean;
+  coursesError: string | null;
   isLoadingCourseOfferings: boolean;
   courseOfferingsError: string | null;
   isLoadingEnrollments: boolean;
@@ -72,15 +101,20 @@ interface AdminStoreState {
 
   studentSearchQuery: string;
   studentDeptFilter: string;
+  studentClassStandingFilter: string;
 
   lecturerSearchQuery: string;
   lecturerDeptFilter: string;
 
   collegeSearchQuery: string;
   departmentSearchQuery: string;
+  departmentCollegeFilter: string;
   programSearchQuery: string;
+  programDeptFilter: string;
+  programDegreeFilter: string;
   academicYearSearchQuery: string;
   semesterSearchQuery: string;
+  semesterYearFilter: string;
 
   courseSearchQuery: string;
   courseProgramFilter: string;
@@ -98,25 +132,49 @@ interface AdminStoreState {
   auditSearchQuery: string;
   auditCategoryFilter: string;
 
+  tagSearchQuery: string;
+
   // Fetch Actions
   fetchAdminData: () => Promise<void>;
-  fetchUsers: () => Promise<void>;
-  fetchStudents: () => Promise<void>;
-  fetchLecturers: () => Promise<void>;
+  fetchAdminAnalytics: () => Promise<void>;
+  fetchUsers: (params?: { search?: string; role?: string }) => Promise<void>;
+  fetchUserById: (id: string) => Promise<UserDetail>;
+  fetchStudents: (params?: StudentFilterParams) => Promise<void>;
+  fetchStudentById: (id: string) => Promise<ApiStudentDetail>;
+  updateStudent: (id: string, payload: UpdateStudentPayload) => Promise<ApiStudentDetail>;
+  fetchLecturers: (params?: LecturerFilterParams) => Promise<void>;
+  fetchLecturerById: (id: string) => Promise<ApiLecturerDetail>;
+  updateLecturer: (id: string, payload: UpdateLecturerPayload) => Promise<ApiLecturerDetail>;
+  fetchTags: () => Promise<void>;
+  fetchTagById: (id: string) => Promise<Tag>;
+  addTag: (data: CreateTagPayload) => Promise<Tag>;
+  updateTag: (id: string, data: UpdateTagPayload) => Promise<Tag>;
+  deleteTag: (id: string) => Promise<void>;
+  setTagSearchQuery: (q: string) => void;
   fetchColleges: () => Promise<void>;
   fetchDepartments: () => Promise<void>;
+  fetchDepartmentById: (id: string) => Promise<Department>;
   fetchPrograms: () => Promise<void>;
+  fetchProgramById: (id: string) => Promise<Program>;
   fetchAcademicYears: () => Promise<void>;
   fetchSemesters: () => Promise<void>;
+  fetchSemesterById: (id: string) => Promise<Semester>;
+  addSemester: (data: CreateSemesterPayload) => Promise<Semester>;
+  updateSemester: (id: string, data: UpdateSemesterPayload) => Promise<Semester>;
+  deleteSemester: (id: string) => Promise<void>;
+  setSemesterSearchQuery: (q: string) => void;
+  setSemesterYearFilter: (yearId: string) => void;
   fetchCourses: () => Promise<void>;
+  fetchCourseById: (id: string) => Promise<Course>;
   fetchCourseOfferings: () => Promise<void>;
+  fetchCourseOfferingById: (id: string) => Promise<AdminCourseOffering>;
   fetchEnrollments: () => Promise<void>;
   fetchExams: () => Promise<void>;
 
   // Actions - Users
-  setUsers: (users: AdminUser[]) => void;
-  addUser: (user: RegisterUserPayload) => Promise<AdminUser>;
-  updateUser: (id: string, data: Partial<AdminUser>) => Promise<AdminUser>;
+  setUsers: (users: UserCompact[]) => void;
+  addUser: (user: RegisterUserPayload) => Promise<UserCompact>;
+  updateUser: (id: string, data: UpdateUserPayload) => Promise<UserDetail>;
   deleteUser: (id: string) => Promise<void>;
   setUserSearchQuery: (q: string) => void;
   setUserRoleFilter: (role: string) => void;
@@ -131,12 +189,15 @@ interface AdminStoreState {
 
   // Actions - Departments
   setDepartmentSearchQuery: (q: string) => void;
+  setDepartmentCollegeFilter: (collegeId: string) => void;
   addDepartment: (data: { name: string; code: string; college?: string | null }) => Promise<Department>;
   updateDepartment: (id: string, data: Partial<{ name: string; code: string; college?: string | null }>) => Promise<Department>;
   deleteDepartment: (id: string) => Promise<void>;
 
   // Actions - Programs
   setProgramSearchQuery: (q: string) => void;
+  setProgramDeptFilter: (deptId: string) => void;
+  setProgramDegreeFilter: (degree: string) => void;
   addProgram: (data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }) => Promise<Program>;
   updateProgram: (id: string, data: Partial<{ department?: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }>) => Promise<Program>;
   deleteProgram: (id: string) => Promise<void>;
@@ -146,12 +207,6 @@ interface AdminStoreState {
   addAcademicYear: (data: { display_label: string; start_boundary: string; end_boundary: string }) => Promise<AcademicYear>;
   updateAcademicYear: (id: string, data: Partial<{ display_label: string; start_boundary: string; end_boundary: string }>) => Promise<AcademicYear>;
   deleteAcademicYear: (id: string) => Promise<void>;
-
-  // Actions - Semesters
-  setSemesterSearchQuery: (q: string) => void;
-  addSemester: (data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }) => Promise<Semester>;
-  updateSemester: (id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>) => Promise<Semester>;
-  deleteSemester: (id: string) => Promise<void>;
 
   // Actions - Courses
   setCourseSearchQuery: (q: string) => void;
@@ -164,6 +219,9 @@ interface AdminStoreState {
   toggleCourseArchive: (id: string) => void;
 
   // Actions - Course Offerings & Enrollments
+  addCourseOffering: (data: CreateCourseOfferingPayload) => Promise<AdminCourseOffering>;
+  updateCourseOffering: (id: string, data: UpdateCourseOfferingPayload) => Promise<AdminCourseOffering>;
+  deleteCourseOffering: (id: string) => Promise<void>;
   setEnrollmentSearchQuery: (q: string) => void;
   setEnrollmentStatusFilter: (status: string) => void;
   setEnrollmentSemesterFilter: (semesterId: string) => void;
@@ -184,6 +242,7 @@ interface AdminStoreState {
   // Actions - Students & Lecturers
   setStudentSearchQuery: (q: string) => void;
   setStudentDeptFilter: (dept: string) => void;
+  setStudentClassStandingFilter: (standing: string) => void;
   setLecturerSearchQuery: (q: string) => void;
   setLecturerDeptFilter: (dept: string) => void;
 
@@ -197,6 +256,7 @@ interface AdminStoreState {
 }
 
 export const useAdminStore = create<AdminStoreState>((set, get) => ({
+  adminAnalytics: null,
   users: [],
   students: [],
   lecturers: [],
@@ -243,18 +303,30 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     },
   },
   notifications: [],
+  tags: [],
   isLoadingData: false,
 
+  isLoadingAnalytics: false,
+  analyticsError: null,
   isLoadingUsers: false,
   usersError: null,
+  isLoadingStudents: false,
+  studentsError: null,
+  isLoadingLecturers: false,
+  lecturersError: null,
+  isLoadingTags: false,
+  tagsError: null,
   isLoadingColleges: false,
   collegesError: null,
   isLoadingDepartments: false,
   departmentsError: null,
   isLoadingPrograms: false,
+  programsError: null,
   isLoadingAcademicYears: false,
   isLoadingSemesters: false,
+  semestersError: null,
   isLoadingCourses: false,
+  coursesError: null,
   isLoadingCourseOfferings: false,
   courseOfferingsError: null,
   isLoadingEnrollments: false,
@@ -268,15 +340,20 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   studentSearchQuery: '',
   studentDeptFilter: 'ALL',
+  studentClassStandingFilter: 'ALL',
 
   lecturerSearchQuery: '',
   lecturerDeptFilter: 'ALL',
 
   collegeSearchQuery: '',
   departmentSearchQuery: '',
+  departmentCollegeFilter: 'ALL',
   programSearchQuery: '',
+  programDeptFilter: 'ALL',
+  programDegreeFilter: 'ALL',
   academicYearSearchQuery: '',
   semesterSearchQuery: '',
+  semesterYearFilter: 'ALL',
 
   courseSearchQuery: '',
   courseProgramFilter: 'ALL',
@@ -294,10 +371,13 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   auditSearchQuery: '',
   auditCategoryFilter: 'ALL',
 
+  tagSearchQuery: '',
+
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments] = await Promise.all([
+      const [analytics, departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
+        adminService.getAdminAnalytics().catch(() => null),
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
         adminService.getAllExams().catch(() => []),
@@ -310,9 +390,11 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         adminService.getSemesters().catch(() => []),
         adminService.getCourseOfferings().catch(() => []),
         adminService.getEnrollments().catch(() => []),
+        adminService.getTags().catch(() => []),
       ]);
 
       set({
+        adminAnalytics: analytics,
         departments,
         courses,
         exams,
@@ -325,6 +407,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         semesters,
         courseOfferings,
         enrollments,
+        tags,
         isLoadingData: false,
       });
     } catch {
@@ -332,28 +415,112 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
-  fetchUsers: async () => {
+  fetchAdminAnalytics: async () => {
+    set({ isLoadingAnalytics: true, analyticsError: null });
+    try {
+      const adminAnalytics = await adminService.getAdminAnalytics();
+      set({ adminAnalytics, isLoadingAnalytics: false, analyticsError: null });
+    } catch (err: unknown) {
+      set({ adminAnalytics: null, isLoadingAnalytics: false, analyticsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchUsers: async (params) => {
     set({ isLoadingUsers: true, usersError: null });
     try {
-      const users = await adminService.getUsers();
+      const search = params?.search !== undefined ? params.search : get().userSearchQuery;
+      const role = params?.role !== undefined ? params.role : get().userRoleFilter;
+      const users = await adminService.getUsers({ search, role });
       set({ users, isLoadingUsers: false, usersError: null });
     } catch (err: unknown) {
       set({ users: [], isLoadingUsers: false, usersError: getUserFriendlyErrorMessage(err) });
     }
   },
 
-  fetchStudents: async () => {
-    try {
-      const students = await adminService.getStudents();
-      set({ students });
-    } catch { }
+  fetchUserById: async (id) => {
+    return adminService.getUserById(id);
   },
 
-  fetchLecturers: async () => {
+  fetchStudents: async (params) => {
+    set({ isLoadingStudents: true, studentsError: null });
     try {
-      const lecturers = await adminService.getLecturers();
-      set({ lecturers });
-    } catch { }
+      const search = params?.search !== undefined ? params.search : get().studentSearchQuery;
+      const department = params?.department !== undefined ? params.department : get().studentDeptFilter;
+      const class_standing = params?.class_standing !== undefined ? params.class_standing : get().studentClassStandingFilter;
+      const students = await adminService.getStudents({ search, department, class_standing });
+      set({ students, isLoadingStudents: false, studentsError: null });
+    } catch (err: unknown) {
+      set({ students: [], isLoadingStudents: false, studentsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchStudentById: async (id) => {
+    return adminService.getStudentById(id);
+  },
+
+  updateStudent: async (id, payload) => {
+    const updated = await adminService.updateStudent(id, payload);
+    set((state) => ({
+      students: state.students.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              student_identifier: updated.student_identifier,
+              class_standing: updated.class_standing,
+              department: updated.department,
+              department_detail: updated.department_detail,
+            }
+          : s
+      ),
+    }));
+    return updated;
+  },
+
+  fetchLecturers: async (params) => {
+    set({ isLoadingLecturers: true, lecturersError: null });
+    try {
+      const search = params?.search !== undefined ? params.search : get().lecturerSearchQuery;
+      const department = params?.department !== undefined ? params.department : get().lecturerDeptFilter;
+      const lecturers = await adminService.getLecturers({ search, department });
+      set({ lecturers, isLoadingLecturers: false, lecturersError: null });
+    } catch (err: unknown) {
+      set({ lecturers: [], isLoadingLecturers: false, lecturersError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchLecturerById: async (id) => {
+    return adminService.getLecturerById(id);
+  },
+
+  updateLecturer: async (id, payload) => {
+    const updated = await adminService.updateLecturer(id, payload);
+    set((state) => ({
+      lecturers: state.lecturers.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              faculty_identifier: updated.faculty_identifier,
+              department: updated.department,
+              department_detail: updated.department_detail,
+            }
+          : l
+      ),
+    }));
+    return updated;
+  },
+
+  fetchTags: async () => {
+    set({ isLoadingTags: true, tagsError: null });
+    try {
+      const tags = await adminService.getTags();
+      set({ tags, isLoadingTags: false, tagsError: null });
+    } catch (err: unknown) {
+      set({ tags: [], isLoadingTags: false, tagsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchTagById: async (id) => {
+    return adminService.getTagById(id);
   },
 
   fetchColleges: async () => {
@@ -376,14 +543,22 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
+  fetchDepartmentById: async (id) => {
+    return adminService.getDepartmentById(id);
+  },
+
   fetchPrograms: async () => {
-    set({ isLoadingPrograms: true });
+    set({ isLoadingPrograms: true, programsError: null });
     try {
       const programs = await adminService.getPrograms();
-      set({ programs, isLoadingPrograms: false });
-    } catch {
-      set({ isLoadingPrograms: false });
+      set({ programs, isLoadingPrograms: false, programsError: null });
+    } catch (err: unknown) {
+      set({ programs: [], isLoadingPrograms: false, programsError: getUserFriendlyErrorMessage(err) });
     }
+  },
+
+  fetchProgramById: async (id) => {
+    return adminService.getProgramById(id);
   },
 
   fetchAcademicYears: async () => {
@@ -397,23 +572,27 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   fetchSemesters: async () => {
-    set({ isLoadingSemesters: true });
+    set({ isLoadingSemesters: true, semestersError: null });
     try {
       const semesters = await adminService.getSemesters();
-      set({ semesters, isLoadingSemesters: false });
-    } catch {
-      set({ isLoadingSemesters: false });
+      set({ semesters, isLoadingSemesters: false, semestersError: null });
+    } catch (err: unknown) {
+      set({ semesters: [], isLoadingSemesters: false, semestersError: getUserFriendlyErrorMessage(err) });
     }
   },
 
   fetchCourses: async () => {
-    set({ isLoadingCourses: true });
+    set({ isLoadingCourses: true, coursesError: null });
     try {
       const courses = await adminService.getCourses();
-      set({ courses, isLoadingCourses: false });
-    } catch {
-      set({ isLoadingCourses: false });
+      set({ courses, isLoadingCourses: false, coursesError: null });
+    } catch (err: unknown) {
+      set({ courses: [], isLoadingCourses: false, coursesError: getUserFriendlyErrorMessage(err) });
     }
+  },
+
+  fetchCourseById: async (id) => {
+    return adminService.getCourseById(id);
   },
 
   fetchCourseOfferings: async () => {
@@ -424,6 +603,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     } catch (err: unknown) {
       set({ courseOfferings: [], isLoadingCourseOfferings: false, courseOfferingsError: getUserFriendlyErrorMessage(err) });
     }
+  },
+
+  fetchCourseOfferingById: async (id) => {
+    return adminService.getCourseOfferingById(id);
   },
 
   fetchEnrollments: async () => {
@@ -450,16 +633,33 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   setUsers: (users) => set({ users }),
   addUser: async (payload) => {
     const newUser = await adminService.createUser(payload);
+    set((state) => ({ users: [newUser, ...state.users.filter((u) => u.id !== newUser.id)] }));
     return newUser;
   },
 
   updateUser: async (id, data) => {
     const updated = await adminService.updateUser(id, data);
+    set((state) => ({
+      users: state.users.map((u) =>
+        u.id === id
+          ? {
+              ...u,
+              first_name: updated.first_name,
+              last_name: updated.last_name,
+              role: updated.role,
+              is_active: updated.is_active,
+            }
+          : u,
+      ),
+    }));
     return updated;
   },
 
   deleteUser: async (id) => {
     await adminService.deleteUser(id);
+    set((state) => ({
+      users: state.users.map((u) => (u.id === id ? { ...u, is_active: false } : u)),
+    }));
   },
 
   setUserSearchQuery: (userSearchQuery) => set({ userSearchQuery }),
@@ -486,9 +686,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   // Actions - Departments
   setDepartmentSearchQuery: (departmentSearchQuery) => set({ departmentSearchQuery }),
+  setDepartmentCollegeFilter: (departmentCollegeFilter) => set({ departmentCollegeFilter }),
   addDepartment: async (data) => {
     const newDept = await adminService.createDepartment(data);
-    set((state) => ({ departments: [newDept, ...state.departments] }));
+    set((state) => ({ departments: [newDept, ...state.departments.filter((d) => d.id !== newDept.id)] }));
     return newDept;
   },
   updateDepartment: async (id, data) => {
@@ -503,9 +704,11 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   // Actions - Programs
   setProgramSearchQuery: (programSearchQuery) => set({ programSearchQuery }),
+  setProgramDeptFilter: (programDeptFilter) => set({ programDeptFilter }),
+  setProgramDegreeFilter: (programDegreeFilter) => set({ programDegreeFilter }),
   addProgram: async (data) => {
     const program = await adminService.createProgram(data);
-    set((state) => ({ programs: [program, ...state.programs] }));
+    set((state) => ({ programs: [program, ...state.programs.filter((p) => p.id !== program.id)] }));
     return program;
   },
   updateProgram: async (id, data) => {
@@ -537,9 +740,13 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   // Actions - Semesters
   setSemesterSearchQuery: (semesterSearchQuery) => set({ semesterSearchQuery }),
+  setSemesterYearFilter: (semesterYearFilter) => set({ semesterYearFilter }),
+  fetchSemesterById: async (id) => {
+    return adminService.getSemesterById(id);
+  },
   addSemester: async (data) => {
     const sem = await adminService.createSemester(data);
-    set((state) => ({ semesters: [sem, ...state.semesters] }));
+    set((state) => ({ semesters: [sem, ...state.semesters.filter((s) => s.id !== sem.id)] }));
     return sem;
   },
   updateSemester: async (id, data) => {
@@ -559,7 +766,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   setCourseDeptFilter: (courseDeptFilter) => set({ courseDeptFilter }),
   addCourse: async (data) => {
     const course = await adminService.createCourse(data);
-    set((state) => ({ courses: [course, ...state.courses] }));
+    set((state) => ({ courses: [course, ...state.courses.filter((c) => c.id !== course.id)] }));
     return course;
   },
   updateCourse: async (id, data) => {
@@ -574,6 +781,23 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   toggleCourseArchive: (_id) => {},
 
   // Actions - Course Offerings & Enrollments
+  addCourseOffering: async (data) => {
+    const newOffering = await adminService.createCourseOffering(data);
+    await get().fetchCourseOfferings();
+    return newOffering;
+  },
+
+  updateCourseOffering: async (id, data) => {
+    const updated = await adminService.updateCourseOffering(id, data);
+    await get().fetchCourseOfferings();
+    return updated;
+  },
+
+  deleteCourseOffering: async (id) => {
+    await adminService.deleteCourseOffering(id);
+    await get().fetchCourseOfferings();
+  },
+
   setEnrollmentSearchQuery: (enrollmentSearchQuery) => set({ enrollmentSearchQuery }),
   setEnrollmentStatusFilter: (enrollmentStatusFilter) => set({ enrollmentStatusFilter }),
   setEnrollmentSemesterFilter: (enrollmentSemesterFilter) => set({ enrollmentSemesterFilter }),
@@ -626,8 +850,26 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   // Actions - Students & Lecturers
   setStudentSearchQuery: (studentSearchQuery) => set({ studentSearchQuery }),
   setStudentDeptFilter: (studentDeptFilter) => set({ studentDeptFilter }),
+  setStudentClassStandingFilter: (studentClassStandingFilter) => set({ studentClassStandingFilter }),
   setLecturerSearchQuery: (lecturerSearchQuery) => set({ lecturerSearchQuery }),
   setLecturerDeptFilter: (lecturerDeptFilter) => set({ lecturerDeptFilter }),
+
+  // Actions - Tags
+  setTagSearchQuery: (tagSearchQuery) => set({ tagSearchQuery }),
+  addTag: async (data) => {
+    const tag = await adminService.createTag(data);
+    set((state) => ({ tags: [tag, ...state.tags] }));
+    return tag;
+  },
+  updateTag: async (id, data) => {
+    const updated = await adminService.updateTag(id, data);
+    set((state) => ({ tags: state.tags.map((t) => (t.id === id ? updated : t)) }));
+    return updated;
+  },
+  deleteTag: async (id) => {
+    await adminService.deleteTag(id);
+    set((state) => ({ tags: state.tags.filter((t) => t.id !== id) }));
+  },
 
   // Actions - AI Jobs, Audit, Settings & Notifications
   retryAIJob: (id) =>

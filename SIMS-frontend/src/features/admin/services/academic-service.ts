@@ -6,14 +6,29 @@ import type {
   Program,
   AcademicYear,
   Semester,
+  CreateSemesterPayload,
+  UpdateSemesterPayload,
   Department,
   Course,
   ClassStanding,
   AdminCourseOffering,
+  CreateCourseOfferingPayload,
+  UpdateCourseOfferingPayload,
   AdminEnrollment,
   CreateEnrollmentPayload,
   UpdateEnrollmentPayload,
   BatchImportResponse,
+  ApiStudentListItem,
+  ApiStudentDetail,
+  StudentFilterParams,
+  UpdateStudentPayload,
+  ApiLecturerListItem,
+  ApiLecturerDetail,
+  LecturerFilterParams,
+  UpdateLecturerPayload,
+  Tag,
+  CreateTagPayload,
+  UpdateTagPayload,
 } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -74,7 +89,7 @@ export interface ApiSemester {
   id: string;
   academic_year: string;
   academic_year_detail?: ApiAcademicYear;
-  semester_index: 'FIRST' | 'SECOND';
+  semester_index: 'FIRST' | 'SECOND' | 'SUMMER' | string;
   created_at?: string;
   updated_at?: string;
 }
@@ -163,62 +178,46 @@ export const academicService = {
 
   // ── Departments ──────────────────────────────────────────────────────────────
   async getDepartments(): Promise<Department[]> {
-    try {
-      const raw = await api.get<ApiDepartment[]>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS);
-      if (Array.isArray(raw)) {
-        return raw.map((d) => ({
-          id: d.id,
-          code: d.code,
-          name: d.name,
-          college: d.college || null,
-          college_detail: d.college_detail,
-          createdAt: d.created_at,
-          updatedAt: d.updated_at,
-        }));
-      }
-      return [];
-    } catch {
-      return [];
-    }
+    const raw = await api.get<ApiDepartment[]>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS);
+    return raw.map((d) => this.mapApiDepartmentToDepartment(d));
   },
 
   async getDepartmentById(id: string): Promise<Department> {
     const res = await api.get<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id));
+    return this.mapApiDepartmentToDepartment(res);
+  },
+
+  mapApiDepartmentToDepartment(d: ApiDepartment): Department {
     return {
-      id: res.id,
-      code: res.code,
-      name: res.name,
-      college: res.college || null,
-      college_detail: res.college_detail,
-      createdAt: res.created_at,
-      updatedAt: res.updated_at,
+      id: d.id,
+      code: d.code,
+      name: d.name,
+      college: d.college || null,
+      college_detail: d.college_detail
+        ? {
+            id: d.college_detail.id,
+            name: d.college_detail.name,
+            code: d.college_detail.code,
+            university: d.college_detail.university,
+            university_detail: d.college_detail.university_detail,
+            createdAt: d.college_detail.created_at,
+            updatedAt: d.college_detail.updated_at,
+          }
+        : null,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
     };
   },
 
   async createDepartment(data: { name: string; code: string; college?: string | null }): Promise<Department> {
-    const payload: Record<string, unknown> = {
+    const payload: { name: string; code: string; college?: string | null } = {
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
       college: data.college && isValidUuid(data.college) ? data.college : null,
     };
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENTS;
-
-    try {
-      const res = await api.post<ApiDepartment>(endpoint, payload);
-
-      return {
-        id: res.id,
-        code: res.code,
-        name: res.name,
-        college: res.college || null,
-        college_detail: res.college_detail,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      throw err;
-    }
+    const res = await api.post<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENTS, payload);
+    return this.mapApiDepartmentToDepartment(res);
   },
 
   async updateDepartment(id: string, data: Partial<{ name: string; code: string; college?: string | null }>): Promise<Department> {
@@ -229,23 +228,8 @@ export const academicService = {
       payload.college = data.college && isValidUuid(data.college) ? data.college : null;
     }
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id);
-
-    try {
-      const res = await api.patch<ApiDepartment>(endpoint, payload);
-
-      return {
-        id: res.id,
-        code: res.code,
-        name: res.name,
-        college: res.college || null,
-        college_detail: res.college_detail,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      throw err;
-    }
+    const res = await api.patch<ApiDepartment>(API_ENDPOINTS.ACADEMICS.DEPARTMENT_BY_ID(id), payload);
+    return this.mapApiDepartmentToDepartment(res);
   },
 
   async deleteDepartment(id: string): Promise<void> {
@@ -255,103 +239,92 @@ export const academicService = {
   // ── Programs ─────────────────────────────────────────────────────────────────
   async getPrograms(): Promise<Program[]> {
     const raw = await api.get<ApiProgram[]>(API_ENDPOINTS.ACADEMICS.PROGRAMS);
-    return raw.map((p) => ({
+    return raw.map((p) => this.mapApiProgramToProgram(p));
+  },
+
+  async getProgramById(id: string): Promise<Program> {
+    const raw = await api.get<ApiProgram>(API_ENDPOINTS.ACADEMICS.PROGRAM_BY_ID(id));
+    return this.mapApiProgramToProgram(raw);
+  },
+
+  mapApiProgramToProgram(p: ApiProgram): Program {
+    return {
       id: p.id,
       department: p.department,
+      department_detail: p.department_detail
+        ? {
+          id: p.department_detail.id,
+          name: p.department_detail.name,
+          code: p.department_detail.code,
+          college: p.department_detail.college,
+          college_detail: p.department_detail.college_detail
+            ? {
+              id: p.department_detail.college_detail.id,
+              name: p.department_detail.college_detail.name,
+              code: p.department_detail.college_detail.code,
+              university: p.department_detail.college_detail.university,
+              createdAt: p.department_detail.college_detail.created_at,
+              updatedAt: p.department_detail.college_detail.updated_at,
+            }
+            : undefined,
+          createdAt: p.department_detail.created_at,
+          updatedAt: p.department_detail.updated_at,
+        }
+        : null,
       name: p.name,
       code: p.code,
       degreeLevel: p.degree_level,
       totalCreditHoursRequired: p.total_credit_hours_required,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
-    }));
+    };
   },
 
-  async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
-    const departmentId = data.department;
-
-    const payload: Record<string, unknown> = {
-      department: departmentId,
+  async createProgram(data: {
+    department: string;
+    name: string;
+    code: string;
+    degree_level?: string;
+    total_credit_hours_required?: number;
+  }): Promise<Program> {
+    const payload: {
+      department: string;
+      name: string;
+      code: string;
+      degree_level?: string;
+      total_credit_hours_required?: number;
+    } = {
+      department: data.department,
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
       degree_level: data.degree_level || 'BACHELOR',
       total_credit_hours_required: Number(data.total_credit_hours_required ?? 120),
     };
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.PROGRAMS;
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[DEBUG] Program Creation Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
-    try {
-      const res = await api.post<ApiProgram>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[DEBUG] Program Creation Response (201 Created):', res);
-      }
-
-      return {
-        id: res.id,
-        department: res.department,
-        name: res.name,
-        code: res.code,
-        degreeLevel: res.degree_level,
-        totalCreditHoursRequired: res.total_credit_hours_required,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Program Creation Error:', err);
-      }
-      throw err;
-    }
+    const res = await api.post<ApiProgram>(API_ENDPOINTS.ACADEMICS.PROGRAMS, payload);
+    return this.mapApiProgramToProgram(res);
   },
 
-  async updateProgram(id: string, data: Partial<{ department?: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }>): Promise<Program> {
+  async updateProgram(
+    id: string,
+    data: Partial<{
+      department?: string;
+      name: string;
+      code: string;
+      degree_level?: string;
+      total_credit_hours_required?: number;
+    }>
+  ): Promise<Program> {
     const payload: Record<string, unknown> = {};
     if (data.department !== undefined) payload.department = data.department;
     if (data.name !== undefined) payload.name = data.name.trim();
     if (data.code !== undefined) payload.code = data.code.trim().toUpperCase();
     if (data.degree_level !== undefined) payload.degree_level = data.degree_level;
-    if (data.total_credit_hours_required !== undefined) payload.total_credit_hours_required = Number(data.total_credit_hours_required);
+    if (data.total_credit_hours_required !== undefined)
+      payload.total_credit_hours_required = Number(data.total_credit_hours_required);
 
-    const endpoint = API_ENDPOINTS.ACADEMICS.PROGRAM_BY_ID(id);
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[DEBUG] Program Update Request:', {
-        url: endpoint,
-        payload,
-      });
-    }
-
-    try {
-      const res = await api.patch<ApiProgram>(endpoint, payload);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[DEBUG] Program Update Response:', res);
-      }
-
-      return {
-        id: res.id,
-        department: res.department,
-        name: res.name,
-        code: res.code,
-        degreeLevel: res.degree_level,
-        totalCreditHoursRequired: res.total_credit_hours_required,
-        createdAt: res.created_at,
-        updatedAt: res.updated_at,
-      };
-    } catch (err: unknown) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG] Program Update Error:', err);
-      }
-      throw err;
-    }
+    const res = await api.patch<ApiProgram>(API_ENDPOINTS.ACADEMICS.PROGRAM_BY_ID(id), payload);
+    return this.mapApiProgramToProgram(res);
   },
 
   async deleteProgram(id: string): Promise<void> {
@@ -401,8 +374,16 @@ export const academicService = {
 
   // ── Semesters ────────────────────────────────────────────────────────────────
   async getSemesters(): Promise<Semester[]> {
-    const raw = await api.get<ApiSemester[]>(API_ENDPOINTS.ACADEMICS.SEMESTERS);
-    return raw.map((s) => ({
+    const raw = await api.get<ApiSemester[] | { results?: ApiSemester[]; data?: ApiSemester[] }>(API_ENDPOINTS.ACADEMICS.SEMESTERS);
+    let list: ApiSemester[] = [];
+    if (Array.isArray(raw)) {
+      list = raw;
+    } else if (Array.isArray(raw?.results)) {
+      list = raw.results;
+    } else if (Array.isArray(raw?.data)) {
+      list = raw.data;
+    }
+    return list.map((s) => ({
       id: s.id,
       academicYear: s.academic_year,
       academicYearDetail: s.academic_year_detail
@@ -411,6 +392,8 @@ export const academicService = {
           displayLabel: s.academic_year_detail.display_label,
           startBoundary: s.academic_year_detail.start_boundary,
           endBoundary: s.academic_year_detail.end_boundary,
+          createdAt: s.academic_year_detail.created_at,
+          updatedAt: s.academic_year_detail.updated_at,
         }
         : undefined,
       semesterIndex: s.semester_index,
@@ -419,8 +402,8 @@ export const academicService = {
     }));
   },
 
-  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }): Promise<Semester> {
-    const res = await api.post<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTERS, data);
+  async getSemesterById(id: string): Promise<Semester> {
+    const res = await api.get<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTER_BY_ID(id));
     return {
       id: res.id,
       academicYear: res.academic_year,
@@ -430,6 +413,8 @@ export const academicService = {
           displayLabel: res.academic_year_detail.display_label,
           startBoundary: res.academic_year_detail.start_boundary,
           endBoundary: res.academic_year_detail.end_boundary,
+          createdAt: res.academic_year_detail.created_at,
+          updatedAt: res.academic_year_detail.updated_at,
         }
         : undefined,
       semesterIndex: res.semester_index,
@@ -438,8 +423,12 @@ export const academicService = {
     };
   },
 
-  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>): Promise<Semester> {
-    const res = await api.patch<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTER_BY_ID(id), data);
+  async createSemester(data: CreateSemesterPayload): Promise<Semester> {
+    const payload = {
+      academic_year: data.academic_year.trim(),
+      semester_index: data.semester_index,
+    };
+    const res = await api.post<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTERS, payload);
     return {
       id: res.id,
       academicYear: res.academic_year,
@@ -449,6 +438,33 @@ export const academicService = {
           displayLabel: res.academic_year_detail.display_label,
           startBoundary: res.academic_year_detail.start_boundary,
           endBoundary: res.academic_year_detail.end_boundary,
+          createdAt: res.academic_year_detail.created_at,
+          updatedAt: res.academic_year_detail.updated_at,
+        }
+        : undefined,
+      semesterIndex: res.semester_index,
+      createdAt: res.created_at,
+      updatedAt: res.updated_at,
+    };
+  },
+
+  async updateSemester(id: string, data: UpdateSemesterPayload): Promise<Semester> {
+    const payload: Record<string, unknown> = {};
+    if (data.academic_year !== undefined) payload.academic_year = data.academic_year.trim();
+    if (data.semester_index !== undefined) payload.semester_index = data.semester_index;
+
+    const res = await api.patch<ApiSemester>(API_ENDPOINTS.ACADEMICS.SEMESTER_BY_ID(id), payload);
+    return {
+      id: res.id,
+      academicYear: res.academic_year,
+      academicYearDetail: res.academic_year_detail
+        ? {
+          id: res.academic_year_detail.id,
+          displayLabel: res.academic_year_detail.display_label,
+          startBoundary: res.academic_year_detail.start_boundary,
+          endBoundary: res.academic_year_detail.end_boundary,
+          createdAt: res.academic_year_detail.created_at,
+          updatedAt: res.academic_year_detail.updated_at,
         }
         : undefined,
       semesterIndex: res.semester_index,
@@ -464,26 +480,49 @@ export const academicService = {
   // ── Courses ──────────────────────────────────────────────────────────────────
   async getCourses(): Promise<Course[]> {
     const raw = await api.get<ApiCourse[]>(API_ENDPOINTS.ACADEMICS.COURSES);
-    return raw.map((c) => ({
+    return raw.map((c) => this.mapApiCourseToCourse(c));
+  },
+
+  async getCourseById(id: string): Promise<Course> {
+    const raw = await api.get<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id));
+    return this.mapApiCourseToCourse(raw);
+  },
+
+  mapApiCourseToCourse(c: ApiCourse): Course {
+    return {
       id: c.id,
       code: c.course_code,
       name: c.title,
+      title: c.title,
       creditHours: c.credit_hours,
       program: c.program || c.program_detail?.id || null,
       programDetail: c.program_detail
         ? {
-            id: c.program_detail.id,
-            name: c.program_detail.name,
-            code: c.program_detail.code,
-            department: c.program_detail.department,
-            degreeLevel: c.program_detail.degree_level,
-            totalCreditHoursRequired: c.program_detail.total_credit_hours_required,
-          }
+          id: c.program_detail.id,
+          name: c.program_detail.name,
+          code: c.program_detail.code,
+          department: c.program_detail.department,
+          department_detail: c.program_detail.department_detail
+            ? {
+              id: c.program_detail.department_detail.id,
+              name: c.program_detail.department_detail.name,
+              code: c.program_detail.department_detail.code,
+              college: c.program_detail.department_detail.college,
+              college_detail: c.program_detail.department_detail.college_detail,
+              createdAt: c.program_detail.department_detail.created_at,
+              updatedAt: c.program_detail.department_detail.updated_at,
+            }
+            : null,
+          degreeLevel: c.program_detail.degree_level,
+          totalCreditHoursRequired: c.program_detail.total_credit_hours_required,
+          createdAt: c.program_detail.created_at,
+          updatedAt: c.program_detail.updated_at,
+        }
         : null,
       intendedClassStanding: c.intended_class_standing,
       createdAt: c.created_at,
       updatedAt: c.updated_at,
-    }));
+    };
   },
 
   async createCourse(data: {
@@ -510,26 +549,7 @@ export const academicService = {
     }
 
     const res = await api.post<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSES, payload);
-    return {
-      id: res.id,
-      code: res.course_code,
-      name: res.title,
-      creditHours: res.credit_hours,
-      program: res.program || res.program_detail?.id || null,
-      programDetail: res.program_detail
-        ? {
-            id: res.program_detail.id,
-            name: res.program_detail.name,
-            code: res.program_detail.code,
-            department: res.program_detail.department,
-            degreeLevel: res.program_detail.degree_level,
-            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
-          }
-        : null,
-      intendedClassStanding: res.intended_class_standing,
-      createdAt: res.created_at,
-      updatedAt: res.updated_at,
-    };
+    return this.mapApiCourseToCourse(res);
   },
 
   async updateCourse(
@@ -556,26 +576,7 @@ export const academicService = {
     if (data.intended_class_standing !== undefined) payload.intended_class_standing = data.intended_class_standing;
 
     const res = await api.patch<ApiCourse>(API_ENDPOINTS.ACADEMICS.COURSE_BY_ID(id), payload);
-    return {
-      id: res.id,
-      code: res.course_code,
-      name: res.title,
-      creditHours: res.credit_hours,
-      program: res.program || res.program_detail?.id || null,
-      programDetail: res.program_detail
-        ? {
-            id: res.program_detail.id,
-            name: res.program_detail.name,
-            code: res.program_detail.code,
-            department: res.program_detail.department,
-            degreeLevel: res.program_detail.degree_level,
-            totalCreditHoursRequired: res.program_detail.total_credit_hours_required,
-          }
-        : null,
-      intendedClassStanding: res.intended_class_standing,
-      createdAt: res.created_at,
-      updatedAt: res.updated_at,
-    };
+    return this.mapApiCourseToCourse(res);
   },
 
   async deleteCourse(id: string): Promise<void> {
@@ -595,6 +596,33 @@ export const academicService = {
 
   async getCourseOfferingById(id: string): Promise<AdminCourseOffering> {
     return api.get<AdminCourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
+  },
+
+  async createCourseOffering(payload: CreateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    const body: Record<string, unknown> = {
+      course: payload.course.trim(),
+      semester: payload.semester.trim(),
+    };
+    if (payload.section !== undefined && payload.section !== null && payload.section.trim() !== '') {
+      body.section = payload.section.trim().toUpperCase();
+    }
+    if (payload.capacity !== undefined && payload.capacity !== null) {
+      body.capacity = Number(payload.capacity);
+    }
+    return api.post<AdminCourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.ROOT, body);
+  },
+
+  async updateCourseOffering(id: string, payload: UpdateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    const body: Record<string, unknown> = {};
+    if (payload.course !== undefined) body.course = payload.course.trim();
+    if (payload.semester !== undefined) body.semester = payload.semester.trim();
+    if (payload.section !== undefined) body.section = payload.section.trim().toUpperCase();
+    if (payload.capacity !== undefined) body.capacity = Number(payload.capacity);
+    return api.patch<AdminCourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id), body);
+  },
+
+  async deleteCourseOffering(id: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
   },
 
   // ── Enrollments ──────────────────────────────────────────────────────────────
@@ -644,5 +672,150 @@ export const academicService = {
     const formData = new FormData();
     formData.append('file', file);
     return api.post<BatchImportResponse>(API_ENDPOINTS.ENROLLMENTS.BATCH_IMPORT, formData);
+  },
+
+  // ── Students (Student Management API) ───────────────────────────────────────
+  async getStudents(params?: StudentFilterParams): Promise<ApiStudentListItem[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.search && params.search.trim()) {
+      queryParams.append('search', params.search.trim());
+    }
+    if (params?.department && params.department.trim() && params.department !== 'ALL') {
+      queryParams.append('department', params.department.trim());
+    }
+    if (params?.class_standing && params.class_standing.trim() && params.class_standing !== 'ALL') {
+      queryParams.append('class_standing', params.class_standing.trim());
+    }
+
+    const queryString = queryParams.toString();
+    const endpoint = queryString
+      ? `${API_ENDPOINTS.STUDENTS.ROOT}?${queryString}`
+      : API_ENDPOINTS.STUDENTS.ROOT;
+
+    const data = await api.get<ApiStudentListItem[] | { results?: ApiStudentListItem[]; data?: ApiStudentListItem[] }>(
+      endpoint
+    );
+
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data?.results)) {
+      return data.results;
+    }
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+    return [];
+  },
+
+  async getStudentById(id: string): Promise<ApiStudentDetail> {
+    return api.get<ApiStudentDetail>(API_ENDPOINTS.STUDENTS.BY_ID(id));
+  },
+
+  async updateStudent(id: string, payload: UpdateStudentPayload): Promise<ApiStudentDetail> {
+    const body: Record<string, unknown> = {};
+    if (payload.student_identifier !== undefined) {
+      body.student_identifier = payload.student_identifier.trim();
+    }
+    if (payload.class_standing !== undefined) {
+      body.class_standing = payload.class_standing;
+    }
+    if (payload.department_id !== undefined) {
+      body.department_id = payload.department_id && payload.department_id.trim() !== ''
+        ? payload.department_id.trim()
+        : null;
+    }
+    return api.patch<ApiStudentDetail>(API_ENDPOINTS.STUDENTS.BY_ID(id), body);
+  },
+
+  // ── Lecturers (Lecturer Management API) ─────────────────────────────────────
+  async getLecturers(params?: LecturerFilterParams): Promise<ApiLecturerListItem[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.search && params.search.trim()) {
+      queryParams.append('search', params.search.trim());
+    }
+    if (params?.department && params.department.trim() && params.department !== 'ALL') {
+      queryParams.append('department', params.department.trim());
+    }
+
+    const queryString = queryParams.toString();
+    const endpoint = queryString
+      ? `${API_ENDPOINTS.LECTURERS.ROOT}?${queryString}`
+      : API_ENDPOINTS.LECTURERS.ROOT;
+
+    const data = await api.get<ApiLecturerListItem[] | { results?: ApiLecturerListItem[]; data?: ApiLecturerListItem[] }>(
+      endpoint
+    );
+
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data?.results)) {
+      return data.results;
+    }
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+    return [];
+  },
+
+  async getLecturerById(id: string): Promise<ApiLecturerDetail> {
+    return api.get<ApiLecturerDetail>(API_ENDPOINTS.LECTURERS.BY_ID(id));
+  },
+
+  async updateLecturer(id: string, payload: UpdateLecturerPayload): Promise<ApiLecturerDetail> {
+    const body: Record<string, unknown> = {};
+    if (payload.faculty_identifier !== undefined) {
+      body.faculty_identifier = payload.faculty_identifier.trim();
+    }
+    if (payload.department_id !== undefined) {
+      body.department_id = payload.department_id && payload.department_id.trim() !== ''
+        ? payload.department_id.trim()
+        : null;
+    }
+    return api.patch<ApiLecturerDetail>(API_ENDPOINTS.LECTURERS.BY_ID(id), body);
+  },
+
+  // ── Tags (Question Tags API) ───────────────────────────────────────────────
+  async getTags(): Promise<Tag[]> {
+    const data = await api.get<Tag[] | { results?: Tag[]; data?: Tag[] }>(API_ENDPOINTS.TAGS.ROOT);
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data?.results)) {
+      return data.results;
+    }
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+    return [];
+  },
+
+  async getTagById(id: string): Promise<Tag> {
+    return api.get<Tag>(API_ENDPOINTS.TAGS.BY_ID(id));
+  },
+
+  async createTag(payload: CreateTagPayload): Promise<Tag> {
+    return api.post<Tag>(API_ENDPOINTS.TAGS.ROOT, {
+      name: payload.name.trim(),
+    });
+  },
+
+  async updateTag(id: string, payload: UpdateTagPayload): Promise<Tag> {
+    return api.put<Tag>(API_ENDPOINTS.TAGS.BY_ID(id), {
+      name: payload.name.trim(),
+    });
+  },
+
+  async patchTag(id: string, payload: Partial<UpdateTagPayload>): Promise<Tag> {
+    const body: Record<string, unknown> = {};
+    if (payload.name !== undefined) {
+      body.name = payload.name.trim();
+    }
+    return api.patch<Tag>(API_ENDPOINTS.TAGS.BY_ID(id), body);
+  },
+
+  async deleteTag(id: string): Promise<void> {
+    return api.delete<void>(API_ENDPOINTS.TAGS.BY_ID(id));
   },
 };

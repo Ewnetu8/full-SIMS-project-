@@ -55,6 +55,17 @@ export interface PaginationParams {
 
 // ─── Analytics Types (SIMS API 4) ───────────────────────────────────────────
 
+export interface AdminAnalyticsResponse {
+  total_users: number;
+  total_students: number;
+  total_lecturers: number;
+  total_colleges: number;
+  total_departments: number;
+  total_programs: number;
+  total_courses: number;
+  total_exams: number;
+}
+
 export interface ScoreSummary {
   mean: number | null;
   median: number | null;

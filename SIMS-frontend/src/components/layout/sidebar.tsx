@@ -68,6 +68,41 @@ export function Sidebar({
   footer,
 }: SidebarProps) {
   const pathname = usePathname();
+  const [currentQuery, setCurrentQuery] = React.useState('');
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentQuery(window.location.search);
+    }
+  }, [pathname]);
+
+  const isItemActive = (href: string) => {
+    if (href.includes('?')) {
+      const [path, query] = href.split('?');
+      const targetQuery = new URLSearchParams(query);
+      const isPathMatch = pathname === path || pathname.startsWith(path + '/');
+      const currentParams = new URLSearchParams(currentQuery);
+      const isQueryMatch = Array.from(targetQuery.entries()).every(
+        ([key, val]) => currentParams.get(key) === val
+      );
+      return isPathMatch && isQueryMatch;
+    }
+    const hasActiveQuerySibling = navItems.some((other) => {
+      if (other.href !== href && other.href.startsWith(href + '?')) {
+        const [, query] = other.href.split('?');
+        const targetQuery = new URLSearchParams(query);
+        const currentParams = new URLSearchParams(currentQuery);
+        return Array.from(targetQuery.entries()).every(
+          ([key, val]) => currentParams.get(key) === val
+        );
+      }
+      return false;
+    });
+
+    if (hasActiveQuerySibling) return false;
+
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   return (
     <motion.aside
@@ -110,7 +145,7 @@ export function Sidebar({
           <SidebarNavItem
             key={item.href}
             item={item}
-            isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
+            isActive={isItemActive(item.href)}
             collapsed={collapsed}
             onNavItemClick={onNavItemClick}
           />

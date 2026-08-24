@@ -19,6 +19,10 @@ import {
   Database,
   FileText,
   UserPlus,
+  RefreshCw,
+  AlertCircle,
+  School,
+  Layers,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -32,15 +36,21 @@ import { useAdminStore } from '../store';
 export function DashboardOverview() {
   const router = useRouter();
   const {
+    adminAnalytics,
+    isLoadingAnalytics,
+    analyticsError,
     users,
     students,
     lecturers,
+    colleges,
     departments,
+    programs,
     courses,
     exams,
     aiJobs,
     auditLogs,
     fetchAdminData,
+    fetchAdminAnalytics,
     isLoadingData,
   } = useAdminStore();
 
@@ -48,27 +58,103 @@ export function DashboardOverview() {
     void fetchAdminData();
   }, [fetchAdminData]);
 
-  const totalStudents = students.length;
-  const totalLecturers = lecturers.length;
-  const totalAdmins = users.filter((u) => u.role === 'admin').length;
-  const totalCourses = courses.length;
-  const totalDepts = departments.length;
-  const totalExamsCount = exams.length;
+  // Authoritative numbers from GET /api/v1/analytics/admin with fallback to loaded state
+  const totalStudents = adminAnalytics ? adminAnalytics.total_students : students.length;
+  const totalLecturers = adminAnalytics ? adminAnalytics.total_lecturers : lecturers.length;
+  const totalColleges = adminAnalytics ? adminAnalytics.total_colleges : colleges.length;
+  const totalDepts = adminAnalytics ? adminAnalytics.total_departments : departments.length;
+  const totalPrograms = adminAnalytics ? adminAnalytics.total_programs : programs.length;
+  const totalCourses = adminAnalytics ? adminAnalytics.total_courses : courses.length;
+  const totalExamsCount = adminAnalytics ? adminAnalytics.total_exams : exams.length;
+  const totalAdmins = users.filter((u) => (u.role || '').toUpperCase() === 'ADMIN').length;
+
   const activeExamsCount = exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length;
   const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length;
   const publishedExamsCount = exams.filter((e) => e.status === 'published').length;
 
+  const isLoading = isLoadingData || isLoadingAnalytics;
+
   const statCards = [
-    { label: 'Total Students', value: isLoadingData ? '...' : totalStudents.toLocaleString(), icon: GraduationCap, color: 'text-primary', bg: 'bg-primary/10', trend: 'Enrolled students' },
-    { label: 'Total Lecturers', value: isLoadingData ? '...' : totalLecturers.toString(), icon: UserCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'Faculty members' },
-    { label: 'Administrators', value: isLoadingData ? '...' : totalAdmins.toString(), icon: Shield, color: 'text-primary', bg: 'bg-primary/10', trend: 'Full access' },
-    { label: 'Active Courses', value: isLoadingData ? '...' : totalCourses.toString(), icon: BookOpen, color: 'text-accent', bg: 'bg-accent/10', trend: 'Academic offerings' },
-    { label: 'Departments', value: isLoadingData ? '...' : totalDepts.toString(), icon: Building2, color: 'text-primary', bg: 'bg-primary/10', trend: 'Academic units' },
-    { label: 'Total Exams', value: isLoadingData ? '...' : totalExamsCount.toString(), icon: ClipboardCheck, color: 'text-primary', bg: 'bg-primary/10', trend: 'Scheduled assessments' },
-    { label: 'Active Exams Now', value: isLoadingData ? '...' : activeExamsCount.toString(), icon: Zap, color: 'text-accent', bg: 'bg-accent/10', trend: 'Live sessions' },
-    { label: 'Pending AI Grading', value: isLoadingData ? '...' : pendingAIGradingCount.toString(), icon: Brain, color: 'text-primary', bg: 'bg-primary/10', trend: 'Queue processing' },
-    { label: 'Published Results', value: isLoadingData ? '...' : publishedExamsCount.toString(), icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10', trend: 'Verified scores' },
-    { label: 'System Status', value: 'Active', icon: Activity, color: 'text-success', bg: 'bg-success/10', trend: 'All services online' },
+    {
+      label: 'Total Students',
+      value: isLoading ? '...' : totalStudents.toLocaleString(),
+      icon: GraduationCap,
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      trend: 'Enrolled students',
+    },
+    {
+      label: 'Total Lecturers',
+      value: isLoading ? '...' : totalLecturers.toString(),
+      icon: UserCheck,
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-500/10',
+      trend: 'Faculty members',
+    },
+    {
+      label: 'Administrators',
+      value: isLoading ? '...' : totalAdmins.toString(),
+      icon: Shield,
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      trend: 'Full system access',
+    },
+    {
+      label: 'Active Courses',
+      value: isLoading ? '...' : totalCourses.toString(),
+      icon: BookOpen,
+      color: 'text-accent',
+      bg: 'bg-accent/10',
+      trend: 'Curriculum catalog',
+    },
+    {
+      label: 'Academic Units',
+      value: isLoading ? '...' : `${totalDepts} Depts / ${totalColleges} Colg`,
+      icon: Building2,
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      trend: `${totalPrograms} Degree Programs`,
+    },
+    {
+      label: 'Total Exams',
+      value: isLoading ? '...' : totalExamsCount.toString(),
+      icon: ClipboardCheck,
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      trend: 'Registered assessments',
+    },
+    {
+      label: 'Active Exams Now',
+      value: isLoading ? '...' : activeExamsCount.toString(),
+      icon: Zap,
+      color: 'text-amber-500',
+      bg: 'bg-amber-500/10',
+      trend: 'Live test sessions',
+    },
+    {
+      label: 'Pending AI Grading',
+      value: isLoading ? '...' : pendingAIGradingCount.toString(),
+      icon: Brain,
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      trend: 'Queue evaluation',
+    },
+    {
+      label: 'Published Results',
+      value: isLoading ? '...' : publishedExamsCount.toString(),
+      icon: CheckCircle2,
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-500/10',
+      trend: 'Certified records',
+    },
+    {
+      label: 'System Status',
+      value: 'Operational',
+      icon: Activity,
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-500/10',
+      trend: 'REST API Active',
+    },
   ];
 
   return (
@@ -85,17 +171,32 @@ export function DashboardOverview() {
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Overview of users, academic departments, examination sessions, and real-time AI grading infrastructure.
+            Authoritative overview of university demographics, academic hierarchy, examination workflows, and AI services.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void fetchAdminAnalytics();
+              void fetchAdminData();
+            }}
+            disabled={isLoading}
+            className="flex items-center gap-1.5"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh Analytics
+          </Button>
+          <Button
+            size="sm"
             leftIcon={<Plus className="h-4 w-4" />}
             onClick={() => router.push(ROUTES.ADMIN.USERS)}
           >
             Add New User
           </Button>
           <Button
+            size="sm"
             variant="outline"
             leftIcon={<Brain className="h-4 w-4" />}
             onClick={() => router.push(ROUTES.ADMIN.AI_MONITOR)}
@@ -104,6 +205,24 @@ export function DashboardOverview() {
           </Button>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {analyticsError && (
+        <Card className="p-4 border-destructive/40 bg-destructive/10 text-destructive flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">{analyticsError}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void fetchAdminAnalytics()}
+            className="border-destructive/30 hover:bg-destructive/20 text-destructive shrink-0"
+          >
+            Retry
+          </Button>
+        </Card>
+      )}
 
       {/* Summary Cards Grid (10 Cards) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -114,9 +233,9 @@ export function DashboardOverview() {
               key={card.label}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.04, duration: 0.2 }}
+              transition={{ delay: idx * 0.03, duration: 0.2 }}
             >
-              <Card className="p-4 transition-all duration-200 hover:shadow-md hover:border-primary/30">
+              <Card className="p-4 transition-all duration-200 hover:shadow-md hover:border-primary/30 border-border">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground">{card.label}</span>
                   <div className={`p-2 rounded-lg ${card.bg}`}>
@@ -135,16 +254,67 @@ export function DashboardOverview() {
         })}
       </div>
 
+      {/* Academic Structure Breakdown Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card className="p-4 flex items-center gap-4 border border-border">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+            <School className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase">Colleges & Faculties</p>
+            <p className="text-xl font-bold text-foreground">{totalColleges} Registered</p>
+            <Link
+              href={ROUTES.ADMIN.COLLEGES}
+              className="text-[11px] text-primary hover:underline font-medium inline-flex items-center gap-1 mt-0.5"
+            >
+              Manage Colleges <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </Card>
+
+        <Card className="p-4 flex items-center gap-4 border border-border">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 shrink-0">
+            <Building2 className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase">Academic Departments</p>
+            <p className="text-xl font-bold text-foreground">{totalDepts} Active Units</p>
+            <Link
+              href={ROUTES.ADMIN.DEPARTMENTS}
+              className="text-[11px] text-primary hover:underline font-medium inline-flex items-center gap-1 mt-0.5"
+            >
+              Manage Departments <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </Card>
+
+        <Card className="p-4 flex items-center gap-4 border border-border">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shrink-0">
+            <Layers className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase">Degree Programs</p>
+            <p className="text-xl font-bold text-foreground">{totalPrograms} Curricula</p>
+            <Link
+              href={ROUTES.ADMIN.PROGRAMS}
+              className="text-[11px] text-primary hover:underline font-medium inline-flex items-center gap-1 mt-0.5"
+            >
+              Manage Programs <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </Card>
+      </div>
+
       {/* Quick Actions & System Health Section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Quick Actions */}
-        <Card className="p-5 lg:col-span-1 flex flex-col justify-between">
+        <Card className="p-5 lg:col-span-1 flex flex-col justify-between border-border">
           <div>
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <Zap className="h-4 w-4 text-accent" /> Quick Administrative Actions
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Shortcuts for routine institution administration tasks.
+              Direct shortcuts for institutional administration workflows.
             </p>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-2.5">
@@ -154,7 +324,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.USERS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <UserCheck className="h-4 w-4 text-primary" /> Manage Users & Roles
+                <UserCheck className="h-4 w-4 text-primary" /> Manage Users & Role Access
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -164,17 +334,17 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.ENROLLMENTS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <UserPlus className="h-4 w-4 text-primary" /> Manage Course Enrollments
+                <UserPlus className="h-4 w-4 text-primary" /> Student Course Enrollments
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
             <Button
               variant="outline"
               className="justify-between text-left h-auto py-2.5 px-3"
-              onClick={() => router.push(ROUTES.ADMIN.DEPARTMENTS)}
+              onClick={() => router.push(ROUTES.ADMIN.REPORTS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Building2 className="h-4 w-4 text-primary" /> Add / Manage Departments
+                <FileText className="h-4 w-4 text-primary" /> Reports & Advising Analytics
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -184,7 +354,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.COURSES)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <BookOpen className="h-4 w-4 text-primary" /> Assign Courses & Lecturers
+                <BookOpen className="h-4 w-4 text-primary" /> Course Catalogue & Offerings
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -194,7 +364,7 @@ export function DashboardOverview() {
               onClick={() => router.push(ROUTES.ADMIN.SETTINGS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Server className="h-4 w-4 text-primary" /> Configure System Settings
+                <Server className="h-4 w-4 text-primary" /> Institution System Settings
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -202,36 +372,36 @@ export function DashboardOverview() {
         </Card>
 
         {/* System Infrastructure & API Status */}
-        <Card className="p-5 lg:col-span-2">
+        <Card className="p-5 lg:col-span-2 border-border">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Activity className="h-4 w-4 text-success" /> Infrastructure & Backend Connectivity
+                <Activity className="h-4 w-4 text-emerald-500" /> Infrastructure & Backend Connectivity
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Real-time connection status with SIMS Django REST backend APIs.
               </p>
             </div>
-            <Badge variant="outline" className="border-success/30 text-success bg-success/10 gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-success animate-pulse" /> SIMS Backend Connected
+            <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 bg-emerald-500/10 gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> SIMS Backend Connected
             </Badge>
           </div>
 
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Server className="h-3.5 w-3.5 text-primary" /> API Gateway
+                <Server className="h-3.5 w-3.5 text-primary" /> REST API Gateway
               </div>
               <p className="text-sm font-semibold text-foreground">Operational</p>
-              <span className="text-[10px] text-muted-foreground">Connected to DRF REST v1 API</span>
+              <span className="text-[10px] text-muted-foreground">DRF v1 Endpoints Authenticated</span>
             </div>
 
             <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Database className="h-3.5 w-3.5 text-primary" /> Database Services
+                <Database className="h-3.5 w-3.5 text-primary" /> Academic Database
               </div>
               <p className="text-sm font-semibold text-foreground">Synchronized</p>
-              <span className="text-[10px] text-muted-foreground">PostgreSQL academic database active</span>
+              <span className="text-[10px] text-muted-foreground">Live counts from /api/v1/analytics/admin</span>
             </div>
 
             <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
@@ -246,8 +416,8 @@ export function DashboardOverview() {
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Brain className="h-3.5 w-3.5 text-primary" /> AI Evaluation Infrastructure
               </div>
-              <p className="text-sm font-semibold text-foreground">Ready</p>
-              <span className="text-[10px] text-muted-foreground">Automated grading pipeline initialized</span>
+              <p className="text-sm font-semibold text-foreground">Active & Ready</p>
+              <span className="text-[10px] text-muted-foreground">Automated grading pipeline monitoring</span>
             </div>
           </div>
         </Card>
@@ -256,14 +426,14 @@ export function DashboardOverview() {
       {/* Activity Streams Grid: Recent Audit Activity & AI Queue Snapshot */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Audit Activity */}
-        <Card className="p-5">
+        <Card className="p-5 border-border">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" /> Recent System Activity & Audit Trail
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Latest security events and administrative actions.
+                Latest administrative actions and security events.
               </p>
             </div>
             <Link
@@ -276,7 +446,7 @@ export function DashboardOverview() {
 
           <div className="mt-4 space-y-3">
             {auditLogs.length === 0 ? (
-              <div className="p-8 text-center bg-muted/20 border-dashed border rounded-lg">
+              <div className="p-8 text-center bg-muted/20 border-dashed border border-border rounded-lg">
                 <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-xs text-muted-foreground">No recent system audit logs recorded.</p>
               </div>
@@ -305,11 +475,11 @@ export function DashboardOverview() {
         </Card>
 
         {/* AI Grading Monitor Snapshot */}
-        <Card className="p-5">
+        <Card className="p-5 border-border">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <div>
               <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Brain className="h-4 w-4 text-ai-primary" /> Active AI Evaluation Jobs
+                <Brain className="h-4 w-4 text-primary" /> Active AI Evaluation Jobs
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Automated grading pipeline status and queue monitoring.
@@ -317,7 +487,7 @@ export function DashboardOverview() {
             </div>
             <Link
               href={ROUTES.ADMIN.AI_MONITOR}
-              className="text-xs text-ai-primary hover:underline font-medium flex items-center gap-1"
+              className="text-xs text-primary hover:underline font-medium flex items-center gap-1"
             >
               AI Monitor <ArrowUpRight className="h-3 w-3" />
             </Link>
@@ -325,7 +495,7 @@ export function DashboardOverview() {
 
           <div className="mt-4 space-y-3">
             {aiJobs.length === 0 ? (
-              <div className="p-8 text-center bg-muted/20 border-dashed border rounded-lg">
+              <div className="p-8 text-center bg-muted/20 border-dashed border border-border rounded-lg">
                 <Brain className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-xs text-muted-foreground">No active AI evaluation jobs in queue.</p>
               </div>

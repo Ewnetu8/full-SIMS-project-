@@ -4,12 +4,13 @@ import { api } from '@/services/api-client';
 
 import { academicService } from './academic-service';
 import { examApiService } from './exam-api-service';
+import { analyticsApiService } from '@/features/analytics/services/analytics-api';
+import type { AdminAnalyticsResponse } from '@/types/api';
 
 import type {
-  AdminUser,
-  UserRole,
-  StudentProfile,
-  LecturerProfile,
+  UserCompact,
+  UserDetail,
+  UpdateUserPayload,
   Department,
   Course,
   ClassStanding,
@@ -17,6 +18,8 @@ import type {
   Program,
   AcademicYear,
   Semester,
+  CreateSemesterPayload,
+  UpdateSemesterPayload,
   AdminExamOverview,
   AIGradingJob,
   AuditLog,
@@ -24,10 +27,23 @@ import type {
   AdminDashboardStats,
   AdminNotification,
   AdminCourseOffering,
+  CreateCourseOfferingPayload,
+  UpdateCourseOfferingPayload,
   AdminEnrollment,
   CreateEnrollmentPayload,
   UpdateEnrollmentPayload,
   BatchImportResponse,
+  ApiStudentListItem,
+  ApiStudentDetail,
+  StudentFilterParams,
+  UpdateStudentPayload,
+  ApiLecturerListItem,
+  ApiLecturerDetail,
+  LecturerFilterParams,
+  UpdateLecturerPayload,
+  Tag,
+  CreateTagPayload,
+  UpdateTagPayload,
 } from '../types';
 
 export interface RegisterUserPayload {
@@ -35,7 +51,7 @@ export interface RegisterUserPayload {
   password?: string;
   first_name?: string;
   last_name?: string;
-  role?: 'STUDENT' | 'LECTURER' | 'ADMIN';
+  role?: 'STUDENT' | 'LECTURER' | 'ADMIN' | 'student' | 'lecturer' | 'admin';
   student_identifier?: string;
   faculty_identifier?: string;
   department_id?: string | null;
@@ -45,19 +61,35 @@ export interface RegisterUserPayload {
 export const adminService = {
   // ─── Users ─────────────────────────────────────────────────────────────────
   /**
-   * Returns user accounts.
-   * Note: The backend SIMS REST API specification does not currently provide a user listing endpoint (GET /api/v1/users).
-   * Returns an empty array to prevent 404 errors, repeated network requests, and displaying fabricated mock data.
+   * Returns list of users matching optional search keyword and role filter.
+   * Endpoint: GET /api/v1/users
    */
-  async getUsers(): Promise<AdminUser[]> {
-    return [];
+  async getUsers(params?: { search?: string; role?: string }): Promise<UserCompact[]> {
+    const queryParams: Record<string, string> = {};
+    if (params?.search && params.search.trim()) {
+      queryParams.search = params.search.trim();
+    }
+    if (params?.role && params.role !== 'ALL') {
+      queryParams.role = params.role.toUpperCase();
+    }
+    return api.get<UserCompact[]>(API_ENDPOINTS.USERS.ROOT, {
+      params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+    });
   },
 
-  async getUserById(_id: string): Promise<AdminUser | null> {
-    return null;
+  /**
+   * Returns full user details including nested profile information.
+   * Endpoint: GET /api/v1/users/{id}
+   */
+  async getUserById(id: string): Promise<UserDetail> {
+    return api.get<UserDetail>(API_ENDPOINTS.USERS.BY_ID(id));
   },
 
-  async createUser(data: RegisterUserPayload): Promise<AdminUser> {
+  /**
+   * Registers a new user account.
+   * Endpoint: POST /api/v1/auth/register
+   */
+  async createUser(data: RegisterUserPayload): Promise<UserCompact> {
     const roleUpper = (data.role || 'STUDENT').toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
 
     const payload: Record<string, unknown> = {
@@ -66,85 +98,50 @@ export const adminService = {
       first_name: data.first_name ? data.first_name.trim() : '',
       last_name: data.last_name ? data.last_name.trim() : '',
       role: roleUpper,
-      national_id_fan: data.national_id_fan ? data.national_id_fan.trim() : null,
     };
 
-    if (roleUpper === 'STUDENT') {
-      payload.student_identifier = data.student_identifier ? data.student_identifier.trim() : '';
-    } else if (roleUpper === 'LECTURER') {
-      payload.faculty_identifier = data.faculty_identifier ? data.faculty_identifier.trim() : '';
+    if (data.national_id_fan && data.national_id_fan.trim()) {
+      payload.national_id_fan = data.national_id_fan.trim();
     }
 
-    payload.department_id = data.department_id && isValidUuid(data.department_id) ? data.department_id : null;
-
-    try {
-      const res = await api.post<{ user?: Record<string, unknown>; [key: string]: unknown }>(API_ENDPOINTS.AUTH.REGISTER, payload);
-      const registeredUser = (res.user || res) as Record<string, unknown>;
-
-      let resolvedDepartment = 'Not assigned';
-      if (data.department_id) {
-        const depts = await academicService.getDepartments().catch(() => []);
-        const found = depts.find((d) => d.id === data.department_id);
-        if (found) {
-          resolvedDepartment = found.name;
-        }
-      }
-
-      const rawStudentId = (data.student_identifier || registeredUser.student_identifier) as string | undefined;
-      const studentId = rawStudentId && !isValidUuid(rawStudentId) ? String(rawStudentId).trim() : undefined;
-
-      const rawFacultyId = (data.faculty_identifier || registeredUser.faculty_identifier) as string | undefined;
-      const facultyId = rawFacultyId && !isValidUuid(rawFacultyId) ? String(rawFacultyId).trim() : undefined;
-
-      const displayUserId = studentId || facultyId || (registeredUser.id as string);
-
-      const newUser: AdminUser = {
-        id: String(registeredUser.id),
-        userId: displayUserId,
-        firstName: String(registeredUser.first_name || data.first_name || 'User'),
-        lastName: String(registeredUser.last_name || data.last_name || ''),
-        email: String(registeredUser.email || data.email),
-        role: (registeredUser.role ? String(registeredUser.role).toLowerCase() : (data.role || 'student').toLowerCase()) as UserRole,
-        department: resolvedDepartment,
-        departmentId: data.department_id || null,
-        status: 'active',
-        lastLogin: 'Never',
-        studentIdentifier: studentId,
-        facultyIdentifier: facultyId,
-        nationalIdFan: data.national_id_fan ? data.national_id_fan.trim() : null,
-        createdAt: String(registeredUser.created_at || new Date().toISOString()),
-      };
-
-      return newUser;
-    } catch (error: unknown) {
-      throw error;
+    if (roleUpper === 'STUDENT' && data.student_identifier) {
+      payload.student_identifier = data.student_identifier.trim();
+    } else if (roleUpper === 'LECTURER' && data.faculty_identifier) {
+      payload.faculty_identifier = data.faculty_identifier.trim();
     }
+
+    if (data.department_id && isValidUuid(data.department_id)) {
+      payload.department_id = data.department_id;
+    }
+
+    const res = await api.post<{ user?: UserCompact } & UserCompact>(API_ENDPOINTS.AUTH.REGISTER, payload);
+    return (res.user || res) as UserCompact;
   },
 
-  async updateUser(id: string, data: Partial<AdminUser>): Promise<AdminUser> {
-    // Note: The SIMS OpenAPI specification does not provide a PATCH /api/v1/users/{id} endpoint.
-    return {
-      id,
-      userId: data.userId || id,
-      firstName: data.firstName || '',
-      lastName: data.lastName || '',
-      email: data.email || '',
-      role: (data.role || 'student') as UserRole,
-      department: data.department || '',
-      departmentId: data.departmentId || null,
-      status: data.status || 'active',
-      lastLogin: data.lastLogin || 'Never',
-      nationalIdFan: data.nationalIdFan || null,
-      createdAt: data.createdAt || new Date().toISOString(),
-    };
+  /**
+   * Updates user fields.
+   * Endpoint: PATCH /api/v1/users/{id}
+   */
+  async updateUser(id: string, data: UpdateUserPayload): Promise<UserDetail> {
+    const payload: Record<string, unknown> = {};
+    if (data.first_name !== undefined) payload.first_name = data.first_name.trim();
+    if (data.last_name !== undefined) payload.last_name = data.last_name.trim();
+    if (data.national_id_fan !== undefined) {
+      payload.national_id_fan = data.national_id_fan ? data.national_id_fan.trim() : null;
+    }
+    if (data.role !== undefined) payload.role = data.role.toUpperCase();
+    if (data.is_active !== undefined) payload.is_active = data.is_active;
+    if (data.is_staff !== undefined) payload.is_staff = data.is_staff;
+
+    return api.patch<UserDetail>(API_ENDPOINTS.USERS.BY_ID(id), payload);
   },
 
-  async toggleUserStatus(id: string, status: AdminUser['status']): Promise<AdminUser> {
-    return this.updateUser(id, { status });
-  },
-
-  async deleteUser(_id: string): Promise<void> {
-    // Note: The SIMS OpenAPI specification does not provide a DELETE /api/v1/users/{id} endpoint.
+  /**
+   * Soft deletes / deactivates a user account.
+   * Endpoint: DELETE /api/v1/users/{id}
+   */
+  async deleteUser(id: string): Promise<{ detail: string }> {
+    return api.delete<{ detail: string }>(API_ENDPOINTS.USERS.BY_ID(id));
   },
 
   // ─── Universities ───────────────────────────────────────────────────────────
@@ -195,6 +192,10 @@ export const adminService = {
     return academicService.getPrograms();
   },
 
+  async getProgramById(id: string): Promise<Program> {
+    return academicService.getProgramById(id);
+  },
+
   async createProgram(data: { department: string; name: string; code: string; degree_level?: string; total_credit_hours_required?: number }): Promise<Program> {
     return academicService.createProgram(data);
   },
@@ -229,66 +230,15 @@ export const adminService = {
     return academicService.getSemesters();
   },
 
-  async createSemester(data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }): Promise<Semester> {
-    let yearId = data.academic_year;
-    let displayLabel = data.academic_year;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.academic_year);
-
-    if (!isUuid) {
-      try {
-        const years = await academicService.getAcademicYears();
-        const trimmedInput = data.academic_year.toLowerCase().trim();
-        const existing = years.find((y) => y.displayLabel.toLowerCase().trim() === trimmedInput);
-
-        if (existing) {
-          yearId = existing.id;
-          displayLabel = existing.displayLabel;
-        } else {
-          const yearsMatch = data.academic_year.match(/(\d{4})[/-](\d{4})/);
-          const startYear = yearsMatch ? yearsMatch[1] : '2025';
-          const endYear = yearsMatch ? yearsMatch[2] : '2026';
-
-          const newYear = await academicService.createAcademicYear({
-            display_label: data.academic_year,
-            start_boundary: `${startYear}-09-01`,
-            end_boundary: `${endYear}-06-30`,
-          });
-          yearId = newYear.id;
-          displayLabel = newYear.displayLabel;
-        }
-      } catch (err) {
-        console.error('Failed to resolve academic year:', err);
-      }
-    } else {
-      try {
-        const years = await academicService.getAcademicYears();
-        const existing = years.find((y) => y.id === yearId);
-        if (existing) {
-          displayLabel = existing.displayLabel;
-        }
-      } catch (err) {
-        console.error('Failed to fetch academic year label:', err);
-      }
-    }
-
-    const createdSem = await academicService.createSemester({
-      academic_year: yearId,
-      semester_index: data.semester_index,
-    });
-
-    if (!createdSem.academicYearDetail) {
-      createdSem.academicYearDetail = {
-        id: yearId,
-        displayLabel: displayLabel,
-        startBoundary: '',
-        endBoundary: '',
-      };
-    }
-
-    return createdSem;
+  async getSemesterById(id: string): Promise<Semester> {
+    return academicService.getSemesterById(id);
   },
 
-  async updateSemester(id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>): Promise<Semester> {
+  async createSemester(data: CreateSemesterPayload): Promise<Semester> {
+    return academicService.createSemester(data);
+  },
+
+  async updateSemester(id: string, data: UpdateSemesterPayload): Promise<Semester> {
     return academicService.updateSemester(id, data);
   },
 
@@ -299,6 +249,10 @@ export const adminService = {
   // ─── Courses ───────────────────────────────────────────────────────────────
   async getCourses(): Promise<Course[]> {
     return academicService.getCourses();
+  },
+
+  async getCourseById(id: string): Promise<Course> {
+    return academicService.getCourseById(id);
   },
 
   async createCourse(data: { title: string; course_code: string; credit_hours: number; program?: string | null; intended_class_standing?: ClassStanding }): Promise<Course> {
@@ -347,6 +301,18 @@ export const adminService = {
     return academicService.getCourseOfferingById(id);
   },
 
+  async createCourseOffering(data: CreateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    return academicService.createCourseOffering(data);
+  },
+
+  async updateCourseOffering(id: string, data: UpdateCourseOfferingPayload): Promise<AdminCourseOffering> {
+    return academicService.updateCourseOffering(id, data);
+  },
+
+  async deleteCourseOffering(id: string): Promise<void> {
+    return academicService.deleteCourseOffering(id);
+  },
+
   // ─── Enrollments ────────────────────────────────────────────────────────────
   async getEnrollments(): Promise<AdminEnrollment[]> {
     return academicService.getEnrollments();
@@ -372,23 +338,55 @@ export const adminService = {
     return academicService.batchImportEnrollments(file);
   },
 
-  // ─── Students & Lecturers ──────────────────────────────────────────────────
-  /**
-   * Returns student profiles.
-   * Note: The backend SIMS REST API does not provide a dedicated GET /api/v1/students listing endpoint.
-   * Returns empty array to prevent 404s, repeated network requests, and displaying fabricated mock data.
-   */
-  async getStudents(): Promise<StudentProfile[]> {
-    return [];
+  // ─── Students (Student Management API) ──────────────────────────────────────
+  async getStudents(params?: StudentFilterParams): Promise<ApiStudentListItem[]> {
+    return academicService.getStudents(params);
   },
 
-  /**
-   * Returns lecturer profiles.
-   * Currently, the backend does not provide a dedicated lecturer directory endpoint.
-   * Returns empty array to prevent displaying fabricated mock data.
-   */
-  async getLecturers(): Promise<LecturerProfile[]> {
-    return [];
+  async getStudentById(id: string): Promise<ApiStudentDetail> {
+    return academicService.getStudentById(id);
+  },
+
+  async updateStudent(id: string, payload: UpdateStudentPayload): Promise<ApiStudentDetail> {
+    return academicService.updateStudent(id, payload);
+  },
+
+  // ─── Lecturers (Lecturer Management API) ───────────────────────────────────
+  async getLecturers(params?: LecturerFilterParams): Promise<ApiLecturerListItem[]> {
+    return academicService.getLecturers(params);
+  },
+
+  async getLecturerById(id: string): Promise<ApiLecturerDetail> {
+    return academicService.getLecturerById(id);
+  },
+
+  async updateLecturer(id: string, payload: UpdateLecturerPayload): Promise<ApiLecturerDetail> {
+    return academicService.updateLecturer(id, payload);
+  },
+
+  // ─── Tags (Question Tags API) ───────────────────────────────────────────────
+  async getTags(): Promise<Tag[]> {
+    return academicService.getTags();
+  },
+
+  async getTagById(id: string): Promise<Tag> {
+    return academicService.getTagById(id);
+  },
+
+  async createTag(payload: CreateTagPayload): Promise<Tag> {
+    return academicService.createTag(payload);
+  },
+
+  async updateTag(id: string, payload: UpdateTagPayload): Promise<Tag> {
+    return academicService.updateTag(id, payload);
+  },
+
+  async patchTag(id: string, payload: Partial<UpdateTagPayload>): Promise<Tag> {
+    return academicService.patchTag(id, payload);
+  },
+
+  async deleteTag(id: string): Promise<void> {
+    return academicService.deleteTag(id);
   },
 
   // ─── AI Jobs, Settings, Reports, Notifications ────────────────────────────
@@ -449,23 +447,24 @@ export const adminService = {
 
   async markNotificationRead(_id: string): Promise<void> { },
 
+  async getAdminAnalytics(): Promise<AdminAnalyticsResponse> {
+    return analyticsApiService.getAdminAnalytics();
+  },
+
   async getDashboardStats(): Promise<AdminDashboardStats> {
-    const [departments, courses, exams, students, lecturers, users] = await Promise.all([
-      academicService.getDepartments().catch(() => []),
-      academicService.getCourses().catch(() => []),
+    const [analytics, exams, users] = await Promise.all([
+      this.getAdminAnalytics().catch(() => null),
       examApiService.getExams().catch(() => []),
-      this.getStudents().catch(() => []),
-      this.getLecturers().catch(() => []),
       this.getUsers().catch(() => []),
     ]);
 
     return {
-      totalStudents: students.length,
-      totalLecturers: lecturers.length,
-      totalAdministrators: users.filter((u) => u.role === 'admin').length,
-      totalCourses: courses.length,
-      totalDepartments: departments.length,
-      totalExams: exams.length,
+      totalStudents: analytics ? analytics.total_students : 0,
+      totalLecturers: analytics ? analytics.total_lecturers : 0,
+      totalAdministrators: users.filter((u) => (u.role || '').toUpperCase() === 'ADMIN').length,
+      totalCourses: analytics ? analytics.total_courses : 0,
+      totalDepartments: analytics ? analytics.total_departments : 0,
+      totalExams: analytics ? analytics.total_exams : exams.length,
       activeExams: exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length,
       pendingAIGrading: 0,
       publishedResults: exams.filter((e) => e.status === 'published').length,
