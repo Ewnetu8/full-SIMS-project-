@@ -44,6 +44,10 @@ import type {
   Tag,
   CreateTagPayload,
   UpdateTagPayload,
+  CoursePrerequisite,
+  CreateCoursePrerequisitePayload,
+  CreditHourPolicy,
+  CreditHourPolicyPayload,
 } from '../types';
 
 export interface RegisterUserPayload {
@@ -265,6 +269,44 @@ export const adminService = {
 
   async deleteCourse(id: string): Promise<void> {
     return academicService.deleteCourse(id);
+  },
+
+  // ─── Course Prerequisites ───────────────────────────────────────────────────
+  async getCoursePrerequisites(): Promise<CoursePrerequisite[]> {
+    return academicService.getCoursePrerequisites();
+  },
+
+  async getCoursePrerequisiteById(id: string): Promise<CoursePrerequisite> {
+    return academicService.getCoursePrerequisiteById(id);
+  },
+
+  async createCoursePrerequisite(data: CreateCoursePrerequisitePayload): Promise<CoursePrerequisite> {
+    return academicService.createCoursePrerequisite(data);
+  },
+
+  async deleteCoursePrerequisite(id: string): Promise<void> {
+    return academicService.deleteCoursePrerequisite(id);
+  },
+
+  // ─── Credit Hour Policies ───────────────────────────────────────────────────
+  async getCreditHourPolicies(): Promise<CreditHourPolicy[]> {
+    return academicService.getCreditHourPolicies();
+  },
+
+  async getCreditHourPolicyById(id: string): Promise<CreditHourPolicy> {
+    return academicService.getCreditHourPolicyById(id);
+  },
+
+  async createCreditHourPolicy(data: CreditHourPolicyPayload): Promise<CreditHourPolicy> {
+    return academicService.createCreditHourPolicy(data);
+  },
+
+  async updateCreditHourPolicy(id: string, data: CreditHourPolicyPayload): Promise<CreditHourPolicy> {
+    return academicService.updateCreditHourPolicy(id, data);
+  },
+
+  async deleteCreditHourPolicy(id: string): Promise<void> {
+    return academicService.deleteCreditHourPolicy(id);
   },
 
   // ─── Exams ─────────────────────────────────────────────────────────────────

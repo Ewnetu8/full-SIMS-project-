@@ -40,6 +40,10 @@ import type {
   Tag,
   CreateTagPayload,
   UpdateTagPayload,
+  CoursePrerequisite,
+  CreateCoursePrerequisitePayload,
+  CreditHourPolicy,
+  CreditHourPolicyPayload,
 } from '../types';
 import type { AdminAnalyticsResponse } from '@/types/api';
 
@@ -55,6 +59,8 @@ interface AdminStoreState {
   academicYears: AcademicYear[];
   semesters: Semester[];
   courses: Course[];
+  coursePrerequisites: CoursePrerequisite[];
+  creditHourPolicies: CreditHourPolicy[];
   courseOfferings: AdminCourseOffering[];
   enrollments: AdminEnrollment[];
   exams: AdminExamOverview[];
@@ -87,6 +93,10 @@ interface AdminStoreState {
   semestersError: string | null;
   isLoadingCourses: boolean;
   coursesError: string | null;
+  isLoadingCoursePrerequisites: boolean;
+  coursePrerequisitesError: string | null;
+  isLoadingCreditHourPolicies: boolean;
+  creditHourPoliciesError: string | null;
   isLoadingCourseOfferings: boolean;
   courseOfferingsError: string | null;
   isLoadingEnrollments: boolean;
@@ -120,6 +130,8 @@ interface AdminStoreState {
   courseProgramFilter: string;
   courseStandingFilter: string;
   courseDeptFilter: string;
+  coursePrerequisiteSearchQuery: string;
+  creditHourPolicySearchQuery: string;
 
   enrollmentSearchQuery: string;
   enrollmentStatusFilter: string;
@@ -166,6 +178,10 @@ interface AdminStoreState {
   setSemesterYearFilter: (yearId: string) => void;
   fetchCourses: () => Promise<void>;
   fetchCourseById: (id: string) => Promise<Course>;
+  fetchCoursePrerequisites: () => Promise<void>;
+  fetchCoursePrerequisiteById: (id: string) => Promise<CoursePrerequisite>;
+  fetchCreditHourPolicies: () => Promise<void>;
+  fetchCreditHourPolicyById: (id: string) => Promise<CreditHourPolicy>;
   fetchCourseOfferings: () => Promise<void>;
   fetchCourseOfferingById: (id: string) => Promise<AdminCourseOffering>;
   fetchEnrollments: () => Promise<void>;
@@ -218,6 +234,17 @@ interface AdminStoreState {
   deleteCourse: (id: string) => Promise<void>;
   toggleCourseArchive: (id: string) => void;
 
+  // Actions - Course Prerequisites
+  setCoursePrerequisiteSearchQuery: (q: string) => void;
+  addCoursePrerequisite: (data: CreateCoursePrerequisitePayload) => Promise<CoursePrerequisite>;
+  deleteCoursePrerequisite: (id: string) => Promise<void>;
+
+  // Actions - Credit Hour Policies
+  setCreditHourPolicySearchQuery: (q: string) => void;
+  addCreditHourPolicy: (data: CreditHourPolicyPayload) => Promise<CreditHourPolicy>;
+  updateCreditHourPolicy: (id: string, data: CreditHourPolicyPayload) => Promise<CreditHourPolicy>;
+  deleteCreditHourPolicy: (id: string) => Promise<void>;
+
   // Actions - Course Offerings & Enrollments
   addCourseOffering: (data: CreateCourseOfferingPayload) => Promise<AdminCourseOffering>;
   updateCourseOffering: (id: string, data: UpdateCourseOfferingPayload) => Promise<AdminCourseOffering>;
@@ -266,6 +293,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   academicYears: [],
   semesters: [],
   courses: [],
+  coursePrerequisites: [],
+  creditHourPolicies: [],
   courseOfferings: [],
   enrollments: [],
   exams: [],
@@ -327,6 +356,10 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   semestersError: null,
   isLoadingCourses: false,
   coursesError: null,
+  isLoadingCoursePrerequisites: false,
+  coursePrerequisitesError: null,
+  isLoadingCreditHourPolicies: false,
+  creditHourPoliciesError: null,
   isLoadingCourseOfferings: false,
   courseOfferingsError: null,
   isLoadingEnrollments: false,
@@ -359,6 +392,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courseProgramFilter: 'ALL',
   courseStandingFilter: 'ALL',
   courseDeptFilter: 'ALL',
+  coursePrerequisiteSearchQuery: '',
+  creditHourPolicySearchQuery: '',
 
   enrollmentSearchQuery: '',
   enrollmentStatusFilter: 'ALL',
@@ -376,10 +411,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [analytics, departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
+      const [analytics, departments, courses, coursePrerequisites, creditHourPolicies, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
         adminService.getAdminAnalytics().catch(() => null),
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
+        adminService.getCoursePrerequisites().catch(() => []),
+        adminService.getCreditHourPolicies().catch(() => []),
         adminService.getAllExams().catch(() => []),
         adminService.getStudents().catch(() => []),
         adminService.getUsers().catch(() => []),
@@ -397,6 +434,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         adminAnalytics: analytics,
         departments,
         courses,
+        coursePrerequisites,
+        creditHourPolicies,
         exams,
         students,
         users,
@@ -595,6 +634,34 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     return adminService.getCourseById(id);
   },
 
+  fetchCoursePrerequisites: async () => {
+    set({ isLoadingCoursePrerequisites: true, coursePrerequisitesError: null });
+    try {
+      const coursePrerequisites = await adminService.getCoursePrerequisites();
+      set({ coursePrerequisites, isLoadingCoursePrerequisites: false, coursePrerequisitesError: null });
+    } catch (err: unknown) {
+      set({ coursePrerequisites: [], isLoadingCoursePrerequisites: false, coursePrerequisitesError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchCoursePrerequisiteById: async (id) => {
+    return adminService.getCoursePrerequisiteById(id);
+  },
+
+  fetchCreditHourPolicies: async () => {
+    set({ isLoadingCreditHourPolicies: true, creditHourPoliciesError: null });
+    try {
+      const creditHourPolicies = await adminService.getCreditHourPolicies();
+      set({ creditHourPolicies, isLoadingCreditHourPolicies: false, creditHourPoliciesError: null });
+    } catch (err: unknown) {
+      set({ creditHourPolicies: [], isLoadingCreditHourPolicies: false, creditHourPoliciesError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchCreditHourPolicyById: async (id) => {
+    return adminService.getCreditHourPolicyById(id);
+  },
+
   fetchCourseOfferings: async () => {
     set({ isLoadingCourseOfferings: true, courseOfferingsError: null });
     try {
@@ -779,6 +846,35 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     set((state) => ({ courses: state.courses.filter((c) => c.id !== id) }));
   },
   toggleCourseArchive: (_id) => {},
+
+  // Actions - Course Prerequisites
+  setCoursePrerequisiteSearchQuery: (coursePrerequisiteSearchQuery) => set({ coursePrerequisiteSearchQuery }),
+  addCoursePrerequisite: async (data) => {
+    const newPrereq = await adminService.createCoursePrerequisite(data);
+    set((state) => ({ coursePrerequisites: [newPrereq, ...state.coursePrerequisites.filter((p) => p.id !== newPrereq.id)] }));
+    return newPrereq;
+  },
+  deleteCoursePrerequisite: async (id) => {
+    await adminService.deleteCoursePrerequisite(id);
+    set((state) => ({ coursePrerequisites: state.coursePrerequisites.filter((p) => p.id !== id) }));
+  },
+
+  // Actions - Credit Hour Policies
+  setCreditHourPolicySearchQuery: (creditHourPolicySearchQuery) => set({ creditHourPolicySearchQuery }),
+  addCreditHourPolicy: async (data) => {
+    const newPolicy = await adminService.createCreditHourPolicy(data);
+    set((state) => ({ creditHourPolicies: [newPolicy, ...state.creditHourPolicies.filter((p) => p.id !== newPolicy.id)] }));
+    return newPolicy;
+  },
+  updateCreditHourPolicy: async (id, data) => {
+    const updated = await adminService.updateCreditHourPolicy(id, data);
+    set((state) => ({ creditHourPolicies: state.creditHourPolicies.map((p) => (p.id === id ? updated : p)) }));
+    return updated;
+  },
+  deleteCreditHourPolicy: async (id) => {
+    await adminService.deleteCreditHourPolicy(id);
+    set((state) => ({ creditHourPolicies: state.creditHourPolicies.filter((p) => p.id !== id) }));
+  },
 
   // Actions - Course Offerings & Enrollments
   addCourseOffering: async (data) => {

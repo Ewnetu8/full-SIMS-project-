@@ -388,6 +388,40 @@ export interface UpdateCoursePayload {
   intended_class_standing?: ClassStanding;
 }
 
+export interface CoursePrerequisite {
+  id: string;
+  course: string;
+  course_detail?: Course | CourseOfferingDetailCourse | null;
+  prerequisite_course: string;
+  prerequisite_course_detail?: Course | CourseOfferingDetailCourse | null;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateCoursePrerequisitePayload {
+  course: string;
+  prerequisite_course: string;
+}
+
+export interface CreditHourPolicy {
+  id: string;
+  class_standing: ClassStanding;
+  min_credit_hours?: number;
+  max_credit_hours?: number;
+  created_at: string;
+  updated_at: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreditHourPolicyPayload {
+  class_standing: ClassStanding;
+  min_credit_hours?: number;
+  max_credit_hours?: number;
+}
+
 export type AdminExamStatus = 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';
 
 export interface AdminExamOverview {
