@@ -50,7 +50,7 @@ export function DashboardOverview() {
 
   const totalStudents = students.length;
   const totalLecturers = lecturers.length;
-  const totalAdmins = users.filter((u) => u.role === 'admin').length;
+  const totalAdmins = users.filter((u) => (u.role || '').toUpperCase() === 'ADMIN').length;
   const totalCourses = courses.length;
   const totalDepts = departments.length;
   const totalExamsCount = exams.length;

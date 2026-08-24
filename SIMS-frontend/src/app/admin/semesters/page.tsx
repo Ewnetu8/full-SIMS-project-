@@ -1,8 +1,8 @@
 'use client';
 
+import { ROUTES } from '@/constants';
 import { AdminShell } from '@/features/admin/components/admin-shell';
 import { SemesterManagement } from '@/features/admin/components/semester-management';
-import { ROUTES } from '@/constants';
 
 export default function SemestersPage() {
   return (

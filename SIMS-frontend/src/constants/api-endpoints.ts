@@ -149,12 +149,21 @@ export const API_ENDPOINTS = {
     EXAM: (id: string) => `/api/v1/results/exam/${id}`,
   },
 
-  // ── Users / Grades / Analytics ──────────────────────────────────────────
-  // Note: The SIMS REST API specification does not currently provide a GET /api/v1/users listing endpoint.
+  // ── Users / Students / Grades / Analytics ──────────────────────────────────────────
   USERS: {
     ROOT: '/api/v1/users',
     BY_ID: (id: string) => `/api/v1/users/${id}`,
     PROFILE: '/api/v1/users/profile',
+  },
+
+  STUDENTS: {
+    ROOT: '/api/v1/students',
+    BY_ID: (id: string) => `/api/v1/students/${id}`,
+  },
+
+  LECTURERS: {
+    ROOT: '/api/v1/lecturers',
+    BY_ID: (id: string) => `/api/v1/lecturers/${id}`,
   },
 
   GRADES: {

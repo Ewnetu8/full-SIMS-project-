@@ -5,9 +5,10 @@ import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import { adminService, type RegisterUserPayload } from '../services/admin-service';
 
 import type {
-  AdminUser,
+  UserCompact,
+  UserDetail,
+  UpdateUserPayload,
   StudentProfile,
-  LecturerProfile,
   Department,
   Course,
   ClassStanding,
@@ -20,18 +21,30 @@ import type {
   Program,
   AcademicYear,
   Semester,
+  CreateSemesterPayload,
+  UpdateSemesterPayload,
   AdminCourseOffering,
   AdminEnrollment,
   CreateEnrollmentPayload,
   UpdateEnrollmentPayload,
   BatchImportResponse,
+  ApiStudentDetail,
+  StudentFilterParams,
+  UpdateStudentPayload,
+  ApiLecturerListItem,
+  ApiLecturerDetail,
+  LecturerFilterParams,
+  UpdateLecturerPayload,
+  Tag,
+  CreateTagPayload,
+  UpdateTagPayload,
 } from '../types';
 
 interface AdminStoreState {
   // Datasets
-  users: AdminUser[];
+  users: UserCompact[];
   students: StudentProfile[];
-  lecturers: LecturerProfile[];
+  lecturers: ApiLecturerListItem[];
   colleges: College[];
   departments: Department[];
   programs: Program[];
@@ -45,11 +58,18 @@ interface AdminStoreState {
   auditLogs: AuditLog[];
   settings: SystemSettings;
   notifications: AdminNotification[];
+  tags: Tag[];
   isLoadingData: boolean;
 
   // Loading states
   isLoadingUsers: boolean;
   usersError: string | null;
+  isLoadingStudents: boolean;
+  studentsError: string | null;
+  isLoadingLecturers: boolean;
+  lecturersError: string | null;
+  isLoadingTags: boolean;
+  tagsError: string | null;
   isLoadingColleges: boolean;
   collegesError: string | null;
   isLoadingDepartments: boolean;
@@ -57,6 +77,7 @@ interface AdminStoreState {
   isLoadingPrograms: boolean;
   isLoadingAcademicYears: boolean;
   isLoadingSemesters: boolean;
+  semestersError: string | null;
   isLoadingCourses: boolean;
   isLoadingCourseOfferings: boolean;
   courseOfferingsError: string | null;
@@ -72,6 +93,7 @@ interface AdminStoreState {
 
   studentSearchQuery: string;
   studentDeptFilter: string;
+  studentClassStandingFilter: string;
 
   lecturerSearchQuery: string;
   lecturerDeptFilter: string;
@@ -81,6 +103,7 @@ interface AdminStoreState {
   programSearchQuery: string;
   academicYearSearchQuery: string;
   semesterSearchQuery: string;
+  semesterYearFilter: string;
 
   courseSearchQuery: string;
   courseProgramFilter: string;
@@ -98,25 +121,44 @@ interface AdminStoreState {
   auditSearchQuery: string;
   auditCategoryFilter: string;
 
+  tagSearchQuery: string;
+
   // Fetch Actions
   fetchAdminData: () => Promise<void>;
-  fetchUsers: () => Promise<void>;
-  fetchStudents: () => Promise<void>;
-  fetchLecturers: () => Promise<void>;
+  fetchUsers: (params?: { search?: string; role?: string }) => Promise<void>;
+  fetchUserById: (id: string) => Promise<UserDetail>;
+  fetchStudents: (params?: StudentFilterParams) => Promise<void>;
+  fetchStudentById: (id: string) => Promise<ApiStudentDetail>;
+  updateStudent: (id: string, payload: UpdateStudentPayload) => Promise<ApiStudentDetail>;
+  fetchLecturers: (params?: LecturerFilterParams) => Promise<void>;
+  fetchLecturerById: (id: string) => Promise<ApiLecturerDetail>;
+  updateLecturer: (id: string, payload: UpdateLecturerPayload) => Promise<ApiLecturerDetail>;
+  fetchTags: () => Promise<void>;
+  fetchTagById: (id: string) => Promise<Tag>;
+  addTag: (data: CreateTagPayload) => Promise<Tag>;
+  updateTag: (id: string, data: UpdateTagPayload) => Promise<Tag>;
+  deleteTag: (id: string) => Promise<void>;
+  setTagSearchQuery: (q: string) => void;
   fetchColleges: () => Promise<void>;
   fetchDepartments: () => Promise<void>;
   fetchPrograms: () => Promise<void>;
   fetchAcademicYears: () => Promise<void>;
   fetchSemesters: () => Promise<void>;
+  fetchSemesterById: (id: string) => Promise<Semester>;
+  addSemester: (data: CreateSemesterPayload) => Promise<Semester>;
+  updateSemester: (id: string, data: UpdateSemesterPayload) => Promise<Semester>;
+  deleteSemester: (id: string) => Promise<void>;
+  setSemesterSearchQuery: (q: string) => void;
+  setSemesterYearFilter: (yearId: string) => void;
   fetchCourses: () => Promise<void>;
   fetchCourseOfferings: () => Promise<void>;
   fetchEnrollments: () => Promise<void>;
   fetchExams: () => Promise<void>;
 
   // Actions - Users
-  setUsers: (users: AdminUser[]) => void;
-  addUser: (user: RegisterUserPayload) => Promise<AdminUser>;
-  updateUser: (id: string, data: Partial<AdminUser>) => Promise<AdminUser>;
+  setUsers: (users: UserCompact[]) => void;
+  addUser: (user: RegisterUserPayload) => Promise<UserCompact>;
+  updateUser: (id: string, data: UpdateUserPayload) => Promise<UserDetail>;
   deleteUser: (id: string) => Promise<void>;
   setUserSearchQuery: (q: string) => void;
   setUserRoleFilter: (role: string) => void;
@@ -146,12 +188,6 @@ interface AdminStoreState {
   addAcademicYear: (data: { display_label: string; start_boundary: string; end_boundary: string }) => Promise<AcademicYear>;
   updateAcademicYear: (id: string, data: Partial<{ display_label: string; start_boundary: string; end_boundary: string }>) => Promise<AcademicYear>;
   deleteAcademicYear: (id: string) => Promise<void>;
-
-  // Actions - Semesters
-  setSemesterSearchQuery: (q: string) => void;
-  addSemester: (data: { academic_year: string; semester_index: 'FIRST' | 'SECOND' }) => Promise<Semester>;
-  updateSemester: (id: string, data: Partial<{ semester_index: 'FIRST' | 'SECOND' }>) => Promise<Semester>;
-  deleteSemester: (id: string) => Promise<void>;
 
   // Actions - Courses
   setCourseSearchQuery: (q: string) => void;
@@ -184,6 +220,7 @@ interface AdminStoreState {
   // Actions - Students & Lecturers
   setStudentSearchQuery: (q: string) => void;
   setStudentDeptFilter: (dept: string) => void;
+  setStudentClassStandingFilter: (standing: string) => void;
   setLecturerSearchQuery: (q: string) => void;
   setLecturerDeptFilter: (dept: string) => void;
 
@@ -211,6 +248,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   exams: [],
   aiJobs: [],
   auditLogs: [],
+  tags: [],
   settings: {
     institutionName: 'Addis Ababa Science and Technology University',
     institutionCode: 'AASTU',
@@ -247,6 +285,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   isLoadingUsers: false,
   usersError: null,
+  isLoadingStudents: false,
+  studentsError: null,
+  isLoadingLecturers: false,
+  lecturersError: null,
+  isLoadingTags: false,
+  tagsError: null,
   isLoadingColleges: false,
   collegesError: null,
   isLoadingDepartments: false,
@@ -254,6 +298,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   isLoadingPrograms: false,
   isLoadingAcademicYears: false,
   isLoadingSemesters: false,
+  semestersError: null,
   isLoadingCourses: false,
   isLoadingCourseOfferings: false,
   courseOfferingsError: null,
@@ -268,6 +313,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   studentSearchQuery: '',
   studentDeptFilter: 'ALL',
+  studentClassStandingFilter: 'ALL',
 
   lecturerSearchQuery: '',
   lecturerDeptFilter: 'ALL',
@@ -277,6 +323,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   programSearchQuery: '',
   academicYearSearchQuery: '',
   semesterSearchQuery: '',
+  semesterYearFilter: 'ALL',
 
   courseSearchQuery: '',
   courseProgramFilter: 'ALL',
@@ -294,10 +341,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   auditSearchQuery: '',
   auditCategoryFilter: 'ALL',
 
+  tagSearchQuery: '',
+
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments] = await Promise.all([
+      const [departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
         adminService.getAllExams().catch(() => []),
@@ -310,6 +359,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         adminService.getSemesters().catch(() => []),
         adminService.getCourseOfferings().catch(() => []),
         adminService.getEnrollments().catch(() => []),
+        adminService.getTags().catch(() => []),
       ]);
 
       set({
@@ -325,6 +375,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         semesters,
         courseOfferings,
         enrollments,
+        tags,
         isLoadingData: false,
       });
     } catch {
@@ -332,28 +383,102 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
-  fetchUsers: async () => {
+  fetchUsers: async (params) => {
     set({ isLoadingUsers: true, usersError: null });
     try {
-      const users = await adminService.getUsers();
+      const search = params?.search !== undefined ? params.search : get().userSearchQuery;
+      const role = params?.role !== undefined ? params.role : get().userRoleFilter;
+      const users = await adminService.getUsers({ search, role });
       set({ users, isLoadingUsers: false, usersError: null });
     } catch (err: unknown) {
       set({ users: [], isLoadingUsers: false, usersError: getUserFriendlyErrorMessage(err) });
     }
   },
 
-  fetchStudents: async () => {
-    try {
-      const students = await adminService.getStudents();
-      set({ students });
-    } catch { }
+  fetchUserById: async (id) => {
+    return adminService.getUserById(id);
   },
 
-  fetchLecturers: async () => {
+  fetchStudents: async (params) => {
+    set({ isLoadingStudents: true, studentsError: null });
     try {
-      const lecturers = await adminService.getLecturers();
-      set({ lecturers });
-    } catch { }
+      const search = params?.search !== undefined ? params.search : get().studentSearchQuery;
+      const department = params?.department !== undefined ? params.department : get().studentDeptFilter;
+      const class_standing = params?.class_standing !== undefined ? params.class_standing : get().studentClassStandingFilter;
+      const students = await adminService.getStudents({ search, department, class_standing });
+      set({ students, isLoadingStudents: false, studentsError: null });
+    } catch (err: unknown) {
+      set({ students: [], isLoadingStudents: false, studentsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchStudentById: async (id) => {
+    return adminService.getStudentById(id);
+  },
+
+  updateStudent: async (id, payload) => {
+    const updated = await adminService.updateStudent(id, payload);
+    set((state) => ({
+      students: state.students.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              student_identifier: updated.student_identifier,
+              class_standing: updated.class_standing,
+              department: updated.department,
+              department_detail: updated.department_detail,
+            }
+          : s
+      ),
+    }));
+    return updated;
+  },
+
+  fetchLecturers: async (params) => {
+    set({ isLoadingLecturers: true, lecturersError: null });
+    try {
+      const search = params?.search !== undefined ? params.search : get().lecturerSearchQuery;
+      const department = params?.department !== undefined ? params.department : get().lecturerDeptFilter;
+      const lecturers = await adminService.getLecturers({ search, department });
+      set({ lecturers, isLoadingLecturers: false, lecturersError: null });
+    } catch (err: unknown) {
+      set({ lecturers: [], isLoadingLecturers: false, lecturersError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchLecturerById: async (id) => {
+    return adminService.getLecturerById(id);
+  },
+
+  updateLecturer: async (id, payload) => {
+    const updated = await adminService.updateLecturer(id, payload);
+    set((state) => ({
+      lecturers: state.lecturers.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              faculty_identifier: updated.faculty_identifier,
+              department: updated.department,
+              department_detail: updated.department_detail,
+            }
+          : l
+      ),
+    }));
+    return updated;
+  },
+
+  fetchTags: async () => {
+    set({ isLoadingTags: true, tagsError: null });
+    try {
+      const tags = await adminService.getTags();
+      set({ tags, isLoadingTags: false, tagsError: null });
+    } catch (err: unknown) {
+      set({ tags: [], isLoadingTags: false, tagsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchTagById: async (id) => {
+    return adminService.getTagById(id);
   },
 
   fetchColleges: async () => {
@@ -397,12 +522,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   fetchSemesters: async () => {
-    set({ isLoadingSemesters: true });
+    set({ isLoadingSemesters: true, semestersError: null });
     try {
       const semesters = await adminService.getSemesters();
-      set({ semesters, isLoadingSemesters: false });
-    } catch {
-      set({ isLoadingSemesters: false });
+      set({ semesters, isLoadingSemesters: false, semestersError: null });
+    } catch (err: unknown) {
+      set({ semesters: [], isLoadingSemesters: false, semestersError: getUserFriendlyErrorMessage(err) });
     }
   },
 
@@ -450,16 +575,33 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   setUsers: (users) => set({ users }),
   addUser: async (payload) => {
     const newUser = await adminService.createUser(payload);
+    set((state) => ({ users: [newUser, ...state.users.filter((u) => u.id !== newUser.id)] }));
     return newUser;
   },
 
   updateUser: async (id, data) => {
     const updated = await adminService.updateUser(id, data);
+    set((state) => ({
+      users: state.users.map((u) =>
+        u.id === id
+          ? {
+              ...u,
+              first_name: updated.first_name,
+              last_name: updated.last_name,
+              role: updated.role,
+              is_active: updated.is_active,
+            }
+          : u,
+      ),
+    }));
     return updated;
   },
 
   deleteUser: async (id) => {
     await adminService.deleteUser(id);
+    set((state) => ({
+      users: state.users.map((u) => (u.id === id ? { ...u, is_active: false } : u)),
+    }));
   },
 
   setUserSearchQuery: (userSearchQuery) => set({ userSearchQuery }),
@@ -537,9 +679,13 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   // Actions - Semesters
   setSemesterSearchQuery: (semesterSearchQuery) => set({ semesterSearchQuery }),
+  setSemesterYearFilter: (semesterYearFilter) => set({ semesterYearFilter }),
+  fetchSemesterById: async (id) => {
+    return adminService.getSemesterById(id);
+  },
   addSemester: async (data) => {
     const sem = await adminService.createSemester(data);
-    set((state) => ({ semesters: [sem, ...state.semesters] }));
+    set((state) => ({ semesters: [sem, ...state.semesters.filter((s) => s.id !== sem.id)] }));
     return sem;
   },
   updateSemester: async (id, data) => {
@@ -626,8 +772,26 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   // Actions - Students & Lecturers
   setStudentSearchQuery: (studentSearchQuery) => set({ studentSearchQuery }),
   setStudentDeptFilter: (studentDeptFilter) => set({ studentDeptFilter }),
+  setStudentClassStandingFilter: (studentClassStandingFilter) => set({ studentClassStandingFilter }),
   setLecturerSearchQuery: (lecturerSearchQuery) => set({ lecturerSearchQuery }),
   setLecturerDeptFilter: (lecturerDeptFilter) => set({ lecturerDeptFilter }),
+
+  // Actions - Tags
+  setTagSearchQuery: (tagSearchQuery) => set({ tagSearchQuery }),
+  addTag: async (data) => {
+    const tag = await adminService.createTag(data);
+    set((state) => ({ tags: [tag, ...state.tags] }));
+    return tag;
+  },
+  updateTag: async (id, data) => {
+    const updated = await adminService.updateTag(id, data);
+    set((state) => ({ tags: state.tags.map((t) => (t.id === id ? updated : t)) }));
+    return updated;
+  },
+  deleteTag: async (id) => {
+    await adminService.deleteTag(id);
+    set((state) => ({ tags: state.tags.filter((t) => t.id !== id) }));
+  },
 
   // Actions - AI Jobs, Audit, Settings & Notifications
   retryAIJob: (id) =>
