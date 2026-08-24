@@ -3,8 +3,8 @@ import { AdminNotifications, AdminShell } from '@/features/admin/components';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Admin Notifications — ExamSphere Admin',
-  description: 'View administrative alerts, AI notifications, and system security events.',
+  title: 'Notifications — SIMS Admin',
+  description: 'View your system notifications and alerts.',
 };
 
 export default function AdminNotificationsPage() {

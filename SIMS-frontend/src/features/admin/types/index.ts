@@ -480,7 +480,7 @@ export interface AdminExamOverview {
   start_window?: string | null;
   end_window?: string | null;
   duration_minutes: number;
-  questions?: any[];
+  questions?: unknown[];
   created_at?: string;
   updated_at?: string;
   courseCode?: string;
@@ -514,36 +514,6 @@ export interface ScheduleExaminationPayload {
   start_window: string;
   end_window: string;
   duration_minutes: number;
-}
-
-export type AIGradingJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
-
-export interface AIGradingJob {
-  id: string;
-  examId: string;
-  examTitle: string;
-  courseName: string;
-  department: string;
-  totalSubmissions: number;
-  processedSubmissions: number;
-  status: AIGradingJobStatus;
-  confidenceAverage?: number;
-  errorReason?: string;
-  startedAt: string;
-  completedAt?: string;
-}
-
-export interface AuditLog {
-  id: string;
-  timestamp: string;
-  actorName: string;
-  actorEmail: string;
-  actorRole: UserRole;
-  actionEvent: string; // e.g. "user.created", "exam.published", "settings.updated"
-  resourceType: string;
-  resourceName: string;
-  ipAddress: string;
-  details: string;
 }
 
 export interface SystemSettings {
@@ -597,16 +567,6 @@ export interface AdminDashboardStats {
     aiEngineStatus: 'online' | 'busy' | 'offline';
     lastBackupTimestamp: string;
   };
-}
-
-export interface AdminNotification {
-  id: string;
-  title: string;
-  message: string;
-  category: 'user' | 'exam' | 'ai' | 'system' | 'security';
-  timestamp: string;
-  read: boolean;
-  actionUrl?: string;
 }
 
 export interface AdminReportData {

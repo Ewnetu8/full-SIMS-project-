@@ -1,11 +1,10 @@
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
+import { analyticsApiService } from '@/features/analytics/services/analytics-api';
 import { isValidUuid } from '@/lib/user-identifier';
 import { api } from '@/services/api-client';
 
 import { academicService } from './academic-service';
 import { examApiService } from './exam-api-service';
-import { analyticsApiService } from '@/features/analytics/services/analytics-api';
-import type { AdminAnalyticsResponse } from '@/types/api';
 
 import type {
   UserCompact,
@@ -24,11 +23,8 @@ import type {
   CreateExaminationPayload,
   UpdateExaminationPayload,
   ScheduleExaminationPayload,
-  AIGradingJob,
-  AuditLog,
   SystemSettings,
   AdminDashboardStats,
-  AdminNotification,
   AdminCourseOffering,
   CreateCourseOfferingPayload,
   UpdateCourseOfferingPayload,
@@ -54,6 +50,7 @@ import type {
   EnrollmentOverride,
   CreateEnrollmentOverridePayload,
 } from '../types';
+import type { AdminAnalyticsResponse } from '@/types/api';
 
 export interface RegisterUserPayload {
   email: string;
@@ -461,19 +458,7 @@ export const adminService = {
     return academicService.deleteTag(id);
   },
 
-  // ─── AI Jobs, Settings, Reports, Notifications ────────────────────────────
-  async getAIGradingJobs(): Promise<AIGradingJob[]> {
-    return [];
-  },
-
-  async retryAIGradingJob(_jobId: string): Promise<AIGradingJob | null> {
-    return null;
-  },
-
-  async getAuditLogs(): Promise<AuditLog[]> {
-    return [];
-  },
-
+  // ─── Settings, Reports, Notifications ─────────────────────────────────────
   async getSettings(): Promise<SystemSettings> {
     return {
       institutionName: 'Addis Ababa Science and Technology University',
@@ -512,12 +497,6 @@ export const adminService = {
     const current = await this.getSettings();
     return { ...current, ...newSettings };
   },
-
-  async getNotifications(): Promise<AdminNotification[]> {
-    return [];
-  },
-
-  async markNotificationRead(_id: string): Promise<void> { },
 
   async getAdminAnalytics(): Promise<AdminAnalyticsResponse> {
     return analyticsApiService.getAdminAnalytics();

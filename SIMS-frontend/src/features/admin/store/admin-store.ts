@@ -16,10 +16,7 @@ import type {
   CreateExaminationPayload,
   UpdateExaminationPayload,
   ScheduleExaminationPayload,
-  AIGradingJob,
-  AuditLog,
   SystemSettings,
-  AdminNotification,
   College,
   Program,
   AcademicYear,
@@ -49,7 +46,6 @@ import type {
   CreditHourPolicyPayload,
   EnrollmentOverride,
   CreateEnrollmentOverridePayload,
-  OverrideType,
 } from '../types';
 import type { AdminAnalyticsResponse } from '@/types/api';
 
@@ -71,10 +67,7 @@ interface AdminStoreState {
   courseOfferings: AdminCourseOffering[];
   enrollments: AdminEnrollment[];
   exams: AdminExamOverview[];
-  aiJobs: AIGradingJob[];
-  auditLogs: AuditLog[];
   settings: SystemSettings;
-  notifications: AdminNotification[];
   tags: Tag[];
   isLoadingData: boolean;
 
@@ -296,13 +289,8 @@ interface AdminStoreState {
   setLecturerSearchQuery: (q: string) => void;
   setLecturerDeptFilter: (dept: string) => void;
 
-  // Actions - AI Jobs, Audit, Settings & Notifications
-  retryAIJob: (id: string) => void;
+  // Actions - Settings
   updateSettings: (settings: Partial<SystemSettings>) => void;
-  setAuditSearchQuery: (q: string) => void;
-  setAuditCategoryFilter: (cat: string) => void;
-  markNotificationRead: (id: string) => void;
-  markAllNotificationsRead: () => void;
 }
 
 export const useAdminStore = create<AdminStoreState>((set, get) => ({
@@ -322,8 +310,6 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courseOfferings: [],
   enrollments: [],
   exams: [],
-  aiJobs: [],
-  auditLogs: [],
   settings: {
     institutionName: 'Addis Ababa Science and Technology University',
     institutionCode: 'AASTU',
@@ -355,7 +341,6 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       weeklyDigestEmail: false,
     },
   },
-  notifications: [],
   tags: [],
   isLoadingData: false,
 
@@ -1041,29 +1026,9 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     set((state) => ({ tags: state.tags.filter((t) => t.id !== id) }));
   },
 
-  // Actions - AI Jobs, Audit, Settings & Notifications
-  retryAIJob: (id) =>
-    set((state) => ({
-      aiJobs: state.aiJobs.map((j) =>
-        j.id === id
-          ? { ...j, status: 'processing', errorReason: undefined, startedAt: new Date().toLocaleString() }
-          : j
-      ),
-    })),
-
+  // Actions - Settings
   updateSettings: (newSettings) =>
     set((state) => ({
       settings: { ...state.settings, ...newSettings },
-    })),
-
-  setAuditSearchQuery: (auditSearchQuery) => set({ auditSearchQuery }),
-  setAuditCategoryFilter: (auditCategoryFilter) => set({ auditCategoryFilter }),
-  markNotificationRead: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    })),
-  markAllNotificationsRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
     })),
 }));
