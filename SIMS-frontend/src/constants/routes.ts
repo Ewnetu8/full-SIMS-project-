@@ -68,6 +68,7 @@ export const ROUTES = {
     CREDIT_HOUR_POLICIES: '/admin/credit-hour-policies',
     ENROLLMENT_OVERRIDES: '/admin/enrollment-overrides',
     ENROLLMENTS: '/admin/enrollments',
+    TEACHING_ASSIGNMENTS: '/admin/teaching-assignments',
     EXAMS: '/admin/exams',
     RESULTS: '/admin/results',
     REPORTS: '/admin/reports',

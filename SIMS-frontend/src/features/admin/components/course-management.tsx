@@ -21,6 +21,9 @@ import {
   Users,
   CheckCircle2,
   FileSpreadsheet,
+  UserCheck,
+  PlusCircle,
+  ArrowDown,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -43,9 +46,9 @@ import {
 } from '@/components/ui';
 import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 
+import { CourseOfferingDropdown, LecturerDropdown, getOfferingLabel } from './assignment-form-dropdowns';
 import { useAdminStore } from '../store';
-
-import type { Course, ClassStanding, AdminCourseOffering } from '../types';
+import type { Course, ClassStanding, AdminCourseOffering, CreateTeachingAssignmentPayload } from '../types';
 
 const CLASS_STANDING_LABELS: Record<ClassStanding, string> = {
   FRESHMAN: 'Freshman',
@@ -76,6 +79,10 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
     semesters,
     programs,
     departments,
+    lecturers,
+    isLoadingLecturers,
+    teachingAssignments,
+    academicYears,
     isLoadingCourses,
     coursesError,
     isLoadingCourseOfferings,
@@ -92,6 +99,10 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
     fetchSemesters,
     fetchPrograms,
     fetchDepartments,
+    fetchLecturers,
+    fetchTeachingAssignments,
+    fetchAcademicYears,
+    addTeachingAssignment,
     fetchCourseById,
     fetchCourseOfferingById,
     addCourse,
@@ -107,19 +118,16 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
   } = useAdminStore();
 
   // Active Tab State
-  const [activeTab, setActiveTab] = React.useState<'courses' | 'offerings'>(initialTab || 'courses');
-
-  React.useEffect(() => {
+  const [activeTab, setActiveTab] = React.useState<'courses' | 'offerings'>(() => {
+    if (initialTab) return initialTab;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam === 'offerings' || initialTab === 'offerings') {
-        setActiveTab('offerings');
-      } else if (tabParam === 'courses') {
-        setActiveTab('courses');
-      }
+      if (tabParam === 'offerings') return 'offerings';
+      if (tabParam === 'courses') return 'courses';
     }
-  }, [initialTab]);
+    return 'courses';
+  });
 
   const handleTabChange = (tab: 'courses' | 'offerings') => {
     setActiveTab(tab);
@@ -184,6 +192,14 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
 
   const itemsPerPage = 10;
 
+  // ── TEACHING ASSIGNMENT MODAL STATE ────────────────────────────────────
+  const [assigningOffering, setAssigningOffering] = React.useState<AdminCourseOffering | null>(null);
+  const [assignOfferingId, setAssignOfferingId] = React.useState('');
+  const [assignLecturerId, setAssignLecturerId] = React.useState('');
+  const [assignIsActive, setAssignIsActive] = React.useState(true);
+  const [assignFormError, setAssignFormError] = React.useState<string | null>(null);
+  const [isSubmittingAssign, setIsSubmittingAssign] = React.useState(false);
+
   // Initial Data Fetch
   React.useEffect(() => {
     void fetchCourses();
@@ -191,7 +207,87 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
     void fetchSemesters();
     void fetchPrograms();
     void fetchDepartments();
-  }, [fetchCourses, fetchCourseOfferings, fetchSemesters, fetchPrograms, fetchDepartments]);
+    void fetchLecturers();
+    void fetchTeachingAssignments();
+    void fetchAcademicYears();
+  }, [
+    fetchCourses,
+    fetchCourseOfferings,
+    fetchSemesters,
+    fetchPrograms,
+    fetchDepartments,
+    fetchLecturers,
+    fetchTeachingAssignments,
+    fetchAcademicYears,
+  ]);
+
+  // Open Assign Lecturer Modal
+  const handleOpenAssignLecturer = (offering: AdminCourseOffering) => {
+    setAssigningOffering(offering);
+    setAssignOfferingId(offering.id);
+    setAssignLecturerId('');
+    setAssignIsActive(true);
+    setAssignFormError(null);
+  };
+
+  // Handle Assign Lecturer Submit
+  const handleAssignLecturerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assigningOffering) return;
+
+    if (!assignOfferingId) {
+      setAssignFormError('Course offering is required.');
+      return;
+    }
+
+    if (!assignLecturerId) {
+      setAssignFormError('Lecturer is required.');
+      return;
+    }
+
+    // Frontend duplicate check
+    const existing = teachingAssignments.find(
+      (a) => a.course_offering === assignOfferingId && a.lecturer === assignLecturerId
+    );
+    if (existing) {
+      setAssignFormError('This lecturer is already assigned to this course offering.');
+      return;
+    }
+
+    setIsSubmittingAssign(true);
+    setAssignFormError(null);
+
+    const payload: CreateTeachingAssignmentPayload = {
+      lecturer: assignLecturerId,
+      course_offering: assignOfferingId,
+      is_active: assignIsActive,
+    };
+
+    try {
+      await addTeachingAssignment(payload);
+      toast.success('Teaching assignment created successfully.');
+      setAssigningOffering(null);
+      await fetchTeachingAssignments();
+    } catch (err: unknown) {
+      const parsed = parseFieldErrors(err);
+      if (parsed.non_field_errors) {
+        setAssignFormError(parsed.non_field_errors);
+      } else if (parsed.lecturer || parsed.course_offering) {
+        setAssignFormError(parsed.lecturer || parsed.course_offering || null);
+      } else {
+        const errorMsg = getUserFriendlyErrorMessage(err);
+        if (errorMsg.toLowerCase().includes('already assigned') || errorMsg.toLowerCase().includes('already exists')) {
+          setAssignFormError('This lecturer is already assigned to this course offering.');
+        } else if (errorMsg.toLowerCase().includes('permission') || errorMsg.includes('403')) {
+          setAssignFormError('You do not have permission to assign lecturers.');
+        } else {
+          setAssignFormError(errorMsg || 'Unable to create teaching assignment. Please try again.');
+        }
+      }
+    } finally {
+      setIsSubmittingAssign(false);
+    }
+  };
 
   // Department Resolver (safely checks Course -> Program -> Department)
   const getDepartmentName = React.useCallback(
@@ -1074,7 +1170,16 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
                               {offering.created_at ? new Date(offering.created_at).toLocaleDateString() : '—'}
                             </td>
                             <td className="px-4 py-3.5 text-right">
-                              <div className="flex items-center justify-end gap-1">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  className="text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
+                                  onClick={() => handleOpenAssignLecturer(offering)}
+                                  title="Assign Lecturer to this course offering"
+                                >
+                                  <UserCheck className="h-3.5 w-3.5 mr-1" /> Assign Lecturer
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="xs"
@@ -1546,8 +1651,20 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
               </div>
             </DialogBody>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setViewingOffering(null)}>
+            <DialogFooter className="flex items-center justify-between sm:justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-primary border-primary/30 hover:bg-primary/10"
+                onClick={() => {
+                  const offering = viewingOffering;
+                  setViewingOffering(null);
+                  handleOpenAssignLecturer(offering);
+                }}
+              >
+                <UserCheck className="h-3.5 w-3.5 mr-1.5" /> Assign Lecturer
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setViewingOffering(null)}>
                 Close
               </Button>
             </DialogFooter>
@@ -1598,6 +1715,172 @@ export function CourseManagement({ initialTab }: CourseManagementProps = {}) {
         onConfirm={handleDeleteOffering}
         onCancel={() => setDeletingOffering(null)}
       />
+
+      {/* ── ASSIGN LECTURER TO COURSE OFFERING MODAL ────────────────────────── */}
+      {assigningOffering && (
+        <Dialog
+          open={!!assigningOffering}
+          onOpenChange={() => {
+            if (!isSubmittingAssign) setAssigningOffering(null);
+          }}
+        >
+          <DialogContent size="lg" className="sm:max-w-xl w-[94vw] p-0 overflow-hidden">
+            <form onSubmit={handleAssignLecturerSubmit}>
+              <DialogHeader className="px-6 pt-6 pb-2">
+                <DialogTitle className="flex items-center gap-2.5 text-xl font-bold text-foreground">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                    <UserCheck className="h-4 w-4" />
+                  </div>
+                  Assign Lecturer to Course Offering
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Assign a lecturer to a specific course offering.
+                </DialogDescription>
+              </DialogHeader>
+
+              <DialogBody className="space-y-4 px-6 py-4">
+                {assignFormError && (
+                  <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{assignFormError}</span>
+                  </div>
+                )}
+
+                {/* 1. Course Offering Dropdown */}
+                <CourseOfferingDropdown
+                  value={assignOfferingId}
+                  onChange={(offeringId) => {
+                    setAssignOfferingId(offeringId);
+                    setAssignFormError(null);
+                  }}
+                  offerings={courseOfferings}
+                  courses={courses}
+                  semesters={semesters}
+                  academicYears={academicYears}
+                  teachingAssignments={teachingAssignments}
+                  selectedLecturerId={assignLecturerId}
+                  isLoading={isLoadingCourseOfferings}
+                  disabled={isSubmittingAssign}
+                />
+
+                {/* 2. Lecturer Dropdown */}
+                <LecturerDropdown
+                  value={assignLecturerId}
+                  onChange={(lecturerId) => {
+                    setAssignLecturerId(lecturerId);
+                    setAssignFormError(null);
+                  }}
+                  lecturers={lecturers}
+                  teachingAssignments={teachingAssignments}
+                  selectedOfferingId={assignOfferingId}
+                  isLoading={isLoadingLecturers}
+                  disabled={isSubmittingAssign}
+                />
+
+                {/* 3. Assignment Status */}
+                <div className="pt-1">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                    Assignment Status
+                  </div>
+                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-foreground bg-muted/20 border border-border p-3 rounded-xl">
+                    <input
+                      type="checkbox"
+                      checked={assignIsActive}
+                      onChange={(e) => setAssignIsActive(e.target.checked)}
+                      className="mt-0.5 rounded border-input text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <div>
+                      <span className="font-semibold text-foreground block">Active</span>
+                      <span className="text-[11px] text-muted-foreground block">
+                        Active assignments are visible to the lecturer.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                {/* 4. Assignment Summary */}
+                <div className="border-t border-border pt-3">
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Assignment Summary
+                    </div>
+                    {assignOfferingId && assignLecturerId ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs bg-background/80 rounded-lg p-3 border border-border">
+                        <div>
+                          {(() => {
+                            const offering = courseOfferings.find((o) => o.id === assignOfferingId);
+                            if (!offering) return null;
+                            const info = getOfferingLabel(offering, courses, semesters, academicYears);
+                            return (
+                              <>
+                                <p className="font-semibold text-foreground">
+                                  {info.code} — {info.title}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {info.section} · {info.semester} · {info.academicYear}
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+                        <div className="text-primary font-bold text-center sm:px-2">
+                          <ArrowDown className="h-4 w-4 mx-auto sm:hidden" />
+                          <span className="hidden sm:inline">↓</span>
+                        </div>
+                        <div className="sm:text-right">
+                          {(() => {
+                            const lecturer = lecturers.find((l) => l.id === assignLecturerId);
+                            if (!lecturer) return null;
+                            return (
+                              <>
+                                <p className="font-semibold text-foreground">
+                                  Dr. {lecturer.user_full_name}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {lecturer.department_detail?.name || 'Academic Faculty'}
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground bg-background/50 rounded-lg p-3 border border-border/60">
+                        Select a course offering and lecturer to preview the assignment.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </DialogBody>
+
+              <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAssigningOffering(null)}
+                  disabled={isSubmittingAssign}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSubmittingAssign || !assignOfferingId || !assignLecturerId}
+                >
+                  {isSubmittingAssign ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Assigning...
+                    </>
+                  ) : (
+                    'Assign Lecturer'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

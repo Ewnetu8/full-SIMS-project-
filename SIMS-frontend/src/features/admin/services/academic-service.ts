@@ -36,6 +36,11 @@ import type {
   EnrollmentOverride,
   CreateEnrollmentOverridePayload,
   OverrideType,
+  TeachingAssignment,
+  CreateTeachingAssignmentPayload,
+  UpdateTeachingAssignmentPayload,
+  TeachingAssignmentFilterParams,
+  UserCompact,
 } from '../types';
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -731,12 +736,12 @@ export const academicService = {
     return {
       id: String(p.id || ''),
       student: String(p.student || ''),
-      student_detail: (p.student_detail as any) || (p.studentDetail as any) || null,
+      student_detail: (p.student_detail as unknown as ApiStudentListItem) || (p.studentDetail as unknown as ApiStudentListItem) || null,
       semester: String(p.semester || ''),
-      semester_detail: (p.semester_detail as any) || (p.semesterDetail as any) || null,
+      semester_detail: (p.semester_detail as unknown as Semester) || (p.semesterDetail as unknown as Semester) || null,
       override_type: (p.override_type || p.overrideType) as OverrideType | undefined,
       approved_by: p.approved_by ? String(p.approved_by) : p.approvedBy ? String(p.approvedBy) : null,
-      approved_by_detail: (p.approved_by_detail as any) || (p.approvedByDetail as any) || null,
+      approved_by_detail: (p.approved_by_detail as unknown as UserCompact) || (p.approvedByDetail as unknown as UserCompact) || null,
       reason: typeof p.reason === 'string' ? p.reason : '',
       is_active: typeof p.is_active === 'boolean' ? p.is_active : typeof p.isActive === 'boolean' ? p.isActive : true,
       created_at: String(p.created_at || p.createdAt || ''),
@@ -1036,5 +1041,59 @@ export const academicService = {
 
   async deleteTag(id: string): Promise<void> {
     return api.delete<void>(API_ENDPOINTS.TAGS.BY_ID(id));
+  },
+
+  // ── Teaching Assignments (SIMS API 7) ──────────────────────────────────────
+  async getTeachingAssignments(params?: TeachingAssignmentFilterParams): Promise<TeachingAssignment[]> {
+    const queryParams: Record<string, string> = {};
+    if (params?.is_active !== undefined) {
+      queryParams.is_active = String(params.is_active);
+    }
+    const data = await api.get<TeachingAssignment[] | { results?: TeachingAssignment[]; data?: TeachingAssignment[] }>(
+      API_ENDPOINTS.TEACHING_ASSIGNMENTS.ROOT,
+      { params: Object.keys(queryParams).length > 0 ? queryParams : undefined }
+    );
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data?.results)) {
+      return data.results;
+    }
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+    return [];
+  },
+
+  async getTeachingAssignmentById(id: string): Promise<TeachingAssignment> {
+    return api.get<TeachingAssignment>(API_ENDPOINTS.TEACHING_ASSIGNMENTS.BY_ID(id));
+  },
+
+  async createTeachingAssignment(payload: CreateTeachingAssignmentPayload): Promise<TeachingAssignment> {
+    return api.post<TeachingAssignment>(API_ENDPOINTS.TEACHING_ASSIGNMENTS.ROOT, {
+      lecturer: payload.lecturer,
+      course_offering: payload.course_offering,
+      is_active: payload.is_active ?? true,
+    });
+  },
+
+  async updateTeachingAssignment(id: string, payload: UpdateTeachingAssignmentPayload): Promise<TeachingAssignment> {
+    const body: Record<string, unknown> = {};
+    if (payload.is_active !== undefined) {
+      body.is_active = payload.is_active;
+    }
+    return api.patch<TeachingAssignment>(API_ENDPOINTS.TEACHING_ASSIGNMENTS.BY_ID(id), body);
+  },
+
+  async patchTeachingAssignment(id: string, payload: Partial<UpdateTeachingAssignmentPayload>): Promise<TeachingAssignment> {
+    const body: Record<string, unknown> = {};
+    if (payload.is_active !== undefined) {
+      body.is_active = payload.is_active;
+    }
+    return api.patch<TeachingAssignment>(API_ENDPOINTS.TEACHING_ASSIGNMENTS.BY_ID(id), body);
+  },
+
+  async deleteTeachingAssignment(id: string): Promise<void> {
+    return api.delete<void>(API_ENDPOINTS.TEACHING_ASSIGNMENTS.BY_ID(id));
   },
 };

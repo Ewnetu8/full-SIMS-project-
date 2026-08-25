@@ -45,6 +45,10 @@ import type {
   CreditHourPolicyPayload,
   EnrollmentOverride,
   CreateEnrollmentOverridePayload,
+  TeachingAssignment,
+  CreateTeachingAssignmentPayload,
+  UpdateTeachingAssignmentPayload,
+  TeachingAssignmentFilterParams,
 } from '../types';
 import type { AdminAnalyticsResponse } from '@/types/api';
 
@@ -65,6 +69,7 @@ interface AdminStoreState {
   enrollmentOverrides: EnrollmentOverride[];
   courseOfferings: AdminCourseOffering[];
   enrollments: AdminEnrollment[];
+  teachingAssignments: TeachingAssignment[];
   exams: AdminExamOverview[];
   tags: Tag[];
   isLoadingData: boolean;
@@ -101,6 +106,8 @@ interface AdminStoreState {
   courseOfferingsError: string | null;
   isLoadingEnrollments: boolean;
   enrollmentsError: string | null;
+  isLoadingTeachingAssignments: boolean;
+  teachingAssignmentsError: string | null;
   isLoadingExams: boolean;
   examsError: string | null;
 
@@ -139,6 +146,9 @@ interface AdminStoreState {
   enrollmentStatusFilter: string;
   enrollmentSemesterFilter: string;
   enrollmentCourseFilter: string;
+
+  teachingAssignmentSearchQuery: string;
+  teachingAssignmentStatusFilter: 'ALL' | 'ACTIVE' | 'INACTIVE';
 
   examSearchQuery: string;
   examStatusFilter: string;
@@ -190,6 +200,13 @@ interface AdminStoreState {
   fetchCourseOfferings: () => Promise<void>;
   fetchCourseOfferingById: (id: string) => Promise<AdminCourseOffering>;
   fetchEnrollments: () => Promise<void>;
+  fetchTeachingAssignments: (params?: TeachingAssignmentFilterParams) => Promise<void>;
+  fetchTeachingAssignmentById: (id: string) => Promise<TeachingAssignment>;
+  addTeachingAssignment: (data: CreateTeachingAssignmentPayload) => Promise<TeachingAssignment>;
+  updateTeachingAssignment: (id: string, data: UpdateTeachingAssignmentPayload) => Promise<TeachingAssignment>;
+  deleteTeachingAssignment: (id: string) => Promise<void>;
+  setTeachingAssignmentSearchQuery: (q: string) => void;
+  setTeachingAssignmentStatusFilter: (status: 'ALL' | 'ACTIVE' | 'INACTIVE') => void;
 
   // Actions - Users
   setUsers: (users: UserCompact[]) => void;
@@ -304,6 +321,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   enrollmentOverrides: [],
   courseOfferings: [],
   enrollments: [],
+  teachingAssignments: [],
   exams: [],
   tags: [],
   isLoadingData: false,
@@ -339,6 +357,8 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courseOfferingsError: null,
   isLoadingEnrollments: false,
   enrollmentsError: null,
+  isLoadingTeachingAssignments: false,
+  teachingAssignmentsError: null,
   isLoadingExams: false,
   examsError: null,
 
@@ -377,6 +397,9 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   enrollmentSemesterFilter: 'ALL',
   enrollmentCourseFilter: 'ALL',
 
+  teachingAssignmentSearchQuery: '',
+  teachingAssignmentStatusFilter: 'ALL',
+
   examSearchQuery: '',
   examStatusFilter: 'ALL',
   examCourseOfferingFilter: 'ALL',
@@ -389,7 +412,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [analytics, departments, courses, coursePrerequisites, creditHourPolicies, enrollmentOverrides, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
+      const [analytics, departments, courses, coursePrerequisites, creditHourPolicies, enrollmentOverrides, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, teachingAssignments, tags] = await Promise.all([
         adminService.getAdminAnalytics().catch(() => null),
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
@@ -406,6 +429,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         adminService.getSemesters().catch(() => []),
         adminService.getCourseOfferings().catch(() => []),
         adminService.getEnrollments().catch(() => []),
+        adminService.getTeachingAssignments().catch(() => []),
         adminService.getTags().catch(() => []),
       ]);
 
@@ -426,6 +450,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         semesters,
         courseOfferings,
         enrollments,
+        teachingAssignments,
         tags,
         isLoadingData: false,
       });
@@ -680,6 +705,20 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
+  fetchTeachingAssignments: async (params) => {
+    set({ isLoadingTeachingAssignments: true, teachingAssignmentsError: null });
+    try {
+      const teachingAssignments = await adminService.getTeachingAssignments(params);
+      set({ teachingAssignments, isLoadingTeachingAssignments: false, teachingAssignmentsError: null });
+    } catch (err: unknown) {
+      set({ teachingAssignments: [], isLoadingTeachingAssignments: false, teachingAssignmentsError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchTeachingAssignmentById: async (id) => {
+    return adminService.getTeachingAssignmentById(id);
+  },
+
   fetchExams: async (params) => {
     set({ isLoadingExams: true, examsError: null });
     try {
@@ -930,6 +969,24 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     const res = await adminService.batchImportEnrollments(file);
     await get().fetchEnrollments();
     return res;
+  },
+
+  // Actions - Teaching Assignments
+  setTeachingAssignmentSearchQuery: (teachingAssignmentSearchQuery) => set({ teachingAssignmentSearchQuery }),
+  setTeachingAssignmentStatusFilter: (teachingAssignmentStatusFilter) => set({ teachingAssignmentStatusFilter }),
+  addTeachingAssignment: async (data) => {
+    const newAssignment = await adminService.createTeachingAssignment(data);
+    await get().fetchTeachingAssignments();
+    return newAssignment;
+  },
+  updateTeachingAssignment: async (id, data) => {
+    const updated = await adminService.updateTeachingAssignment(id, data);
+    await get().fetchTeachingAssignments();
+    return updated;
+  },
+  deleteTeachingAssignment: async (id) => {
+    await adminService.deleteTeachingAssignment(id);
+    await get().fetchTeachingAssignments();
   },
 
   // Actions - Exams
