@@ -210,6 +210,11 @@ export async function listCourseOfferings(): Promise<CourseOffering[]> {
 }
 
 /**
+ * Alias for listCourseOfferings
+ */
+export const getCourseOfferings = listCourseOfferings;
+
+/**
  * Get a single course offering by ID.
  *
  * @param id - Course offering UUID
@@ -218,6 +223,11 @@ export async function listCourseOfferings(): Promise<CourseOffering[]> {
 export async function getCourseOffering(id: string): Promise<CourseOffering> {
   return api.get<CourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
 }
+
+/**
+ * Alias for getCourseOffering
+ */
+export const getCourseOfferingById = getCourseOffering;
 
 // ─── Enrollments ──────────────────────────────────────────────────────────────
 

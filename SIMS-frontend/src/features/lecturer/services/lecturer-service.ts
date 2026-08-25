@@ -104,6 +104,11 @@ function transformOfferingToUiCourse(
     studentCount: offeringEnrollments.length,
     examCount: offeringExams.length,
     description: offering.course_detail?.title || '',
+    section: offering.section || 'A',
+    capacity: offering.capacity,
+    creditHours: offering.course_detail?.credit_hours,
+    intendedClassStanding: offering.course_detail?.intended_class_standing,
+    programName: offering.course_detail?.program_detail?.name,
   };
 }
 
@@ -144,48 +149,79 @@ export const lecturerService = {
   },
 
   /**
-   * Get lecturer's course offerings
+   * Get raw course offerings from backend
    */
-  async getCourses(): Promise<Course[]> {
-    try {
-      const [offeringsRes, enrollmentsRes, examsRes] = await Promise.allSettled([
-        listCourseOfferings(),
-        listEnrollments(),
-        listExaminations(),
-      ]);
-
-      const offerings = offeringsRes.status === 'fulfilled' ? offeringsRes.value : [];
-      const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
-      const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
-
-      return offerings.map((o) => transformOfferingToUiCourse(o, enrollments, exams));
-    } catch (err) {
-      console.error('Error fetching courses:', err);
-      return [];
-    }
+  async getCourseOfferings(): Promise<CourseOffering[]> {
+    return listCourseOfferings();
   },
 
   /**
-   * Get course offering by ID
+   * Get single course offering by ID from backend
+   */
+  async getCourseOfferingById(id: string): Promise<CourseOffering> {
+    return getCourseOffering(id);
+  },
+
+  /**
+   * Get lecturer's course offerings mapped to UI Course domain
+   */
+  async getCourses(): Promise<Course[]> {
+    const [offerings, enrollments, exams] = await Promise.all([
+      listCourseOfferings().catch((err) => {
+        console.error('Error fetching course offerings:', err);
+        throw err;
+      }),
+      listEnrollments().catch(() => [] as Enrollment[]),
+      listExaminations().catch(() => [] as Examination[]),
+    ]);
+
+    return offerings.map((o) => transformOfferingToUiCourse(o, enrollments, exams));
+  },
+
+  /**
+   * Get course offering by ID mapped to UI Course domain
    */
   async getCourseById(id: string): Promise<Course | null> {
     try {
-      const [offeringRes, enrollmentsRes, examsRes] = await Promise.allSettled([
+      const [offering, enrollments, exams] = await Promise.all([
         getCourseOffering(id),
-        listEnrollments(),
-        listExaminations(),
+        listEnrollments().catch(() => [] as Enrollment[]),
+        listExaminations().catch(() => [] as Examination[]),
       ]);
-
-      const offering = offeringRes.status === 'fulfilled' ? offeringRes.value : null;
-      const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
-      const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
 
       if (!offering) return null;
       return transformOfferingToUiCourse(offering, enrollments, exams);
     } catch (err) {
       console.error(`Error fetching course ${id}:`, err);
-      return null;
+      throw err;
     }
+  },
+
+  /**
+   * Get course offering full details including real enrollments and associated examinations
+   */
+  async getCourseOfferingWithDetails(id: string): Promise<{
+    offering: CourseOffering;
+    course: Course;
+    enrollments: Enrollment[];
+    exams: LecturerExam[];
+  }> {
+    const [offering, allEnrollments, allExams] = await Promise.all([
+      getCourseOffering(id),
+      listEnrollments().catch(() => [] as Enrollment[]),
+      listExaminations().catch(() => [] as Examination[]),
+    ]);
+
+    const courseEnrollments = allEnrollments.filter((e) => e.course_offering === id);
+    const courseExams = allExams.filter((e) => e.course_offering === id).map(transformExamToUi);
+    const course = transformOfferingToUiCourse(offering, allEnrollments, allExams);
+
+    return {
+      offering,
+      course,
+      enrollments: courseEnrollments,
+      exams: courseExams,
+    };
   },
 
   /**

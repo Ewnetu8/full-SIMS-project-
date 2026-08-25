@@ -55,6 +55,11 @@ export interface Course {
   studentCount: number;
   examCount: number;
   description: string;
+  section?: string;
+  capacity?: number;
+  creditHours?: number;
+  intendedClassStanding?: string;
+  programName?: string;
 }
 
 export type AIGradingStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED';
