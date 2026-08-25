@@ -17,6 +17,7 @@ import {
   createExamination,
   patchExamination,
   publishExamination,
+  scheduleExamination,
   deleteExamination,
 } from './examinations-api';
 import {
@@ -206,15 +207,15 @@ export const lecturerService = {
     enrollments: Enrollment[];
     exams: LecturerExam[];
   }> {
-    const [offering, allEnrollments, allExams] = await Promise.all([
+    const [offering, allEnrollments, courseExamsList] = await Promise.all([
       getCourseOffering(id),
       listEnrollments().catch(() => [] as Enrollment[]),
-      listExaminations().catch(() => [] as Examination[]),
+      listExaminations({ course_offering: id }).catch(() => [] as Examination[]),
     ]);
 
     const courseEnrollments = allEnrollments.filter((e) => e.course_offering === id);
-    const courseExams = allExams.filter((e) => e.course_offering === id).map(transformExamToUi);
-    const course = transformOfferingToUiCourse(offering, allEnrollments, allExams);
+    const courseExams = courseExamsList.map(transformExamToUi);
+    const course = transformOfferingToUiCourse(offering, allEnrollments, courseExamsList);
 
     return {
       offering,
@@ -225,14 +226,15 @@ export const lecturerService = {
   },
 
   /**
-   * Get lecturer's exams from backend
+   * Get lecturer's exams from backend with optional filters (status, course_offering)
    */
-  async getExams(): Promise<LecturerExam[]> {
+  async getExams(params?: import('@/types/lecturer').ListExaminationsParams): Promise<LecturerExam[]> {
     try {
-      const exams = await listExaminations();
+      const exams = await listExaminations(params);
       return exams.map(transformExamToUi);
-    } catch {
-      return [];
+    } catch (err) {
+      console.error('Error fetching examinations:', err);
+      throw err;
     }
   },
 
@@ -257,36 +259,24 @@ export const lecturerService = {
   },
 
   /**
-   * Toggle or transition exam status strictly enforcing Django lifecycle:
-   * DRAFT -> SCHEDULED -> ACTIVE -> CLOSED -> PUBLISHED (via publish endpoint)
+   * Publish examination results.
+   * Only allowed when status is CLOSED and all attempts are fully graded.
    */
-  async togglePublishExam(id: string): Promise<LecturerExam | null> {
-    try {
-      const current = await getExamination(id);
-      if (!current) return null;
-
-      if (current.status === 'CLOSED') {
-        const published = await publishExamination(id);
-        return transformExamToUi(published);
-      }
-
-      let nextStatus: Examination['status'] = 'SCHEDULED';
-      if (current.status === 'DRAFT') nextStatus = 'SCHEDULED';
-      else if (current.status === 'SCHEDULED') nextStatus = 'ACTIVE';
-      else if (current.status === 'ACTIVE') nextStatus = 'CLOSED';
-      else if (current.status === 'PUBLISHED') nextStatus = 'DRAFT';
-
-      const updated = await patchExamination(id, { status: nextStatus });
-      return transformExamToUi(updated);
-    } catch (err: any) {
-      console.error('Failed to update/publish exam status:', err);
-      throw err;
-    }
+  async publishExamResults(id: string): Promise<LecturerExam> {
+    const published = await publishExamination(id);
+    return transformExamToUi(published);
   },
 
+  /**
+   * Legacy alias for publishExamResults
+   */
+  async togglePublishExam(id: string): Promise<LecturerExam> {
+    return this.publishExamResults(id);
+  },
 
   /**
-   * Save (create or update) an examination and its questions to backend
+   * Save (create or update) an examination and its questions to backend.
+   * New examinations are always created in DRAFT.
    */
   async saveExam(data: Partial<LecturerExam>): Promise<LecturerExam> {
     const courseOfferingId = data.courseId;
@@ -359,24 +349,55 @@ export const lecturerService = {
   },
 
   /**
-   * Duplicate an exam
+   * Duplicate an exam through supported frontend API orchestration:
+   * 1. Fetches the existing exam.
+   * 2. Creates a new DRAFT examination with copied fields and fresh timestamps.
+   * 3. Clones the questions and options for the new exam.
    */
   async duplicateExam(examId: string): Promise<LecturerExam | null> {
     try {
       const original = await getExamination(examId);
       if (!original) return null;
 
+      const now = new Date();
+      const defaultStart = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const defaultEnd = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
+
       const duplicated = await createExamination({
         course_offering: original.course_offering,
         title: `${original.title} (Copy)`,
-        start_window: original.start_window,
-        end_window: original.end_window,
-        duration_minutes: original.duration_minutes,
+        start_window: original.start_window || defaultStart,
+        end_window: original.end_window || defaultEnd,
+        duration_minutes: original.duration_minutes || 60,
       });
 
-      return transformExamToUi(duplicated);
-    } catch {
-      return null;
+      // Clone questions if present
+      if (original.questions && original.questions.length > 0) {
+        for (const q of original.questions) {
+          const createdQ = await createQuestion({
+            examination: duplicated.id,
+            question_text: q.question_text,
+            question_type: q.question_type,
+            total_points: q.total_points,
+          });
+
+          if (q.options && q.options.length > 0) {
+            for (const opt of q.options) {
+              await createQuestionOption({
+                question: createdQ.id,
+                option_text: opt.option_text,
+                is_correct: opt.is_correct,
+              });
+            }
+          }
+        }
+      }
+
+      const finalExam = await getExamination(duplicated.id);
+      return transformExamToUi(finalExam);
+    } catch (err) {
+      console.error('Failed to duplicate exam:', err);
+      throw err;
     }
   },
 
@@ -432,7 +453,7 @@ export const lecturerService = {
   },
 
   /**
-   * Schedule exam window
+   * Schedule exam window via POST /api/v1/exams/{id}/schedule
    */
   async scheduleExam(
     examId: string,
@@ -444,16 +465,22 @@ export const lecturerService = {
       endDate?: string;
       durationMinutes?: number;
     }
-  ): Promise<void> {
-    const startWindow = data.start_window || data.startDate || new Date().toISOString();
-    const endWindow = data.end_window || data.endDate || new Date(Date.now() + 86400000).toISOString();
+  ): Promise<LecturerExam> {
+    const startWindow = data.start_window || data.startDate;
+    const endWindow = data.end_window || data.endDate;
     const durationMinutes = data.duration_minutes ?? data.durationMinutes ?? 60;
 
-    await patchExamination(examId, {
-      start_window: startWindow,
-      end_window: endWindow,
-      duration_minutes: durationMinutes,
+    if (!startWindow || !endWindow) {
+      throw new Error('Start and End dates are required for scheduling.');
+    }
+
+    const scheduled = await scheduleExamination(examId, {
+      start_window: new Date(startWindow).toISOString(),
+      end_window: new Date(endWindow).toISOString(),
+      duration_minutes: Number(durationMinutes),
     });
+
+    return transformExamToUi(scheduled);
   },
 
   /**

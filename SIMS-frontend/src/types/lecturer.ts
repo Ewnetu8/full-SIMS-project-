@@ -56,7 +56,7 @@ export interface CreateQuestionRequest {
 /**
  * Request body for updating a question (partial).
  */
-export interface UpdateQuestionRequest extends Partial<CreateQuestionRequest> {}
+export type UpdateQuestionRequest = Partial<CreateQuestionRequest>;
 
 /**
  * Request body for creating a question option.
