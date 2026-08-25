@@ -879,8 +879,15 @@ export const academicService = {
   },
 
   async batchImportEnrollments(file: File): Promise<BatchImportResponse> {
+    const text = await file.text();
+    const cleanText = text.replace(/^\uFEFF/, '');
+
+    const cleanFile = new File([cleanText], file.name, {
+      type: file.type || 'text/csv',
+    });
+
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', cleanFile);
     return api.post<BatchImportResponse>(API_ENDPOINTS.ENROLLMENTS.BATCH_IMPORT, formData);
   },
 

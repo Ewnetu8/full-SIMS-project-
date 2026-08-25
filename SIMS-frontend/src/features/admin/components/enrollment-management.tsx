@@ -18,7 +18,7 @@ import {
   RefreshCw,
   FileText,
   Building2,
-  Search,
+  Loader2,
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -106,11 +106,30 @@ export function EnrollmentManagement() {
   const [generalError, setGeneralError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // CSV Import State
+  // CSV Batch Import & Async Polling State
+  type ImportStatus = 'idle' | 'uploading' | 'processing' | 'completed' | 'timeout';
+  const [importStatus, setImportStatus] = React.useState<ImportStatus>('idle');
   const [importFile, setImportFile] = React.useState<File | null>(null);
-  const [isImporting, setIsImporting] = React.useState(false);
+  const [importTaskId, setImportTaskId] = React.useState<string | null>(null);
+  const [importStatusMessage, setImportStatusMessage] = React.useState<string | null>(null);
   const [importValidationError, setImportValidationError] = React.useState<string | null>(null);
-  const [importResult, setImportResult] = React.useState<{ taskId?: string; message: string } | null>(null);
+  const [importedCount, setImportedCount] = React.useState<number>(0);
+  const [pollingSeconds, setPollingSeconds] = React.useState<number>(0);
+
+  // Polling Refs
+  const pollingTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const pollingStartTimeRef = React.useRef<number>(0);
+  const baselineEnrollmentIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Cleanup polling timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+        pollingTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -354,40 +373,126 @@ export function EnrollmentManagement() {
     }
   };
 
+  const stopPolling = React.useCallback(() => {
+    if (pollingTimerRef.current) {
+      clearInterval(pollingTimerRef.current);
+      pollingTimerRef.current = null;
+    }
+  }, []);
+
+  const startPolling = React.useCallback(
+    (initialIds: Set<string>, _taskId: string) => {
+      stopPolling();
+      pollingStartTimeRef.current = Date.now();
+      baselineEnrollmentIdsRef.current = initialIds;
+      setPollingSeconds(0);
+
+      const MAX_POLL_DURATION_MS = 60_000; // 60s bounded polling
+      const POLL_INTERVAL_MS = 2500; // 2.5s interval
+
+      pollingTimerRef.current = setInterval(async () => {
+        const elapsed = Date.now() - pollingStartTimeRef.current;
+        setPollingSeconds(Math.floor(elapsed / 1000));
+
+        try {
+          await fetchEnrollments();
+          const currentEnrollments = useAdminStore.getState().enrollments;
+          const baseline = baselineEnrollmentIdsRef.current;
+          const newEnrollments = currentEnrollments.filter((e) => !baseline.has(e.id));
+
+          if (newEnrollments.length > 0) {
+            stopPolling();
+            setImportStatus('completed');
+            setImportedCount(newEnrollments.length);
+            setImportStatusMessage(
+              `Enrollment import completed successfully. ${newEnrollments.length} new record${
+                newEnrollments.length > 1 ? 's' : ''
+              } imported.`
+            );
+            toast.success('Enrollment import completed successfully.');
+            void fetchCourseOfferings();
+            void fetchStudents();
+            return;
+          }
+
+          if (elapsed >= MAX_POLL_DURATION_MS) {
+            stopPolling();
+            setImportStatus('timeout');
+            setImportStatusMessage(
+              'The file was accepted by the server, but processing has not completed yet. You can refresh the enrollment list later.'
+            );
+          }
+        } catch {
+          if (elapsed >= MAX_POLL_DURATION_MS) {
+            stopPolling();
+            setImportStatus('timeout');
+            setImportStatusMessage(
+              'The file was accepted by the server, but processing has not completed yet. You can refresh the enrollment list later.'
+            );
+          }
+        }
+      }, POLL_INTERVAL_MS);
+    },
+    [fetchEnrollments, fetchCourseOfferings, fetchStudents, stopPolling]
+  );
+
   const handleBatchImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setImportValidationError(null);
-    setImportResult(null);
 
     if (!importFile) {
       setImportValidationError('Please select a CSV file to upload.');
       return;
     }
 
-    if (!importFile.name.endsWith('.csv')) {
+    if (!importFile.name.toLowerCase().endsWith('.csv')) {
       setImportValidationError('Only CSV files are supported (.csv).');
       return;
     }
 
-    setIsImporting(true);
+    const initialIds = new Set(enrollments.map((e) => e.id));
+    setImportStatus('uploading');
+    setImportedCount(0);
+
     try {
       const res = await batchImportEnrollments(importFile);
-      setImportResult({
-        taskId: res.task_id,
-        message:
-          res.detail ||
+      const taskId = res.task_id || '';
+      setImportTaskId(taskId);
+      setImportStatus('processing');
+      setImportStatusMessage(
+        res.detail ||
           res.message ||
-          'Batch enrollment import task dispatched successfully. Processing in background.',
-      });
-      toast.success('Batch enrollment file uploaded successfully.');
+          'Batch enrollment import task dispatched successfully. Processing in background.'
+      );
+      toast.info('Import started. Your enrollment file is being processed.');
       setImportFile(null);
+      startPolling(initialIds, taskId);
     } catch (err: unknown) {
+      setImportStatus('idle');
       const msg = getUserFriendlyErrorMessage(err);
       setImportValidationError(msg);
       toast.error(msg);
-    } finally {
-      setIsImporting(false);
     }
+  };
+
+  const handleOpenBatchImportDialog = () => {
+    setImportValidationError(null);
+    if (importStatus !== 'processing') {
+      setImportFile(null);
+    }
+    setIsBatchImportOpen(true);
+  };
+
+  const handleCloseBatchImportDialog = () => {
+    if (importStatus === 'completed' || importStatus === 'timeout' || importStatus === 'idle') {
+      setImportStatus('idle');
+      setImportTaskId(null);
+      setImportStatusMessage(null);
+      setImportFile(null);
+      setImportValidationError(null);
+      setImportedCount(0);
+    }
+    setIsBatchImportOpen(false);
   };
 
   const selectClass =
@@ -430,12 +535,7 @@ export function EnrollmentManagement() {
             variant="outline"
             size="sm"
             leftIcon={<Upload className="h-4 w-4" />}
-            onClick={() => {
-              setImportFile(null);
-              setImportValidationError(null);
-              setImportResult(null);
-              setIsBatchImportOpen(true);
-            }}
+            onClick={handleOpenBatchImportDialog}
           >
             Batch CSV Import
           </Button>
@@ -444,6 +544,125 @@ export function EnrollmentManagement() {
           </Button>
         </div>
       </div>
+
+      {/* Background Async Import Banners */}
+      {importStatus === 'processing' && (
+        <Card className="border-blue-500/30 bg-blue-500/10 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-foreground text-sm flex items-center gap-2">
+                  Processing Enrollment Import...
+                  <Badge variant="outline" className="border-blue-500/30 text-blue-700 dark:text-blue-300 bg-blue-500/10 text-[11px]">
+                    Polling Active ({pollingSeconds}s)
+                  </Badge>
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Your enrollment file is being processed. The dashboard will automatically update once imported records are ready.
+                </p>
+                {importTaskId && (
+                  <p className="font-mono text-[11px] text-muted-foreground/80 mt-1">
+                    Task ID: {importTaskId}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsBatchImportOpen(true)}
+              >
+                View Status
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  void fetchEnrollments();
+                }}
+                disabled={isLoadingEnrollments}
+                className="flex items-center gap-1.5"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoadingEnrollments ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {importStatus === 'completed' && !isBatchImportOpen && (
+        <Card className="border-emerald-500/30 bg-emerald-500/10 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div>
+                <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+                  Enrollment Import Completed Successfully
+                </p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
+                  {importStatusMessage || `${importedCount} new enrollment records imported.`}
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setImportStatus('idle')}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Dismiss
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {importStatus === 'timeout' && !isBatchImportOpen && (
+        <Card className="border-amber-500/30 bg-amber-500/10 p-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-800 dark:text-amber-300">
+                  Import is still processing
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                  The file was accepted by the server, but processing has not completed yet. You can refresh the enrollment list later.
+                </p>
+                {importTaskId && (
+                  <p className="font-mono text-[11px] text-muted-foreground mt-1">
+                    Task ID: {importTaskId}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void fetchEnrollments();
+                }}
+                disabled={isLoadingEnrollments}
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoadingEnrollments ? 'animate-spin' : ''}`} />
+                Refresh Now
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setImportStatus('idle')}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* KPI Stats Grid (5 Cards) */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -1248,7 +1467,7 @@ export function EnrollmentManagement() {
       />
 
       {/* ── BATCH CSV IMPORT DIALOG (FR-004) ────────────────────────────────── */}
-      <Dialog open={isBatchImportOpen} onOpenChange={setIsBatchImportOpen}>
+      <Dialog open={isBatchImportOpen} onOpenChange={handleCloseBatchImportDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1268,83 +1487,187 @@ export function EnrollmentManagement() {
                 </div>
               )}
 
-              {importResult && (
-                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>Import Task Dispatched</span>
+              {/* Status: Processing */}
+              {importStatus === 'processing' && (
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 text-xs text-blue-700 dark:text-blue-300 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-semibold text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                      <span>Processing enrollment import...</span>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-600 dark:text-blue-400">
+                      {pollingSeconds}s elapsed
+                    </Badge>
                   </div>
-                  <p>{importResult.message}</p>
-                  {importResult.taskId && (
-                    <p className="font-mono text-[11px] opacity-80">Task ID: {importResult.taskId}</p>
+                  <p className="text-foreground/80">
+                    Your enrollment file is being processed. The system is actively checking for completed enrollments and will automatically update the dashboard.
+                  </p>
+                  {importTaskId && (
+                    <div className="flex items-center justify-between pt-1 border-t border-blue-500/20">
+                      <p className="font-mono text-[11px] opacity-80">Task ID: {importTaskId}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void fetchEnrollments()}
+                        disabled={isLoadingEnrollments}
+                        className="h-6 px-2 text-[11px] text-blue-700 dark:text-blue-300 hover:bg-blue-500/20"
+                      >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${isLoadingEnrollments ? 'animate-spin' : ''}`} />
+                        Refresh Now
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
 
-              <div className="rounded-lg border-2 border-dashed border-border p-6 text-center hover:bg-muted/20 transition-colors">
-                <FileSpreadsheet className="h-10 w-10 text-muted-foreground/60 mx-auto mb-3" />
-                <p className="text-sm font-medium text-foreground">
-                  {importFile ? importFile.name : 'Select CSV File to Upload'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {importFile
-                    ? `${(importFile.size / 1024).toFixed(1)} KB`
-                    : 'CSV format required with student and course offering identifiers'}
-                </p>
-
-                <input
-                  type="file"
-                  id="csvFileInput"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setImportFile(file);
-                      setImportValidationError(null);
-                    }
-                  }}
-                />
-
-                <div className="mt-4 flex items-center justify-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => document.getElementById('csvFileInput')?.click()}
-                  >
-                    Browse CSV
-                  </Button>
-                  {importFile && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setImportFile(null)}
-                      className="text-xs text-destructive hover:bg-destructive/10"
-                    >
-                      Remove
-                    </Button>
+              {/* Status: Completed */}
+              {importStatus === 'completed' && (
+                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 text-xs text-emerald-700 dark:text-emerald-300 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>Enrollment import completed successfully.</span>
+                  </div>
+                  <p className="text-foreground/80">
+                    {importStatusMessage || `${importedCount} new enrollment records were added and reflected in your dashboard.`}
+                  </p>
+                  {importTaskId && (
+                    <p className="font-mono text-[11px] opacity-80 pt-1 border-t border-emerald-500/20">
+                      Task ID: {importTaskId}
+                    </p>
                   )}
                 </div>
-              </div>
+              )}
 
-              <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground space-y-1 border border-border">
-                <p className="font-semibold text-foreground flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-primary" /> Expected CSV Format
-                </p>
-                <p>Header: <code>student_identifier,course_code,academic_year,semester,section</code></p>
-                <p>Example: <code>AASTU/1234/14,CS301,2025/2026,FIRST,A</code></p>
-              </div>
+              {/* Status: Timeout */}
+              {importStatus === 'timeout' && (
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 text-xs text-amber-700 dark:text-amber-300 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm">
+                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <span>Import is still processing</span>
+                  </div>
+                  <p className="text-foreground/80">
+                    The file was accepted by the server, but processing has not completed yet. You can refresh the enrollment list later.
+                  </p>
+                  {importTaskId && (
+                    <div className="flex items-center justify-between pt-1 border-t border-amber-500/20">
+                      <p className="font-mono text-[11px] opacity-80">Task ID: {importTaskId}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void fetchEnrollments()}
+                        disabled={isLoadingEnrollments}
+                        className="h-6 px-2 text-[11px] text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                      >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${isLoadingEnrollments ? 'animate-spin' : ''}`} />
+                        Refresh Now
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* File upload dropzone */}
+              {importStatus !== 'processing' && importStatus !== 'completed' && (
+                <div className="rounded-lg border-2 border-dashed border-border p-6 text-center hover:bg-muted/20 transition-colors">
+                  <FileSpreadsheet className="h-10 w-10 text-muted-foreground/60 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-foreground">
+                    {importFile ? importFile.name : 'Select CSV File to Upload'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {importFile
+                      ? `${(importFile.size / 1024).toFixed(1)} KB`
+                      : 'CSV format required with student and course offering identifiers'}
+                  </p>
+
+                  <input
+                    type="file"
+                    id="csvFileInput"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    disabled={importStatus === 'uploading'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setImportFile(file);
+                        setImportValidationError(null);
+                      }
+                    }}
+                  />
+
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={importStatus === 'uploading'}
+                      onClick={() => document.getElementById('csvFileInput')?.click()}
+                    >
+                      Browse CSV
+                    </Button>
+                    {importFile && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={importStatus === 'uploading'}
+                        onClick={() => setImportFile(null)}
+                        className="text-xs text-destructive hover:bg-destructive/10"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {importStatus !== 'processing' && (
+                <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground space-y-1 border border-border">
+                  <p className="font-semibold text-foreground flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-primary" /> Expected CSV Format
+                  </p>
+                  <p>Header: <code>student_identifier,course_code,academic_year,semester,section</code></p>
+                  <p>Example: <code>AASTU/1234/14,CS301,2025/2026,FIRST,A</code></p>
+                </div>
+              )}
             </DialogBody>
 
             <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => setIsBatchImportOpen(false)}>
-                Close
+              <Button variant="outline" type="button" onClick={handleCloseBatchImportDialog}>
+                {importStatus === 'processing' ? 'Close (Runs in Background)' : 'Close'}
               </Button>
-              <Button type="submit" disabled={isImporting || !importFile}>
-                {isImporting ? 'Uploading...' : 'Start Batch Import'}
-              </Button>
+              {importStatus === 'completed' ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setImportStatus('idle');
+                    setImportTaskId(null);
+                    setImportStatusMessage(null);
+                    setImportFile(null);
+                    setImportedCount(0);
+                  }}
+                >
+                  Upload Another CSV
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={importStatus === 'uploading' || importStatus === 'processing' || !importFile}
+                >
+                  {importStatus === 'uploading' ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...
+                    </>
+                  ) : importStatus === 'processing' ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    'Start Batch Import'
+                  )}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
