@@ -1,7 +1,6 @@
-// ─── Academic Hierarchy API Service (Read-Only for Lecturers) ────────────────
-
-import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants';
+import { api } from '@/services/api-client';
+
 import type {
   University,
   College,
@@ -12,6 +11,7 @@ import type {
   Course,
   CoursePrerequisite,
   CourseOffering,
+  CourseOfferingBrief,
   Enrollment,
 } from '@/types/lecturer';
 
@@ -19,6 +19,26 @@ import type {
  * All endpoints in this service are READ-ONLY for lecturers.
  * Write operations (POST/PUT/PATCH/DELETE) require ADMIN role.
  */
+
+// ─── Assigned Courses for Authenticated Lecturer (Source of Truth) ───────────
+
+/**
+ * List the course offerings the authenticated lecturer is actively assigned to teach.
+ * Endpoint: GET /api/v1/my-courses
+ *
+ * @returns Promise resolving to an array of CourseOfferingBrief objects
+ */
+export async function listMyCourses(): Promise<CourseOfferingBrief[]> {
+  const res = await api.get<CourseOfferingBrief[] | { results?: CourseOfferingBrief[] }>(
+    API_ENDPOINTS.COURSES.MY_COURSES
+  );
+  return Array.isArray(res) ? res : (res?.results ?? []);
+}
+
+/**
+ * Alias for listMyCourses
+ */
+export const getMyCourses = listMyCourses;
 
 // ─── Universities ─────────────────────────────────────────────────────────────
 
@@ -192,20 +212,15 @@ export async function getCoursePrerequisite(id: string): Promise<CoursePrerequis
 
 /**
  * List all course offerings.
- * This is the most important endpoint for lecturers, as they need to
- * select a course offering when creating an examination.
+ * General academic listing (for general reference and details).
+ * For authenticated lecturer assignment ownership, use listMyCourses() as the source of truth.
  *
  * @returns Promise resolving to an array of course offerings
- *
- * @example
- * const offerings = await listCourseOfferings();
- * // Filter by semester or course code on frontend if needed
- * const cs101Offerings = offerings.filter(
- *   (o) => o.course_detail.course_code === 'CS101'
- * );
  */
 export async function listCourseOfferings(): Promise<CourseOffering[]> {
-  const res = await api.get<any>(API_ENDPOINTS.COURSE_OFFERINGS.ROOT);
+  const res = await api.get<CourseOffering[] | { results?: CourseOffering[] }>(
+    API_ENDPOINTS.COURSE_OFFERINGS.ROOT
+  );
   return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
@@ -245,7 +260,9 @@ export const getCourseOfferingById = getCourseOffering;
  * );
  */
 export async function listEnrollments(): Promise<Enrollment[]> {
-  const res = await api.get<any>(API_ENDPOINTS.ENROLLMENTS.ROOT);
+  const res = await api.get<Enrollment[] | { results?: Enrollment[] }>(
+    API_ENDPOINTS.ENROLLMENTS.ROOT
+  );
   return Array.isArray(res) ? res : (res?.results ?? []);
 }
 

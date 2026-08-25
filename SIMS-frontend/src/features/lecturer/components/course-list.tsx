@@ -7,10 +7,6 @@ import {
   Search,
   Users,
   ArrowRight,
-  Layers,
-  Sparkles,
-  AlertCircle,
-  Hash,
 } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
@@ -29,32 +25,62 @@ export function LecturerCourseList() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const fetchCourses = React.useCallback(async () => {
+  const fetchCourses = React.useCallback(() => {
     setLoading(true);
     setError(null);
-    try {
-      const data = await lecturerService.getCourses();
-      setCourses(data);
-    } catch (err: any) {
-      console.error('Failed to load courses:', err);
-      const status = err?.response?.status;
-      if (status === 401) {
-        setError('Unauthorized. Please sign in to view your courses.');
-      } else if (status === 403) {
-        setError('You do not have permission to view course offerings.');
-      } else if (status === 404) {
-        setError('Course offerings not found.');
-      } else {
-        setError(err?.message || 'Failed to load course offerings. Please check your network connection.');
-      }
-    } finally {
-      setLoading(false);
-    }
+    lecturerService.getCourses()
+      .then((data) => {
+        setCourses(data);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to load courses:', err);
+        const apiErr = err as { response?: { status?: number }; message?: string };
+        const status = apiErr?.response?.status;
+        if (status === 401) {
+          setError('Unauthorized. Please sign in to view your assigned courses.');
+        } else if (status === 403) {
+          setError('You do not have permission to view your assigned courses.');
+        } else if (status === 404) {
+          setError('Assigned courses not found.');
+        } else {
+          setError(apiErr?.message || 'Failed to load assigned courses. Please check your network connection.');
+        }
+        setLoading(false);
+      });
   }, []);
 
   React.useEffect(() => {
-    fetchCourses();
-  }, [fetchCourses]);
+    let isMounted = true;
+    lecturerService.getCourses()
+      .then((data) => {
+        if (isMounted) {
+          setCourses(data);
+          setLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (isMounted) {
+          console.error('Failed to load courses:', err);
+          const apiErr = err as { response?: { status?: number }; message?: string };
+          const status = apiErr?.response?.status;
+          if (status === 401) {
+            setError('Unauthorized. Please sign in to view your assigned courses.');
+          } else if (status === 403) {
+            setError('You do not have permission to view your assigned courses.');
+          } else if (status === 404) {
+            setError('Assigned courses not found.');
+          } else {
+            setError(apiErr?.message || 'Failed to load assigned courses. Please check your network connection.');
+          }
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredCourses = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -147,7 +173,7 @@ export function LecturerCourseList() {
             <EmptyState
               icon={<BookOpen className="h-8 w-8 text-muted-foreground/60" />}
               title="No assigned courses"
-              description="Courses assigned to you will appear here."
+              description="No courses are currently assigned to you."
             />
           </CardContent>
         </Card>

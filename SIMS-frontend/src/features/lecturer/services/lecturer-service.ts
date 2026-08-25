@@ -5,7 +5,10 @@
  * Django REST Framework backend APIs via academic-api, examinations-api, and questions-api.
  */
 
+import { getExamAnalytics, getExamResults } from '@/features/analytics/services/analytics-api';
+
 import {
+  listMyCourses,
   listCourseOfferings,
   getCourseOffering,
   listEnrollments,
@@ -23,12 +26,24 @@ import {
 import {
   createQuestion,
   createQuestionOption,
-  deleteQuestion,
 } from './questions-api';
-import { getExamAnalytics, getExamResults } from '@/features/analytics/services/analytics-api';
 
-import type { Examination, Question as BackendQuestion, CourseOffering, Enrollment } from '@/types/lecturer';
-import type { Course, LecturerExam, LecturerNotification, LecturerStats, LecturerAnalytics, Question as UiQuestion, StudentSubmission } from '../types';
+import type {
+  Course,
+  LecturerExam,
+  LecturerNotification,
+  LecturerStats,
+  Question as UiQuestion,
+  StudentSubmission,
+} from '../types';
+import type {
+  Examination,
+  Question as BackendQuestion,
+  CourseOffering,
+  CourseOfferingBrief,
+  Enrollment,
+  ListExaminationsParams,
+} from '@/types/lecturer';
 
 /**
  * Maps a Django backend Question object to the UI Question interface
@@ -84,6 +99,32 @@ function transformExamToUi(exam: Examination): LecturerExam {
 }
 
 /**
+ * Maps a Django CourseOfferingBrief (from GET /api/v1/my-courses) + enrollments + exams into the UI Course interface
+ */
+function transformBriefToUiCourse(
+  brief: CourseOfferingBrief,
+  allEnrollments: Enrollment[],
+  allExams: Examination[]
+): Course {
+  const offeringEnrollments = allEnrollments.filter(
+    (e) => e.course_offering === brief.id && e.status === 'ENROLLED'
+  );
+  const offeringExams = allExams.filter((e) => e.course_offering === brief.id);
+
+  return {
+    id: brief.id,
+    code: brief.course_code || 'COURSE',
+    name: brief.course_title || 'Unnamed Course',
+    semester: brief.semester_index || 'FIRST',
+    academicYear: brief.semester || '2024-2025',
+    studentCount: offeringEnrollments.length,
+    examCount: offeringExams.length,
+    description: brief.course_title || '',
+    section: brief.section,
+  };
+}
+
+/**
  * Maps a Django CourseOffering + enrollments + exams into the UI Course interface
  */
 function transformOfferingToUiCourse(
@@ -115,26 +156,32 @@ function transformOfferingToUiCourse(
 
 export const lecturerService = {
   /**
-   * Get lecturer dashboard statistics calculated from real backend data
+   * Get lecturer dashboard statistics calculated from real backend data.
+   * Total courses count is derived from the lecturer's assigned courses (/api/v1/my-courses).
    */
   async getStats(): Promise<LecturerStats> {
     try {
-      const [offeringsRes, enrollmentsRes, examsRes] = await Promise.allSettled([
-        listCourseOfferings(),
+      const [myCoursesRes, enrollmentsRes, examsRes] = await Promise.allSettled([
+        listMyCourses(),
         listEnrollments(),
         listExaminations(),
       ]);
 
-      const offerings = offeringsRes.status === 'fulfilled' ? offeringsRes.value : [];
+      const myCourses = myCoursesRes.status === 'fulfilled' ? myCoursesRes.value : [];
       const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
       const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
 
-      const activeExams = exams.filter((e) => e.status === 'ACTIVE' || e.status === 'PUBLISHED').length;
-      const enrolledStudentsCount = enrollments.filter((e) => e.status === 'ENROLLED').length;
+      const assignedCourseIds = new Set(myCourses.map((c) => c.id));
+      const activeExams = exams.filter(
+        (e) => (e.status === 'ACTIVE' || e.status === 'PUBLISHED') && (assignedCourseIds.size === 0 || assignedCourseIds.has(e.course_offering))
+      ).length;
+      const enrolledStudentsCount = enrollments.filter(
+        (e) => e.status === 'ENROLLED' && (assignedCourseIds.size === 0 || assignedCourseIds.has(e.course_offering))
+      ).length;
 
       return {
         totalStudents: enrolledStudentsCount,
-        totalCourses: offerings.length,
+        totalCourses: myCourses.length,
         activeExams,
         pendingGrading: 0,
       };
@@ -164,19 +211,20 @@ export const lecturerService = {
   },
 
   /**
-   * Get lecturer's course offerings mapped to UI Course domain
+   * Get lecturer's active assigned course offerings mapped to UI Course domain.
+   * Source of truth: GET /api/v1/my-courses
    */
   async getCourses(): Promise<Course[]> {
-    const [offerings, enrollments, exams] = await Promise.all([
-      listCourseOfferings().catch((err) => {
-        console.error('Error fetching course offerings:', err);
+    const [myCourses, enrollments, exams] = await Promise.all([
+      listMyCourses().catch((err) => {
+        console.error('Error fetching lecturer assigned courses:', err);
         throw err;
       }),
       listEnrollments().catch(() => [] as Enrollment[]),
       listExaminations().catch(() => [] as Examination[]),
     ]);
 
-    return offerings.map((o) => transformOfferingToUiCourse(o, enrollments, exams));
+    return myCourses.map((brief) => transformBriefToUiCourse(brief, enrollments, exams));
   },
 
   /**
@@ -228,7 +276,7 @@ export const lecturerService = {
   /**
    * Get lecturer's exams from backend with optional filters (status, course_offering)
    */
-  async getExams(params?: import('@/types/lecturer').ListExaminationsParams): Promise<LecturerExam[]> {
+  async getExams(params?: ListExaminationsParams): Promise<LecturerExam[]> {
     try {
       const exams = await listExaminations(params);
       return exams.map(transformExamToUi);
@@ -448,7 +496,7 @@ export const lecturerService = {
   /**
    * Get recent activity
    */
-  async getRecentActivity(): Promise<any[]> {
+  async getRecentActivity(): Promise<unknown[]> {
     return [];
   },
 

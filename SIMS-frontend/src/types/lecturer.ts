@@ -109,9 +109,9 @@ export interface CourseOfferingBrief {
   id: string;
   course_code: string;
   course_title: string;
-  semester: string; // e.g., "2024-2025"
-  semester_index: 'FIRST' | 'SECOND' | 'SUMMER';
-  section: string;
+  semester: string; // Academic year label e.g., "2024-2025"
+  semester_index: string; // e.g., "FIRST", "SECOND", "1", "2"
+  section?: string;
 }
 
 export interface Examination extends BaseModel {
