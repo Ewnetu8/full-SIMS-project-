@@ -1,11 +1,10 @@
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
+import { analyticsApiService } from '@/features/analytics/services/analytics-api';
 import { isValidUuid } from '@/lib/user-identifier';
 import { api } from '@/services/api-client';
 
 import { academicService } from './academic-service';
 import { examApiService } from './exam-api-service';
-import { analyticsApiService } from '@/features/analytics/services/analytics-api';
-import type { AdminAnalyticsResponse } from '@/types/api';
 
 import type {
   UserCompact,
@@ -21,11 +20,10 @@ import type {
   CreateSemesterPayload,
   UpdateSemesterPayload,
   AdminExamOverview,
-  AIGradingJob,
-  AuditLog,
-  SystemSettings,
+  CreateExaminationPayload,
+  UpdateExaminationPayload,
+  ScheduleExaminationPayload,
   AdminDashboardStats,
-  AdminNotification,
   AdminCourseOffering,
   CreateCourseOfferingPayload,
   UpdateCourseOfferingPayload,
@@ -44,7 +42,14 @@ import type {
   Tag,
   CreateTagPayload,
   UpdateTagPayload,
+  CoursePrerequisite,
+  CreateCoursePrerequisitePayload,
+  CreditHourPolicy,
+  CreditHourPolicyPayload,
+  EnrollmentOverride,
+  CreateEnrollmentOverridePayload,
 } from '../types';
+import type { AdminAnalyticsResponse } from '@/types/api';
 
 export interface RegisterUserPayload {
   email: string;
@@ -267,25 +272,88 @@ export const adminService = {
     return academicService.deleteCourse(id);
   },
 
-  // ─── Exams ─────────────────────────────────────────────────────────────────
-  async getAllExams(): Promise<AdminExamOverview[]> {
-    return examApiService.getExams();
+  // ─── Course Prerequisites ───────────────────────────────────────────────────
+  async getCoursePrerequisites(): Promise<CoursePrerequisite[]> {
+    return academicService.getCoursePrerequisites();
   },
 
-  async createExam(data: { title: string; duration_minutes: number; course_offering?: string }): Promise<AdminExamOverview> {
+  async getCoursePrerequisiteById(id: string): Promise<CoursePrerequisite> {
+    return academicService.getCoursePrerequisiteById(id);
+  },
+
+  async createCoursePrerequisite(data: CreateCoursePrerequisitePayload): Promise<CoursePrerequisite> {
+    return academicService.createCoursePrerequisite(data);
+  },
+
+  async deleteCoursePrerequisite(id: string): Promise<void> {
+    return academicService.deleteCoursePrerequisite(id);
+  },
+
+  // ─── Credit Hour Policies ───────────────────────────────────────────────────
+  async getCreditHourPolicies(): Promise<CreditHourPolicy[]> {
+    return academicService.getCreditHourPolicies();
+  },
+
+  async getCreditHourPolicyById(id: string): Promise<CreditHourPolicy> {
+    return academicService.getCreditHourPolicyById(id);
+  },
+
+  async createCreditHourPolicy(data: CreditHourPolicyPayload): Promise<CreditHourPolicy> {
+    return academicService.createCreditHourPolicy(data);
+  },
+
+  async updateCreditHourPolicy(id: string, data: CreditHourPolicyPayload): Promise<CreditHourPolicy> {
+    return academicService.updateCreditHourPolicy(id, data);
+  },
+
+  async deleteCreditHourPolicy(id: string): Promise<void> {
+    return academicService.deleteCreditHourPolicy(id);
+  },
+
+  // ─── Enrollment Overrides ───────────────────────────────────────────────────
+  async getEnrollmentOverrides(): Promise<EnrollmentOverride[]> {
+    return academicService.getEnrollmentOverrides();
+  },
+
+  async getEnrollmentOverrideById(id: string): Promise<EnrollmentOverride> {
+    return academicService.getEnrollmentOverrideById(id);
+  },
+
+  async createEnrollmentOverride(data: CreateEnrollmentOverridePayload): Promise<EnrollmentOverride> {
+    return academicService.createEnrollmentOverride(data);
+  },
+
+  async deleteEnrollmentOverride(id: string): Promise<void> {
+    return academicService.deleteEnrollmentOverride(id);
+  },
+
+  // ─── Exams ─────────────────────────────────────────────────────────────────
+  async getAllExams(params?: { status?: string; course_offering?: string }): Promise<AdminExamOverview[]> {
+    return examApiService.getExams(params);
+  },
+
+  async getExams(params?: { status?: string; course_offering?: string }): Promise<AdminExamOverview[]> {
+    return examApiService.getExams(params);
+  },
+
+  async getExamById(id: string): Promise<AdminExamOverview> {
+    return examApiService.getExamById(id);
+  },
+
+  async createExam(data: CreateExaminationPayload): Promise<AdminExamOverview> {
     return examApiService.createExam(data);
   },
 
-  async scheduleExam(id: string, data: { start_window: string; end_window: string; duration_minutes: number }): Promise<void> {
+  async updateExam(id: string, data: UpdateExaminationPayload): Promise<AdminExamOverview> {
+    return examApiService.updateExam(id, data);
+  },
+
+  async scheduleExam(id: string, data: ScheduleExaminationPayload): Promise<AdminExamOverview> {
     return examApiService.scheduleExam(id, data);
   },
 
-  async archiveExam(id: string): Promise<AdminExamOverview> {
-    const exams = await this.getAllExams();
-    const exam = exams.find((e) => e.id === id);
-    if (!exam) throw new Error('Exam not found');
-    exam.status = 'archived';
-    return exam;
+  async publishExam(id: string): Promise<AdminExamOverview> {
+    return examApiService.publishExam(id);
   },
 
   async deleteExam(id: string): Promise<void> {
@@ -389,64 +457,6 @@ export const adminService = {
     return academicService.deleteTag(id);
   },
 
-  // ─── AI Jobs, Settings, Reports, Notifications ────────────────────────────
-  async getAIGradingJobs(): Promise<AIGradingJob[]> {
-    return [];
-  },
-
-  async retryAIGradingJob(_jobId: string): Promise<AIGradingJob | null> {
-    return null;
-  },
-
-  async getAuditLogs(): Promise<AuditLog[]> {
-    return [];
-  },
-
-  async getSettings(): Promise<SystemSettings> {
-    return {
-      institutionName: 'Addis Ababa Science and Technology University',
-      institutionCode: 'AASTU',
-      supportEmail: 'support@aastu.edu.et',
-      timezone: 'Africa/Addis_Ababa',
-      academicYear: '2025/2026',
-      activeSemester: 'First Semester',
-      branding: {
-        primaryColor: '#102A7A',
-        darkThemeDefault: false,
-        portalTitle: 'AASTU SIMS',
-      },
-      examDefaults: {
-        defaultDurationMinutes: 60,
-        passPercentageThreshold: 50,
-        autoSaveIntervalSeconds: 30,
-        allowReviewBeforeSubmission: true,
-      },
-      aiConfig: {
-        provider: 'AASTU AI Engine',
-        apiKeyMasked: '••••••••••••••••',
-        autoGradingConfidenceThreshold: 85,
-        flagLowConfidenceForManualReview: true,
-        maxParallelGradingWorkers: 4,
-      },
-      notificationSettings: {
-        emailAlertsOnSystemErrors: true,
-        notifyLecturersOnExamPublish: true,
-        weeklyDigestEmail: false,
-      },
-    };
-  },
-
-  async updateSettings(newSettings: Partial<SystemSettings>): Promise<SystemSettings> {
-    const current = await this.getSettings();
-    return { ...current, ...newSettings };
-  },
-
-  async getNotifications(): Promise<AdminNotification[]> {
-    return [];
-  },
-
-  async markNotificationRead(_id: string): Promise<void> { },
-
   async getAdminAnalytics(): Promise<AdminAnalyticsResponse> {
     return analyticsApiService.getAdminAnalytics();
   },
@@ -465,9 +475,9 @@ export const adminService = {
       totalCourses: analytics ? analytics.total_courses : 0,
       totalDepartments: analytics ? analytics.total_departments : 0,
       totalExams: analytics ? analytics.total_exams : exams.length,
-      activeExams: exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length,
+      activeExams: exams.filter((e) => e.status === 'ACTIVE' || e.status === 'SCHEDULED').length,
       pendingAIGrading: 0,
-      publishedResults: exams.filter((e) => e.status === 'published').length,
+      publishedResults: exams.filter((e) => e.status === 'PUBLISHED').length,
       systemHealth: {
         status: 'healthy',
         cpuUsage: 0,

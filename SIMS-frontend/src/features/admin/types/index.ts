@@ -148,6 +148,8 @@ export interface CourseOfferingDetailSemester {
 export interface AdminCourseOffering {
   id: string;
   course: string;
+  course_code?: string;
+  course_title?: string;
   course_detail?: CourseOfferingDetailCourse | null;
   semester: string;
   semester_detail?: CourseOfferingDetailSemester | null;
@@ -245,8 +247,20 @@ export interface University {
   id: string;
   name: string;
   code: string;
+  created_at?: string;
+  updated_at?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface UniversityRequest {
+  name: string;
+  code: string;
+}
+
+export interface PatchedUniversityRequest {
+  name?: string;
+  code?: string;
 }
 
 export interface College {
@@ -388,83 +402,130 @@ export interface UpdateCoursePayload {
   intended_class_standing?: ClassStanding;
 }
 
-export type AdminExamStatus = 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';
+export interface CoursePrerequisite {
+  id: string;
+  course: string;
+  course_detail?: Course | CourseOfferingDetailCourse | null;
+  prerequisite_course: string;
+  prerequisite_course_detail?: Course | CourseOfferingDetailCourse | null;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateCoursePrerequisitePayload {
+  course: string;
+  prerequisite_course: string;
+}
+
+export interface CreditHourPolicy {
+  id: string;
+  class_standing: ClassStanding;
+  min_credit_hours?: number;
+  max_credit_hours?: number;
+  created_at: string;
+  updated_at: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreditHourPolicyPayload {
+  class_standing: ClassStanding;
+  min_credit_hours?: number;
+  max_credit_hours?: number;
+}
+
+export type OverrideType =
+  | 'PREREQUISITE'
+  | 'STANDING'
+  | 'CREDIT_LIMIT'
+  | 'DUPLICATE';
+
+export interface EnrollmentOverride {
+  id: string;
+  student: string;
+  student_detail?: ApiStudentListItem | null;
+  semester: string;
+  semester_detail?: Semester | null;
+  override_type?: OverrideType;
+  approved_by?: string | null;
+  approved_by_detail?: UserCompact | null;
+  reason?: string;
+  is_active?: boolean;
+  created_at: string;
+  updated_at: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateEnrollmentOverridePayload {
+  student: string;
+  semester: string;
+  override_type?: OverrideType;
+  approved_by?: string | null;
+  reason?: string;
+  is_active?: boolean;
+}
+
+export type ExaminationStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
+export type ExamStatus = ExaminationStatus;
+export type AdminExamStatus = ExaminationStatus | 'scheduled' | 'active' | 'completed' | 'grading' | 'published' | 'archived';
+
+export interface CourseOfferingBrief {
+  id: string;
+  course_code: string;
+  course_title: string;
+  semester: string;
+  semester_index: 'FIRST' | 'SECOND' | 'SUMMER' | string;
+  section: string;
+}
 
 export interface AdminExamOverview {
   id: string;
+  course_offering?: string;
+  course_offering_detail?: CourseOfferingBrief | null;
+  lecturer?: string;
+  lecturerName?: string;
   title: string;
-  courseCode: string;
-  courseName: string;
-  department: string;
-  lecturerName: string;
-  status: AdminExamStatus;
-  startDate: string;
-  endDate: string;
-  durationMinutes: number;
-  totalStudents: number;
-  participatedStudents: number;
+  status: ExaminationStatus;
+  start_window?: string | null;
+  end_window?: string | null;
+  duration_minutes: number;
+  questions?: unknown[];
+  created_at?: string;
+  updated_at?: string;
+  courseCode?: string;
+  courseName?: string;
+  department?: string;
+  startDate?: string;
+  endDate?: string;
+  durationMinutes?: number;
+  totalStudents?: number;
+  participatedStudents?: number;
 }
 
-export type AIGradingJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
-
-export interface AIGradingJob {
-  id: string;
-  examId: string;
-  examTitle: string;
-  courseName: string;
-  department: string;
-  totalSubmissions: number;
-  processedSubmissions: number;
-  status: AIGradingJobStatus;
-  confidenceAverage?: number;
-  errorReason?: string;
-  startedAt: string;
-  completedAt?: string;
+export interface CreateExaminationPayload {
+  course_offering: string;
+  title: string;
+  start_window: string;
+  end_window: string;
+  duration_minutes: number;
 }
 
-export interface AuditLog {
-  id: string;
-  timestamp: string;
-  actorName: string;
-  actorEmail: string;
-  actorRole: UserRole;
-  actionEvent: string; // e.g. "user.created", "exam.published", "settings.updated"
-  resourceType: string;
-  resourceName: string;
-  ipAddress: string;
-  details: string;
+export interface UpdateExaminationPayload {
+  course_offering?: string;
+  title?: string;
+  start_window?: string;
+  end_window?: string;
+  duration_minutes?: number;
+  status?: ExaminationStatus;
 }
 
-export interface SystemSettings {
-  institutionName: string;
-  institutionCode: string;
-  supportEmail: string;
-  timezone: string;
-  academicYear: string;
-  activeSemester: string;
-  branding: {
-    primaryColor: string;
-    darkThemeDefault: boolean;
-    portalTitle: string;
-  };
-  examDefaults: {
-    defaultDurationMinutes: number;
-    passPercentageThreshold: number;
-    autoSaveIntervalSeconds: number;
-    allowReviewBeforeSubmission: boolean;
-  };
-  aiConfig: {
-    provider: string; // e.g. "OpenAI GPT-4o", "Claude 3.5 Sonnet", "Local LLM Server"
-    apiKeyMasked: string;
-    autoGradingConfidenceThreshold: number; // e.g. 85%
-    flagLowConfidenceForManualReview: boolean;
-    maxParallelGradingWorkers: number;
-  };
-  notificationSettings: {
-    emailAlertsOnSystemErrors: boolean;
-    notifyLecturersOnExamPublish: boolean;
-    weeklyDigestEmail: boolean;
-  };
+export interface ScheduleExaminationPayload {
+  start_window: string;
+  end_window: string;
+  duration_minutes: number;
 }
 
 export interface AdminDashboardStats {
@@ -488,16 +549,6 @@ export interface AdminDashboardStats {
   };
 }
 
-export interface AdminNotification {
-  id: string;
-  title: string;
-  message: string;
-  category: 'user' | 'exam' | 'ai' | 'system' | 'security';
-  timestamp: string;
-  read: boolean;
-  actionUrl?: string;
-}
-
 export interface AdminReportData {
   performanceTrends: { month: string; avgScore: number; passRate: number }[];
   departmentPassRates: { department: string; passRate: number; totalExams: number }[];
@@ -518,6 +569,6 @@ export interface CreateTagPayload {
 }
 
 export interface UpdateTagPayload {
-  name: string;
+  name?: string;
 }
 

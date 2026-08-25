@@ -9,12 +9,10 @@ import {
   Building2,
   ClipboardCheck,
   Zap,
-  Brain,
   CheckCircle2,
   Activity,
   Plus,
   ArrowUpRight,
-  Clock,
   Server,
   Database,
   FileText,
@@ -28,7 +26,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
-import { Badge, Button, Card, Progress } from '@/components/ui';
+import { Badge, Button, Card } from '@/components/ui';
 import { ROUTES } from '@/constants';
 
 import { useAdminStore } from '../store';
@@ -47,8 +45,6 @@ export function DashboardOverview() {
     programs,
     courses,
     exams,
-    aiJobs,
-    auditLogs,
     fetchAdminData,
     fetchAdminAnalytics,
     isLoadingData,
@@ -68,9 +64,8 @@ export function DashboardOverview() {
   const totalExamsCount = adminAnalytics ? adminAnalytics.total_exams : exams.length;
   const totalAdmins = users.filter((u) => (u.role || '').toUpperCase() === 'ADMIN').length;
 
-  const activeExamsCount = exams.filter((e) => e.status === 'active' || e.status === 'scheduled').length;
-  const pendingAIGradingCount = aiJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length;
-  const publishedExamsCount = exams.filter((e) => e.status === 'published').length;
+  const activeExamsCount = exams.filter((e) => e.status === 'ACTIVE' || e.status === 'SCHEDULED').length;
+  const publishedExamsCount = exams.filter((e) => e.status === 'PUBLISHED').length;
 
   const isLoading = isLoadingData || isLoadingAnalytics;
 
@@ -132,14 +127,6 @@ export function DashboardOverview() {
       trend: 'Live test sessions',
     },
     {
-      label: 'Pending AI Grading',
-      value: isLoading ? '...' : pendingAIGradingCount.toString(),
-      icon: Brain,
-      color: 'text-primary',
-      bg: 'bg-primary/10',
-      trend: 'Queue evaluation',
-    },
-    {
       label: 'Published Results',
       value: isLoading ? '...' : publishedExamsCount.toString(),
       icon: CheckCircle2,
@@ -171,7 +158,7 @@ export function DashboardOverview() {
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Authoritative overview of university demographics, academic hierarchy, examination workflows, and AI services.
+            Authoritative overview of university demographics, academic hierarchy, and examination workflows.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -195,14 +182,6 @@ export function DashboardOverview() {
           >
             Add New User
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<Brain className="h-4 w-4" />}
-            onClick={() => router.push(ROUTES.ADMIN.AI_MONITOR)}
-          >
-            AI Grading Queue
-          </Button>
         </div>
       </div>
 
@@ -224,8 +203,8 @@ export function DashboardOverview() {
         </Card>
       )}
 
-      {/* Summary Cards Grid (10 Cards) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Summary Cards Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {statCards.map((card, idx) => {
           const Icon = card.icon;
           return (
@@ -361,10 +340,10 @@ export function DashboardOverview() {
             <Button
               variant="outline"
               className="justify-between text-left h-auto py-2.5 px-3"
-              onClick={() => router.push(ROUTES.ADMIN.SETTINGS)}
+              onClick={() => router.push(ROUTES.ADMIN.EXAMS)}
             >
               <span className="flex items-center gap-2.5 text-xs font-medium">
-                <Server className="h-4 w-4 text-primary" /> Institution System Settings
+                <ClipboardCheck className="h-4 w-4 text-primary" /> Exams & Assessments Overview
               </span>
               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
@@ -403,138 +382,6 @@ export function DashboardOverview() {
               <p className="text-sm font-semibold text-foreground">Synchronized</p>
               <span className="text-[10px] text-muted-foreground">Live counts from /api/v1/analytics/admin</span>
             </div>
-
-            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <ClipboardCheck className="h-3.5 w-3.5 text-primary" /> Examination Engine
-              </div>
-              <p className="text-sm font-semibold text-foreground">{totalExamsCount} Registered Assessments</p>
-              <span className="text-[10px] text-muted-foreground">{activeExamsCount} active session(s)</span>
-            </div>
-
-            <div className="p-3.5 rounded-lg border border-border bg-card/60 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Brain className="h-3.5 w-3.5 text-primary" /> AI Evaluation Infrastructure
-              </div>
-              <p className="text-sm font-semibold text-foreground">Active & Ready</p>
-              <span className="text-[10px] text-muted-foreground">Automated grading pipeline monitoring</span>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Activity Streams Grid: Recent Audit Activity & AI Queue Snapshot */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Audit Activity */}
-        <Card className="p-5 border-border">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-primary" /> Recent System Activity & Audit Trail
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Latest administrative actions and security events.
-              </p>
-            </div>
-            <Link
-              href={ROUTES.ADMIN.AUDIT_LOGS}
-              className="text-xs text-primary hover:underline font-medium flex items-center gap-1"
-            >
-              View Full Logs <ArrowUpRight className="h-3 w-3" />
-            </Link>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {auditLogs.length === 0 ? (
-              <div className="p-8 text-center bg-muted/20 border-dashed border border-border rounded-lg">
-                <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">No recent system audit logs recorded.</p>
-              </div>
-            ) : (
-              auditLogs.slice(0, 4).map((log) => (
-                <div key={log.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-accent/40 transition-colors">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
-                    <FileText className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-foreground truncate">{log.actionEvent}</p>
-                      <span className="text-[10px] text-muted-foreground shrink-0">{log.timestamp}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.details}</p>
-                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <span className="font-medium text-foreground">{log.actorName}</span>
-                      <span>•</span>
-                      <span>IP: {log.ipAddress}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-        {/* AI Grading Monitor Snapshot */}
-        <Card className="p-5 border-border">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Brain className="h-4 w-4 text-primary" /> Active AI Evaluation Jobs
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Automated grading pipeline status and queue monitoring.
-              </p>
-            </div>
-            <Link
-              href={ROUTES.ADMIN.AI_MONITOR}
-              className="text-xs text-primary hover:underline font-medium flex items-center gap-1"
-            >
-              AI Monitor <ArrowUpRight className="h-3 w-3" />
-            </Link>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {aiJobs.length === 0 ? (
-              <div className="p-8 text-center bg-muted/20 border-dashed border border-border rounded-lg">
-                <Brain className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">No active AI evaluation jobs in queue.</p>
-              </div>
-            ) : (
-              aiJobs.map((job) => {
-                const progressPct = Math.round((job.processedSubmissions / job.totalSubmissions) * 100);
-                return (
-                  <div key={job.id} className="p-3 rounded-lg border border-border bg-card/40 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-foreground truncate">{job.examTitle}</span>
-                      <Badge
-                        variant={
-                          job.status === 'completed'
-                            ? 'success'
-                            : job.status === 'processing'
-                            ? 'warning'
-                            : job.status === 'failed'
-                            ? 'destructive'
-                            : 'secondary'
-                        }
-                        className="text-[10px] capitalize"
-                      >
-                        {job.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>{job.courseName}</span>
-                      <span>
-                        {job.processedSubmissions} / {job.totalSubmissions} ({progressPct}%)
-                      </span>
-                    </div>
-                    <Progress value={progressPct} className="h-1.5" />
-                    {job.errorReason && (
-                      <p className="text-[10px] text-destructive font-medium">⚠️ {job.errorReason}</p>
-                    )}
-                  </div>
-                );
-              })
-            )}
           </div>
         </Card>
       </div>

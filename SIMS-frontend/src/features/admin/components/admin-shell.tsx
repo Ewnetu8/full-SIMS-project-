@@ -8,10 +8,7 @@ import {
   Building2,
   BookOpen,
   ClipboardCheck,
-  Brain,
   BarChart3,
-  Settings,
-  ShieldAlert,
   Landmark,
   Layers,
   Calendar,
@@ -20,6 +17,11 @@ import {
   UserPlus,
   Tag,
   Layers3,
+  GitFork,
+  Scale,
+  ShieldCheck,
+  Award,
+  School,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -29,8 +31,7 @@ import { Breadcrumb } from '@/components/navigation';
 import { NotificationDropdown } from '@/components/navigation';
 import { ROUTES } from '@/constants';
 import { useRouteProtection } from '@/features/auth/hooks';
-
-import { useAdminStore } from '../store';
+import { useNotifications, useMarkNotificationAsRead } from '@/features/notifications';
 
 import type { NavItem } from '@/components/layout/sidebar';
 
@@ -40,6 +41,7 @@ const adminNavigation: NavItem[] = [
   { label: 'Student Directory', href: ROUTES.ADMIN.STUDENTS, icon: <GraduationCap className="h-4 w-4" /> },
   { label: 'Enrollment Management', href: ROUTES.ADMIN.ENROLLMENTS, icon: <UserPlus className="h-4 w-4" /> },
   { label: 'Lecturer Directory', href: ROUTES.ADMIN.LECTURERS, icon: <UserCheck className="h-4 w-4" /> },
+  { label: 'Universities', href: ROUTES.ADMIN.UNIVERSITIES, icon: <School className="h-4 w-4" /> },
   { label: 'Colleges', href: ROUTES.ADMIN.COLLEGES, icon: <Landmark className="h-4 w-4" /> },
   { label: 'Departments', href: ROUTES.ADMIN.DEPARTMENTS, icon: <Building2 className="h-4 w-4" /> },
   { label: 'Programs', href: ROUTES.ADMIN.PROGRAMS, icon: <Layers className="h-4 w-4" /> },
@@ -47,12 +49,13 @@ const adminNavigation: NavItem[] = [
   { label: 'Semesters', href: ROUTES.ADMIN.SEMESTERS, icon: <Clock className="h-4 w-4" /> },
   { label: 'Courses', href: ROUTES.ADMIN.COURSES, icon: <BookOpen className="h-4 w-4" /> },
   { label: 'Course Offerings', href: ROUTES.ADMIN.COURSE_OFFERINGS, icon: <Layers3 className="h-4 w-4" /> },
+  { label: 'Course Prerequisites', href: ROUTES.ADMIN.COURSE_PREREQUISITES, icon: <GitFork className="h-4 w-4" /> },
+  { label: 'Credit Hour Policies', href: ROUTES.ADMIN.CREDIT_HOUR_POLICIES, icon: <Scale className="h-4 w-4" /> },
+  { label: 'Enrollment Overrides', href: ROUTES.ADMIN.ENROLLMENT_OVERRIDES, icon: <ShieldCheck className="h-4 w-4" /> },
   { label: 'Tags Management', href: ROUTES.ADMIN.TAGS, icon: <Tag className="h-4 w-4" /> },
   { label: 'Exams Overview', href: ROUTES.ADMIN.EXAMS, icon: <ClipboardCheck className="h-4 w-4" /> },
-  { label: 'AI Grading Monitor', href: ROUTES.ADMIN.AI_MONITOR, icon: <Brain className="h-4 w-4" /> },
+  { label: 'Results & Grades', href: ROUTES.ADMIN.RESULTS, icon: <Award className="h-4 w-4" /> },
   { label: 'Reports & Analytics', href: ROUTES.ADMIN.REPORTS, icon: <BarChart3 className="h-4 w-4" /> },
-  { label: 'System Settings', href: ROUTES.ADMIN.SETTINGS, icon: <Settings className="h-4 w-4" /> },
-  { label: 'Audit Logs', href: ROUTES.ADMIN.AUDIT_LOGS, icon: <ShieldAlert className="h-4 w-4" /> },
   { label: 'Notifications', href: ROUTES.ADMIN.NOTIFICATIONS, icon: <Bell className="h-4 w-4" /> },
 ];
 
@@ -64,11 +67,12 @@ export interface AdminShellProps {
 
 export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
   const router = useRouter();
-  const { notifications, markAllNotificationsRead } = useAdminStore();
+  const { data: notifications = [] } = useNotifications();
+  const markAsReadMutation = useMarkNotificationAsRead();
 
   useRouteProtection(['admin']);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const dynamicNavItems: NavItem[] = React.useMemo(() => {
     return adminNavigation.map((item) => {
@@ -81,6 +85,13 @@ export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
       return item;
     });
   }, [unreadCount]);
+
+  const handleMarkAllRead = React.useCallback(() => {
+    const unread = notifications.filter((n) => !n.is_read);
+    unread.forEach((n) => {
+      markAsReadMutation.mutate(n.id);
+    });
+  }, [notifications, markAsReadMutation]);
 
   return (
     <DashboardLayout
@@ -96,15 +107,28 @@ export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
         ) : undefined,
         notificationMenu: (
           <NotificationDropdown
-            notifications={notifications.map((n) => ({
-              id: n.id,
-              title: n.title,
-              message: n.message,
-              time: n.timestamp,
-              read: n.read,
-              type: (n.category === 'ai' ? 'ai' : n.category === 'security' ? 'warning' : 'info') as 'ai' | 'warning' | 'info',
-            }))}
-            onMarkAllRead={markAllNotificationsRead}
+            notifications={notifications.map((n) => {
+              let formattedTime = n.created_at;
+              try {
+                formattedTime = new Date(n.created_at).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+              } catch {
+                formattedTime = n.created_at;
+              }
+              return {
+                id: n.id,
+                title: 'System Notification',
+                message: n.message_body,
+                time: formattedTime,
+                read: n.is_read,
+                type: 'info' as const,
+              };
+            })}
+            onMarkAllRead={handleMarkAllRead}
             onViewAll={() => router.push(ROUTES.ADMIN.NOTIFICATIONS)}
           />
         ),

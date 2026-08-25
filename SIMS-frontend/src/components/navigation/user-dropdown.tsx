@@ -111,11 +111,13 @@ export function UserDropdown({
           <DropdownMenuShortcut>⌘P</DropdownMenuShortcut>
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={onSettings}>
-          <Settings className="h-4 w-4" />
-          Settings
-          <DropdownMenuShortcut>⌘,</DropdownMenuShortcut>
-        </DropdownMenuItem>
+        {onSettings && (
+          <DropdownMenuItem onClick={onSettings}>
+            <Settings className="h-4 w-4" />
+            Settings
+            <DropdownMenuShortcut>⌘,</DropdownMenuShortcut>
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
 

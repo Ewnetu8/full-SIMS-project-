@@ -3,6 +3,7 @@
 import {
   Tag as TagIcon,
   Plus,
+  Eye,
   Edit2,
   Trash2,
   RefreshCw,
@@ -10,7 +11,9 @@ import {
   Hash,
   Calendar,
   Clock,
-  Sparkles,
+  Copy,
+  Check,
+  Search,
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -43,15 +46,23 @@ export function TagManagement() {
     tagsError,
     tagSearchQuery,
     fetchTags,
+    fetchTagById,
     addTag,
     updateTag,
     deleteTag,
     setTagSearchQuery,
   } = useAdminStore();
 
+  // Modals & Dialogs State
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingTag, setEditingTag] = React.useState<Tag | null>(null);
   const [deletingTag, setDeletingTag] = React.useState<Tag | null>(null);
+  const [viewingTagId, setViewingTagId] = React.useState<string | null>(null);
+  const [viewingTagDetail, setViewingTagDetail] = React.useState<Tag | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = React.useState(false);
+  const [copiedId, setCopiedId] = React.useState(false);
+
+  // Form State
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formData, setFormData] = React.useState({ name: '' });
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
@@ -77,6 +88,27 @@ export function TagManagement() {
     setFormError(null);
     setEditingTag(tag);
     setFormData({ name: tag.name });
+  };
+
+  const handleOpenViewModal = async (tag: Tag) => {
+    setViewingTagId(tag.id);
+    setViewingTagDetail(tag); // Optimistic prefill
+    setIsLoadingDetail(true);
+    try {
+      const detail = await fetchTagById(tag.id);
+      setViewingTagDetail(detail);
+    } catch {
+      // Keep optimistic tag data if detail fetch fails
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
+
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(true);
+    toast.success('Tag ID copied to clipboard');
+    setTimeout(() => setCopiedId(false), 2000);
   };
 
   const validateForm = () => {
@@ -183,7 +215,7 @@ export function TagManagement() {
             <TagIcon className="h-6 w-6 text-primary" /> Tags Management
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage question classification and subject domain tags used across examinations and question banks.
+            Manage reusable tags used throughout the system.
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -202,13 +234,13 @@ export function TagManagement() {
             onClick={handleOpenAddModal}
             className="flex items-center gap-1.5 font-semibold"
           >
-            <Plus className="h-4 w-4" /> Create Tag
+            <Plus className="h-4 w-4" /> Add Tag
           </Button>
         </div>
       </div>
 
       {/* Stats Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="p-4 flex items-center gap-4 border border-border bg-card">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
             <TagIcon className="h-6 w-6" />
@@ -221,21 +253,11 @@ export function TagManagement() {
 
         <Card className="p-4 flex items-center gap-4 border border-border bg-card">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent shrink-0">
-            <Sparkles className="h-6 w-6" />
+            <Search className="h-6 w-6" />
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtered Results</p>
             <p className="text-2xl font-bold text-foreground">{filteredTags.length}</p>
-          </div>
-        </Card>
-
-        <Card className="p-4 flex items-center gap-4 border border-border bg-card">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 shrink-0">
-            <Hash className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Taxonomy</p>
-            <p className="text-2xl font-bold text-foreground">Global</p>
           </div>
         </Card>
       </div>
@@ -243,7 +265,7 @@ export function TagManagement() {
       {/* Search Bar */}
       <Card className="p-4">
         <SearchInput
-          placeholder="Search tags by name or ID..."
+          placeholder="Search tags..."
           value={tagSearchQuery}
           onChange={(e) => {
             setTagSearchQuery(e.target.value);
@@ -286,7 +308,7 @@ export function TagManagement() {
                 <th className="px-4 py-3.5">Tag Name</th>
                 <th className="px-4 py-3.5">Identifier (UUID)</th>
                 <th className="px-4 py-3.5">Created Date</th>
-                <th className="px-4 py-3.5">Last Updated</th>
+                <th className="px-4 py-3.5">Updated Date</th>
                 <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
@@ -308,7 +330,7 @@ export function TagManagement() {
                       <div className="h-4 w-28 bg-muted rounded-sm" />
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <div className="h-8 w-20 bg-muted rounded-md inline-block" />
+                      <div className="h-8 w-28 bg-muted rounded-md inline-block" />
                     </td>
                   </tr>
                 ))
@@ -320,16 +342,18 @@ export function TagManagement() {
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/80 text-muted-foreground mx-auto">
                         <TagIcon className="h-6 w-6" />
                       </div>
-                      <p className="font-semibold text-foreground text-base">No Tags Found</p>
+                      <p className="font-semibold text-foreground text-base">
+                        {tagSearchQuery.trim() ? 'No Matching Tags Found' : 'No tags have been created yet.'}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {tagSearchQuery.trim()
                           ? `No tags match your search keyword "${tagSearchQuery}".`
-                          : 'There are currently no tags created in the system. Create your first tag to classify examination questions.'}
+                          : 'Create your first tag to classify questions and organize academic resources across the system.'}
                       </p>
                       {!tagSearchQuery.trim() && (
                         <div className="pt-2">
                           <Button size="sm" onClick={handleOpenAddModal}>
-                            <Plus className="h-4 w-4 mr-1.5" /> Create Tag
+                            <Plus className="h-4 w-4 mr-1.5" /> Add Tag
                           </Button>
                         </div>
                       )}
@@ -352,25 +376,37 @@ export function TagManagement() {
                     <td className="px-4 py-3.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        {new Date(tag.created_at).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                        {tag.created_at
+                          ? new Date(tag.created_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        {new Date(tag.updated_at).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                        {tag.updated_at
+                          ? new Date(tag.updated_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenViewModal(tag)}
+                          title="View Tag Details"
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1 text-muted-foreground" /> View
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -432,6 +468,135 @@ export function TagManagement() {
         )}
       </Card>
 
+      {/* View Tag Details Modal */}
+      {viewingTagId && (
+        <Dialog open={!!viewingTagId} onOpenChange={() => setViewingTagId(null)}>
+          <DialogContent size="md" className="sm:max-w-md p-0 overflow-hidden">
+            <DialogHeader className="px-6 pt-6 pb-2">
+              <DialogTitle className="flex items-center gap-2.5 text-xl font-bold text-foreground">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                  <TagIcon className="h-4 w-4" />
+                </div>
+                Tag Details
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Complete metadata and system identifiers for this tag.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogBody className="space-y-4 px-6 py-4">
+              {isLoadingDetail && !viewingTagDetail ? (
+                <div className="space-y-3 py-4 animate-pulse">
+                  <div className="h-6 w-3/4 bg-muted rounded" />
+                  <div className="h-4 w-full bg-muted rounded" />
+                  <div className="h-4 w-1/2 bg-muted rounded" />
+                </div>
+              ) : viewingTagDetail ? (
+                <div className="space-y-4">
+                  {/* Tag Name Card */}
+                  <div className="p-4 rounded-xl bg-muted/40 border border-border/60 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">
+                        Tag Name
+                      </p>
+                      <span className="text-lg font-bold text-foreground flex items-center gap-1.5">
+                        <Hash className="h-4 w-4 text-primary" />
+                        {viewingTagDetail.name}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs border-primary/30 text-primary bg-primary/5">
+                      Active Tag
+                    </Badge>
+                  </div>
+
+                  {/* UUID Card with copy */}
+                  <div className="p-3.5 rounded-lg border border-border bg-card space-y-1">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                      Tag UUID
+                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <code className="text-xs font-mono text-foreground break-all">
+                        {viewingTagDetail.id}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => handleCopyId(viewingTagDetail.id)}
+                        title="Copy UUID"
+                      >
+                        {copiedId ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Timestamps */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3.5 rounded-lg border border-border bg-card space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5" /> Created At
+                      </p>
+                      <p className="text-xs font-medium text-foreground">
+                        {viewingTagDetail.created_at
+                          ? new Date(viewingTagDetail.created_at).toLocaleString(undefined, {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            })
+                          : '—'}
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg border border-border bg-card space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" /> Updated At
+                      </p>
+                      <p className="text-xs font-medium text-foreground">
+                        {viewingTagDetail.updated_at
+                          ? new Date(viewingTagDetail.updated_at).toLocaleString(undefined, {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            })
+                          : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </DialogBody>
+
+            <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20 flex justify-between sm:justify-between items-center">
+              {viewingTagDetail && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const tagToEdit = viewingTagDetail;
+                    setViewingTagId(null);
+                    handleOpenEditModal(tagToEdit);
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <Edit2 className="h-3.5 w-3.5" /> Edit Tag
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setViewingTagId(null)}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Create Tag Modal */}
       {isAddModalOpen && (
         <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
@@ -442,10 +607,10 @@ export function TagManagement() {
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
                     <Plus className="h-4 w-4" />
                   </div>
-                  Create New Tag
+                  Create Tag
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Add a new subject or taxonomy tag to categorize questions across the system.
+                  Add a new reusable tag to classify questions and examinations.
                 </DialogDescription>
               </DialogHeader>
 
@@ -463,7 +628,7 @@ export function TagManagement() {
                   </Label>
                   <Input
                     id="create-tag-name"
-                    placeholder="e.g. Data Structures, Calculus, AI"
+                    placeholder="e.g. Data Structures, Calculus, Artificial Intelligence"
                     value={formData.name}
                     onChange={(e) => {
                       setFormData({ name: e.target.value });
@@ -477,6 +642,9 @@ export function TagManagement() {
                   {fieldErrors.name && (
                     <p className="text-xs text-destructive font-medium">{fieldErrors.name}</p>
                   )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Must be between 1 and 100 characters.
+                  </p>
                 </div>
               </DialogBody>
 
@@ -512,7 +680,7 @@ export function TagManagement() {
                   Edit Tag
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Update the name of tag &ldquo;{editingTag.name}&rdquo;.
+                  Update the tag name for &ldquo;{editingTag.name}&rdquo;.
                 </DialogDescription>
               </DialogHeader>
 
@@ -544,6 +712,9 @@ export function TagManagement() {
                   {fieldErrors.name && (
                     <p className="text-xs text-destructive font-medium">{fieldErrors.name}</p>
                   )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Must be between 1 and 100 characters.
+                  </p>
                 </div>
               </DialogBody>
 

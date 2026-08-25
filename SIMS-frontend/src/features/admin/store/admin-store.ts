@@ -13,10 +13,9 @@ import type {
   Course,
   ClassStanding,
   AdminExamOverview,
-  AIGradingJob,
-  AuditLog,
-  SystemSettings,
-  AdminNotification,
+  CreateExaminationPayload,
+  UpdateExaminationPayload,
+  ScheduleExaminationPayload,
   College,
   Program,
   AcademicYear,
@@ -40,6 +39,12 @@ import type {
   Tag,
   CreateTagPayload,
   UpdateTagPayload,
+  CoursePrerequisite,
+  CreateCoursePrerequisitePayload,
+  CreditHourPolicy,
+  CreditHourPolicyPayload,
+  EnrollmentOverride,
+  CreateEnrollmentOverridePayload,
 } from '../types';
 import type { AdminAnalyticsResponse } from '@/types/api';
 
@@ -55,13 +60,12 @@ interface AdminStoreState {
   academicYears: AcademicYear[];
   semesters: Semester[];
   courses: Course[];
+  coursePrerequisites: CoursePrerequisite[];
+  creditHourPolicies: CreditHourPolicy[];
+  enrollmentOverrides: EnrollmentOverride[];
   courseOfferings: AdminCourseOffering[];
   enrollments: AdminEnrollment[];
   exams: AdminExamOverview[];
-  aiJobs: AIGradingJob[];
-  auditLogs: AuditLog[];
-  settings: SystemSettings;
-  notifications: AdminNotification[];
   tags: Tag[];
   isLoadingData: boolean;
 
@@ -87,11 +91,18 @@ interface AdminStoreState {
   semestersError: string | null;
   isLoadingCourses: boolean;
   coursesError: string | null;
+  isLoadingCoursePrerequisites: boolean;
+  coursePrerequisitesError: string | null;
+  isLoadingCreditHourPolicies: boolean;
+  creditHourPoliciesError: string | null;
+  isLoadingEnrollmentOverrides: boolean;
+  enrollmentOverridesError: string | null;
   isLoadingCourseOfferings: boolean;
   courseOfferingsError: string | null;
   isLoadingEnrollments: boolean;
   enrollmentsError: string | null;
   isLoadingExams: boolean;
+  examsError: string | null;
 
   // Search & Filter States
   userSearchQuery: string;
@@ -120,6 +131,9 @@ interface AdminStoreState {
   courseProgramFilter: string;
   courseStandingFilter: string;
   courseDeptFilter: string;
+  coursePrerequisiteSearchQuery: string;
+  creditHourPolicySearchQuery: string;
+  enrollmentOverrideSearchQuery: string;
 
   enrollmentSearchQuery: string;
   enrollmentStatusFilter: string;
@@ -128,6 +142,7 @@ interface AdminStoreState {
 
   examSearchQuery: string;
   examStatusFilter: string;
+  examCourseOfferingFilter: string;
 
   auditSearchQuery: string;
   auditCategoryFilter: string;
@@ -166,10 +181,15 @@ interface AdminStoreState {
   setSemesterYearFilter: (yearId: string) => void;
   fetchCourses: () => Promise<void>;
   fetchCourseById: (id: string) => Promise<Course>;
+  fetchCoursePrerequisites: () => Promise<void>;
+  fetchCoursePrerequisiteById: (id: string) => Promise<CoursePrerequisite>;
+  fetchCreditHourPolicies: () => Promise<void>;
+  fetchCreditHourPolicyById: (id: string) => Promise<CreditHourPolicy>;
+  fetchEnrollmentOverrides: () => Promise<void>;
+  fetchEnrollmentOverrideById: (id: string) => Promise<EnrollmentOverride>;
   fetchCourseOfferings: () => Promise<void>;
   fetchCourseOfferingById: (id: string) => Promise<AdminCourseOffering>;
   fetchEnrollments: () => Promise<void>;
-  fetchExams: () => Promise<void>;
 
   // Actions - Users
   setUsers: (users: UserCompact[]) => void;
@@ -218,6 +238,22 @@ interface AdminStoreState {
   deleteCourse: (id: string) => Promise<void>;
   toggleCourseArchive: (id: string) => void;
 
+  // Actions - Course Prerequisites
+  setCoursePrerequisiteSearchQuery: (q: string) => void;
+  addCoursePrerequisite: (data: CreateCoursePrerequisitePayload) => Promise<CoursePrerequisite>;
+  deleteCoursePrerequisite: (id: string) => Promise<void>;
+
+  // Actions - Credit Hour Policies
+  setCreditHourPolicySearchQuery: (q: string) => void;
+  addCreditHourPolicy: (data: CreditHourPolicyPayload) => Promise<CreditHourPolicy>;
+  updateCreditHourPolicy: (id: string, data: CreditHourPolicyPayload) => Promise<CreditHourPolicy>;
+  deleteCreditHourPolicy: (id: string) => Promise<void>;
+
+  // Actions - Enrollment Overrides
+  setEnrollmentOverrideSearchQuery: (q: string) => void;
+  addEnrollmentOverride: (data: CreateEnrollmentOverridePayload) => Promise<EnrollmentOverride>;
+  deleteEnrollmentOverride: (id: string) => Promise<void>;
+
   // Actions - Course Offerings & Enrollments
   addCourseOffering: (data: CreateCourseOfferingPayload) => Promise<AdminCourseOffering>;
   updateCourseOffering: (id: string, data: UpdateCourseOfferingPayload) => Promise<AdminCourseOffering>;
@@ -234,9 +270,14 @@ interface AdminStoreState {
   // Actions - Exams
   setExamSearchQuery: (q: string) => void;
   setExamStatusFilter: (status: string) => void;
-  addExam: (data: { title: string; duration_minutes: number; course_offering?: string }) => Promise<AdminExamOverview>;
-  scheduleExam: (id: string, data: { start_window: string; end_window: string; duration_minutes: number }) => Promise<void>;
-  archiveExam: (id: string) => void;
+  setExamCourseOfferingFilter: (offeringId: string) => void;
+  fetchExams: (params?: { status?: string; course_offering?: string }) => Promise<void>;
+  fetchExamById: (id: string) => Promise<AdminExamOverview>;
+  addExam: (data: CreateExaminationPayload) => Promise<AdminExamOverview>;
+  createExam: (data: CreateExaminationPayload) => Promise<AdminExamOverview>;
+  updateExam: (id: string, data: UpdateExaminationPayload) => Promise<AdminExamOverview>;
+  scheduleExam: (id: string, data: ScheduleExaminationPayload) => Promise<AdminExamOverview>;
+  publishExam: (id: string) => Promise<AdminExamOverview>;
   deleteExam: (id: string) => Promise<void>;
 
   // Actions - Students & Lecturers
@@ -245,14 +286,6 @@ interface AdminStoreState {
   setStudentClassStandingFilter: (standing: string) => void;
   setLecturerSearchQuery: (q: string) => void;
   setLecturerDeptFilter: (dept: string) => void;
-
-  // Actions - AI Jobs, Audit, Settings & Notifications
-  retryAIJob: (id: string) => void;
-  updateSettings: (settings: Partial<SystemSettings>) => void;
-  setAuditSearchQuery: (q: string) => void;
-  setAuditCategoryFilter: (cat: string) => void;
-  markNotificationRead: (id: string) => void;
-  markAllNotificationsRead: () => void;
 }
 
 export const useAdminStore = create<AdminStoreState>((set, get) => ({
@@ -266,43 +299,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   academicYears: [],
   semesters: [],
   courses: [],
+  coursePrerequisites: [],
+  creditHourPolicies: [],
+  enrollmentOverrides: [],
   courseOfferings: [],
   enrollments: [],
   exams: [],
-  aiJobs: [],
-  auditLogs: [],
-  settings: {
-    institutionName: 'Addis Ababa Science and Technology University',
-    institutionCode: 'AASTU',
-    supportEmail: 'support@aastu.edu.et',
-    timezone: 'Africa/Addis_Ababa',
-    academicYear: '2025/2026',
-    activeSemester: 'First Semester',
-    branding: {
-      primaryColor: '#102A7A',
-      darkThemeDefault: false,
-      portalTitle: 'AASTU SIMS',
-    },
-    examDefaults: {
-      defaultDurationMinutes: 60,
-      passPercentageThreshold: 50,
-      autoSaveIntervalSeconds: 30,
-      allowReviewBeforeSubmission: true,
-    },
-    aiConfig: {
-      provider: 'AASTU AI Engine',
-      apiKeyMasked: '••••••••••••••••',
-      autoGradingConfidenceThreshold: 85,
-      flagLowConfidenceForManualReview: true,
-      maxParallelGradingWorkers: 4,
-    },
-    notificationSettings: {
-      emailAlertsOnSystemErrors: true,
-      notifyLecturersOnExamPublish: true,
-      weeklyDigestEmail: false,
-    },
-  },
-  notifications: [],
   tags: [],
   isLoadingData: false,
 
@@ -327,11 +329,18 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   semestersError: null,
   isLoadingCourses: false,
   coursesError: null,
+  isLoadingCoursePrerequisites: false,
+  coursePrerequisitesError: null,
+  isLoadingCreditHourPolicies: false,
+  creditHourPoliciesError: null,
+  isLoadingEnrollmentOverrides: false,
+  enrollmentOverridesError: null,
   isLoadingCourseOfferings: false,
   courseOfferingsError: null,
   isLoadingEnrollments: false,
   enrollmentsError: null,
   isLoadingExams: false,
+  examsError: null,
 
   userSearchQuery: '',
   userRoleFilter: 'ALL',
@@ -359,6 +368,9 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   courseProgramFilter: 'ALL',
   courseStandingFilter: 'ALL',
   courseDeptFilter: 'ALL',
+  coursePrerequisiteSearchQuery: '',
+  creditHourPolicySearchQuery: '',
+  enrollmentOverrideSearchQuery: '',
 
   enrollmentSearchQuery: '',
   enrollmentStatusFilter: 'ALL',
@@ -367,6 +379,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
 
   examSearchQuery: '',
   examStatusFilter: 'ALL',
+  examCourseOfferingFilter: 'ALL',
 
   auditSearchQuery: '',
   auditCategoryFilter: 'ALL',
@@ -376,10 +389,13 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   fetchAdminData: async () => {
     set({ isLoadingData: true });
     try {
-      const [analytics, departments, courses, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
+      const [analytics, departments, courses, coursePrerequisites, creditHourPolicies, enrollmentOverrides, exams, students, users, lecturers, colleges, programs, academicYears, semesters, courseOfferings, enrollments, tags] = await Promise.all([
         adminService.getAdminAnalytics().catch(() => null),
         adminService.getDepartments().catch(() => []),
         adminService.getCourses().catch(() => []),
+        adminService.getCoursePrerequisites().catch(() => []),
+        adminService.getCreditHourPolicies().catch(() => []),
+        adminService.getEnrollmentOverrides().catch(() => []),
         adminService.getAllExams().catch(() => []),
         adminService.getStudents().catch(() => []),
         adminService.getUsers().catch(() => []),
@@ -397,6 +413,9 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
         adminAnalytics: analytics,
         departments,
         courses,
+        coursePrerequisites,
+        creditHourPolicies,
+        enrollmentOverrides,
         exams,
         students,
         users,
@@ -595,6 +614,48 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     return adminService.getCourseById(id);
   },
 
+  fetchCoursePrerequisites: async () => {
+    set({ isLoadingCoursePrerequisites: true, coursePrerequisitesError: null });
+    try {
+      const coursePrerequisites = await adminService.getCoursePrerequisites();
+      set({ coursePrerequisites, isLoadingCoursePrerequisites: false, coursePrerequisitesError: null });
+    } catch (err: unknown) {
+      set({ coursePrerequisites: [], isLoadingCoursePrerequisites: false, coursePrerequisitesError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchCoursePrerequisiteById: async (id) => {
+    return adminService.getCoursePrerequisiteById(id);
+  },
+
+  fetchCreditHourPolicies: async () => {
+    set({ isLoadingCreditHourPolicies: true, creditHourPoliciesError: null });
+    try {
+      const creditHourPolicies = await adminService.getCreditHourPolicies();
+      set({ creditHourPolicies, isLoadingCreditHourPolicies: false, creditHourPoliciesError: null });
+    } catch (err: unknown) {
+      set({ creditHourPolicies: [], isLoadingCreditHourPolicies: false, creditHourPoliciesError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchCreditHourPolicyById: async (id) => {
+    return adminService.getCreditHourPolicyById(id);
+  },
+
+  fetchEnrollmentOverrides: async () => {
+    set({ isLoadingEnrollmentOverrides: true, enrollmentOverridesError: null });
+    try {
+      const enrollmentOverrides = await adminService.getEnrollmentOverrides();
+      set({ enrollmentOverrides, isLoadingEnrollmentOverrides: false, enrollmentOverridesError: null });
+    } catch (err: unknown) {
+      set({ enrollmentOverrides: [], isLoadingEnrollmentOverrides: false, enrollmentOverridesError: getUserFriendlyErrorMessage(err) });
+    }
+  },
+
+  fetchEnrollmentOverrideById: async (id) => {
+    return adminService.getEnrollmentOverrideById(id);
+  },
+
   fetchCourseOfferings: async () => {
     set({ isLoadingCourseOfferings: true, courseOfferingsError: null });
     try {
@@ -619,14 +680,18 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     }
   },
 
-  fetchExams: async () => {
-    set({ isLoadingExams: true });
+  fetchExams: async (params) => {
+    set({ isLoadingExams: true, examsError: null });
     try {
-      const exams = await adminService.getAllExams();
-      set({ exams, isLoadingExams: false });
-    } catch {
-      set({ isLoadingExams: false });
+      const exams = await adminService.getAllExams(params);
+      set({ exams, isLoadingExams: false, examsError: null });
+    } catch (err: unknown) {
+      set({ exams: [], isLoadingExams: false, examsError: getUserFriendlyErrorMessage(err) });
     }
+  },
+
+  fetchExamById: async (id) => {
+    return adminService.getExamById(id);
   },
 
   // Actions - Users
@@ -780,6 +845,47 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
   toggleCourseArchive: (_id) => {},
 
+  // Actions - Course Prerequisites
+  setCoursePrerequisiteSearchQuery: (coursePrerequisiteSearchQuery) => set({ coursePrerequisiteSearchQuery }),
+  addCoursePrerequisite: async (data) => {
+    const newPrereq = await adminService.createCoursePrerequisite(data);
+    set((state) => ({ coursePrerequisites: [newPrereq, ...state.coursePrerequisites.filter((p) => p.id !== newPrereq.id)] }));
+    return newPrereq;
+  },
+  deleteCoursePrerequisite: async (id) => {
+    await adminService.deleteCoursePrerequisite(id);
+    set((state) => ({ coursePrerequisites: state.coursePrerequisites.filter((p) => p.id !== id) }));
+  },
+
+  // Actions - Credit Hour Policies
+  setCreditHourPolicySearchQuery: (creditHourPolicySearchQuery) => set({ creditHourPolicySearchQuery }),
+  addCreditHourPolicy: async (data) => {
+    const newPolicy = await adminService.createCreditHourPolicy(data);
+    set((state) => ({ creditHourPolicies: [newPolicy, ...state.creditHourPolicies.filter((p) => p.id !== newPolicy.id)] }));
+    return newPolicy;
+  },
+  updateCreditHourPolicy: async (id, data) => {
+    const updated = await adminService.updateCreditHourPolicy(id, data);
+    set((state) => ({ creditHourPolicies: state.creditHourPolicies.map((p) => (p.id === id ? updated : p)) }));
+    return updated;
+  },
+  deleteCreditHourPolicy: async (id) => {
+    await adminService.deleteCreditHourPolicy(id);
+    set((state) => ({ creditHourPolicies: state.creditHourPolicies.filter((p) => p.id !== id) }));
+  },
+
+  // Actions - Enrollment Overrides
+  setEnrollmentOverrideSearchQuery: (enrollmentOverrideSearchQuery) => set({ enrollmentOverrideSearchQuery }),
+  addEnrollmentOverride: async (data) => {
+    const newOverride = await adminService.createEnrollmentOverride(data);
+    set((state) => ({ enrollmentOverrides: [newOverride, ...state.enrollmentOverrides.filter((p) => p.id !== newOverride.id)] }));
+    return newOverride;
+  },
+  deleteEnrollmentOverride: async (id) => {
+    await adminService.deleteEnrollmentOverride(id);
+    set((state) => ({ enrollmentOverrides: state.enrollmentOverrides.filter((p) => p.id !== id) }));
+  },
+
   // Actions - Course Offerings & Enrollments
   addCourseOffering: async (data) => {
     const newOffering = await adminService.createCourseOffering(data);
@@ -829,19 +935,32 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   // Actions - Exams
   setExamSearchQuery: (examSearchQuery) => set({ examSearchQuery }),
   setExamStatusFilter: (examStatusFilter) => set({ examStatusFilter }),
+  setExamCourseOfferingFilter: (examCourseOfferingFilter) => set({ examCourseOfferingFilter }),
   addExam: async (data) => {
     const exam = await adminService.createExam(data);
     set((state) => ({ exams: [exam, ...state.exams] }));
     return exam;
   },
-  scheduleExam: async (id, data) => {
-    await adminService.scheduleExam(id, data);
-    get().fetchExams();
+  createExam: async (data) => {
+    const exam = await adminService.createExam(data);
+    set((state) => ({ exams: [exam, ...state.exams] }));
+    return exam;
   },
-  archiveExam: (id) =>
-    set((state) => ({
-      exams: state.exams.map((e) => (e.id === id ? { ...e, status: 'archived' } : e)),
-    })),
+  updateExam: async (id, data) => {
+    const updated = await adminService.updateExam(id, data);
+    set((state) => ({ exams: state.exams.map((e) => (e.id === id ? updated : e)) }));
+    return updated;
+  },
+  scheduleExam: async (id, data) => {
+    const updated = await adminService.scheduleExam(id, data);
+    set((state) => ({ exams: state.exams.map((e) => (e.id === id ? updated : e)) }));
+    return updated;
+  },
+  publishExam: async (id) => {
+    const updated = await adminService.publishExam(id);
+    set((state) => ({ exams: state.exams.map((e) => (e.id === id ? updated : e)) }));
+    return updated;
+  },
   deleteExam: async (id) => {
     await adminService.deleteExam(id);
     set((state) => ({ exams: state.exams.filter((e) => e.id !== id) }));
@@ -870,30 +989,4 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     await adminService.deleteTag(id);
     set((state) => ({ tags: state.tags.filter((t) => t.id !== id) }));
   },
-
-  // Actions - AI Jobs, Audit, Settings & Notifications
-  retryAIJob: (id) =>
-    set((state) => ({
-      aiJobs: state.aiJobs.map((j) =>
-        j.id === id
-          ? { ...j, status: 'processing', errorReason: undefined, startedAt: new Date().toLocaleString() }
-          : j
-      ),
-    })),
-
-  updateSettings: (newSettings) =>
-    set((state) => ({
-      settings: { ...state.settings, ...newSettings },
-    })),
-
-  setAuditSearchQuery: (auditSearchQuery) => set({ auditSearchQuery }),
-  setAuditCategoryFilter: (auditCategoryFilter) => set({ auditCategoryFilter }),
-  markNotificationRead: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    })),
-  markAllNotificationsRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
-    })),
 }));
