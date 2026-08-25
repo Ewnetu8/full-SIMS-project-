@@ -51,6 +51,9 @@ export function ResultsPage() {
     enrollments,
     isLoadingEnrollments,
     fetchEnrollments,
+    myMarks,
+    isLoadingMarks,
+    fetchMyMarks,
   } = useStudentStore();
 
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -60,7 +63,8 @@ export function ResultsPage() {
   React.useEffect(() => {
     void fetchResults();
     void fetchEnrollments();
-  }, [fetchResults, fetchEnrollments]);
+    void fetchMyMarks();
+  }, [fetchResults, fetchEnrollments, fetchMyMarks]);
 
   // Graded course enrollments
   const gradedEnrollments = enrollments.filter(
@@ -351,11 +355,14 @@ export function ResultsPage() {
           />
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
-            {gradedEnrollments.map((enrollment) => {
+            {enrollments.map((enrollment) => {
               const offering = enrollment.course_offering_detail;
               const course = offering?.course_detail;
               const status = enrollment.status;
               const grade = enrollment.grade;
+              const markGroup = myMarks.find(
+                (m) => m.enrollment_id === enrollment.id || m.course_offering?.id === offering?.id
+              );
 
               return (
                 <Card key={enrollment.id} hoverable className="border-border/80 shadow-sm flex flex-col justify-between">
@@ -363,16 +370,16 @@ export function ResultsPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="inline-block font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded">
-                          {course?.course_code || 'CODE'}
+                          {course?.course_code || offering?.course_detail?.course_code || 'CODE'}
                         </span>
-                        <CardTitle className="mt-2 text-base">{course?.title || 'Enrolled Course'}</CardTitle>
+                        <CardTitle className="mt-2 text-base">{course?.title || offering?.course_detail?.title || 'Enrolled Course'}</CardTitle>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Section {offering?.section || 'A'} · {course?.credit_hours || 0} Credit Hours
                         </p>
                       </div>
                       <div className="text-right">
-                        {grade ? (
-                          <p className="text-2xl font-mono font-bold text-success">{grade}</p>
+                        {grade || markGroup?.letter_grade ? (
+                          <p className="text-2xl font-mono font-bold text-success">{grade || markGroup?.letter_grade}</p>
                         ) : (
                           <Badge
                             variant={
@@ -392,8 +399,34 @@ export function ResultsPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="pt-2">
+                  <CardContent className="space-y-3">
+                    {markGroup && markGroup.assessments && markGroup.assessments.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-border/60">
+                        <p className="text-xs font-semibold text-foreground">Published Continuous Assessments</p>
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                          {markGroup.assessments.map((a) => (
+                            <div
+                              key={a.assessment_id}
+                              className="flex items-center justify-between text-xs bg-muted/30 px-2.5 py-1.5 rounded"
+                            >
+                              <span className="truncate max-w-[60%] font-medium text-foreground">
+                                {a.title} ({a.assessment_type})
+                              </span>
+                              <span className="font-mono font-semibold text-primary">
+                                {a.score !== null && a.score !== undefined ? `${a.score} / ${a.max_marks}` : 'Not graded'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        {markGroup.total_percent !== null && markGroup.total_percent !== undefined && (
+                          <div className="flex justify-between items-center text-xs font-semibold pt-1 text-foreground">
+                            <span>Running Total:</span>
+                            <span className="font-mono text-primary font-bold">{markGroup.total_percent}%</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="pt-2 flex items-center justify-between">
                       <Badge variant="outline" className="text-xs font-normal">
                         {enrollment.is_retake ? 'Retake Enrollment' : 'Standard Enrollment'}
                       </Badge>
