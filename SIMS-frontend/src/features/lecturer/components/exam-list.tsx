@@ -67,7 +67,11 @@ export function ExamList() {
   const [isPublishing, setIsPublishing] = React.useState(false);
 
   const [schedulingExam, setSchedulingExam] = React.useState<LecturerExam | null>(null);
-  const [scheduleForm, setScheduleForm] = React.useState({ startDate: '', endDate: '', durationMinutes: 60 });
+  const [scheduleForm, setScheduleForm] = React.useState<{
+    startDate: string;
+    endDate: string;
+    durationMinutes: string | number;
+  }>({ startDate: '', endDate: '', durationMinutes: 60 });
   const [scheduleError, setScheduleError] = React.useState<string | null>(null);
   const [isScheduling, setIsScheduling] = React.useState(false);
 
@@ -181,7 +185,8 @@ export function ExamList() {
       return;
     }
 
-    if (Number(scheduleForm.durationMinutes) < 1) {
+    const duration = scheduleForm.durationMinutes === '' ? NaN : Number(scheduleForm.durationMinutes);
+    if (scheduleForm.durationMinutes === '' || isNaN(duration) || duration < 1) {
       setScheduleError('Duration must be at least 1 minute.');
       return;
     }
@@ -687,11 +692,11 @@ export function ExamList() {
                   type="number"
                   min={1}
                   max={1440}
-                  value={scheduleForm.durationMinutes}
+                  value={scheduleForm.durationMinutes === '' ? '' : scheduleForm.durationMinutes}
                   onChange={(e) =>
                     setScheduleForm((prev) => ({
                       ...prev,
-                      durationMinutes: Math.max(1, parseInt(e.target.value) || 1),
+                      durationMinutes: e.target.value,
                     }))
                   }
                   required

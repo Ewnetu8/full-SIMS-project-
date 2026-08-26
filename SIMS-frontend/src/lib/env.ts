@@ -9,7 +9,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_API_BASE_URL: z
     .string()
     .url('NEXT_PUBLIC_API_BASE_URL must be a valid URL')
-    .default('http://localhost:8000'),
+    .default('https://localhost'),
 
   // Application public URL — used for canonical links and OG meta
   NEXT_PUBLIC_APP_URL: z
@@ -23,11 +23,15 @@ const envSchema = z.object({
     .default('development'),
 });
 
+// Helper to normalize the base API URL (e.g., stripping trailing /api/v1 or / so path constants compose cleanly)
+const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://localhost';
+const normalizedApiBaseUrl = rawApiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '') || 'https://localhost';
+
 // Validate and throw a readable error if any required vars are missing
 const parsed = envSchema.safeParse({
-  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_API_BASE_URL: normalizedApiBaseUrl,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  NODE_ENV: process.env.NODE_ENV || 'development',
 });
 
 if (!parsed.success) {

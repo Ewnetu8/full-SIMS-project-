@@ -77,6 +77,11 @@ export interface CreateRubricCriterionRequest {
 }
 
 /**
+ * Request body for updating a rubric criterion (partial).
+ */
+export type UpdateRubricCriterionRequest = Partial<CreateRubricCriterionRequest>;
+
+/**
  * Request body for creating a tag.
  */
 export interface CreateTagRequest {

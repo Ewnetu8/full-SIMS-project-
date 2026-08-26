@@ -96,62 +96,11 @@ export function LecturerCourseList() {
     );
   }, [courses, search]);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Course Management</h1>
-            <p className="text-sm text-muted-foreground">
-              Overview of your assigned academic courses, enrolled cohorts, and associated examinations.
-            </p>
-          </div>
-          <div className="w-full sm:w-72">
-            <Input
-              placeholder="Search by code, title, section..."
-              disabled
-              leadingIcon={<Search className="h-4 w-4" />}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} className="min-h-[220px]" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Course Management</h1>
-          <p className="text-sm text-muted-foreground">
-            Overview of your assigned academic courses, enrolled cohorts, and associated examinations.
-          </p>
-        </div>
-        <Card className="border-destructive/20 bg-destructive/5">
-          <CardContent className="p-6">
-            <ErrorState
-              title="Unable to load courses"
-              description={error}
-              onRetry={fetchCourses}
-              retryLabel="Retry loading courses"
-            />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header & Search */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Course Management</h1>
           <p className="text-sm text-muted-foreground">
             Overview of your assigned academic courses, enrolled cohorts, and associated examinations.
@@ -162,12 +111,30 @@ export function LecturerCourseList() {
             placeholder="Search by code, title, section..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            disabled={loading}
             leadingIcon={<Search className="h-4 w-4" />}
           />
         </div>
       </div>
 
-      {courses.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} className="min-h-[220px]" />
+          ))}
+        </div>
+      ) : error ? (
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="p-6">
+            <ErrorState
+              title="Unable to load courses"
+              description={error}
+              onRetry={fetchCourses}
+              retryLabel="Retry loading courses"
+            />
+          </CardContent>
+        </Card>
+      ) : courses.length === 0 ? (
         <Card className="border-dashed border-border/80">
           <CardContent className="p-12">
             <EmptyState

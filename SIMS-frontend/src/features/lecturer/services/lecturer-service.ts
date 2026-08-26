@@ -31,6 +31,10 @@ import {
   listQuestionOptions,
   patchQuestionOption,
   deleteQuestionOption,
+  listRubricCriteria,
+  createRubricCriterion,
+  patchRubricCriterion,
+  deleteRubricCriterion,
 } from './questions-api';
 
 import type {
@@ -68,6 +72,14 @@ function transformQuestionToUi(q: BackendQuestion): UiQuestion {
     required: true,
     options: q.options?.map((o) => ({ id: o.id, text: o.option_text })),
     correctAnswer: q.options?.find((o) => o.is_correct)?.id,
+    rubricCriteria: q.rubric_criteria?.map((rc) => ({
+      id: rc.id,
+      criterionText: rc.criterion_text,
+      pointWeight: Number(rc.point_weight),
+    })),
+    explanationNote: q.rubric_criteria
+      ?.map((rc) => `${rc.criterion_text} (${rc.point_weight} pts)`)
+      .join('\n'),
   };
 }
 
@@ -479,6 +491,36 @@ export const lecturerService = {
             }
           }
         }
+
+        // Add or sync Rubric Criteria for Essay / Short Answer
+        if ((backendType === 'ESSAY' || backendType === 'SHORT_ANSWER') && q.rubricCriteria && q.rubricCriteria.length > 0) {
+          const existingCriteria = await listRubricCriteria({ question: questionId }).catch(() => []);
+          const existingCriteriaMap = new Map(existingCriteria.map((c) => [c.id, c]));
+          const currentCriteriaIds = new Set(q.rubricCriteria.map((c) => c.id));
+
+          // Delete removed criteria
+          for (const existingCrit of existingCriteria) {
+            if (!currentCriteriaIds.has(existingCrit.id)) {
+              await deleteRubricCriterion(existingCrit.id).catch(() => {});
+            }
+          }
+
+          // Create or update criteria
+          for (const crit of q.rubricCriteria) {
+            if (existingCriteriaMap.has(crit.id)) {
+              await patchRubricCriterion(crit.id, {
+                criterion_text: crit.criterionText,
+                point_weight: Number(crit.pointWeight),
+              }).catch(() => {});
+            } else {
+              await createRubricCriterion({
+                question: questionId,
+                criterion_text: crit.criterionText,
+                point_weight: Number(crit.pointWeight),
+              });
+            }
+          }
+        }
       }
 
       // Re-fetch exam to get nested updated questions
@@ -492,7 +534,7 @@ export const lecturerService = {
    * Duplicate an exam through supported frontend API orchestration:
    * 1. Fetches the existing exam.
    * 2. Creates a new DRAFT examination with copied fields and fresh timestamps.
-   * 3. Clones the questions and options for the new exam.
+   * 3. Clones the questions, options, and rubric criteria for the new exam.
    */
   async duplicateExam(examId: string): Promise<LecturerExam | null> {
     try {
@@ -531,6 +573,16 @@ export const lecturerService = {
                 option_text: opt.option_text,
                 is_correct: opt.is_correct,
               });
+            }
+          }
+
+          if (q.rubric_criteria && q.rubric_criteria.length > 0) {
+            for (const rc of q.rubric_criteria) {
+              await createRubricCriterion({
+                question: createdQ.id,
+                criterion_text: rc.criterion_text,
+                point_weight: Number(rc.point_weight),
+              }).catch(() => {});
             }
           }
         }

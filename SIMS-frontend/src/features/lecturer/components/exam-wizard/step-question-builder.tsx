@@ -38,7 +38,7 @@ import {
 } from '../../hooks/use-exam-questions';
 import { toast } from '@/components/feedback';
 
-import type { Question, QuestionOption, QuestionType } from '../../types';
+import type { Question, QuestionOption, QuestionType, RubricCriterionItem } from '../../types';
 
 export const QUESTION_TYPE_LABELS: Record<string, string> = {
   MCQ: 'Multiple Choice (MCQ)',
@@ -57,6 +57,10 @@ function generateOptionId() {
   return `opt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+function generateRubricId() {
+  return `rc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 function createDefaultQuestion(): Question {
   return {
     id: generateId(),
@@ -71,6 +75,7 @@ function createDefaultQuestion(): Question {
       { id: generateOptionId(), text: '' },
     ],
     correctAnswer: undefined,
+    rubricCriteria: [],
   };
 }
 
@@ -84,6 +89,7 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
     useLecturerStore();
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = React.useState<Question | null>(null);
+  const [marksInput, setMarksInput] = React.useState<string>('10');
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Backend integration hooks
@@ -103,6 +109,7 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
   function openNew() {
     const q = createDefaultQuestion();
     setEditingQuestion(q);
+    setMarksInput(String(q.marks || 10));
     setExpandedId(q.id);
   }
 
@@ -111,6 +118,12 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
 
     if (!editingQuestion.prompt.trim()) {
       toast.error('Question text is required');
+      return;
+    }
+
+    const parsedMarks = marksInput.trim() === '' ? NaN : Number(marksInput);
+    if (marksInput.trim() === '' || isNaN(parsedMarks) || parsedMarks <= 0) {
+      toast.error('Marks must be greater than 0');
       return;
     }
 
@@ -130,28 +143,50 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       return;
     }
 
+    // Validate Rubric Criteria if specified for Essay / Short Answer
+    if (
+      (editingQuestion.type === 'ESSAY' || editingQuestion.type === 'essay' || editingQuestion.type === 'SHORT_ANSWER' || editingQuestion.type === 'short_answer') &&
+      editingQuestion.rubricCriteria &&
+      editingQuestion.rubricCriteria.length > 0
+    ) {
+      const hasEmpty = editingQuestion.rubricCriteria.some((rc) => !rc.criterionText.trim());
+      if (hasEmpty) {
+        toast.error('Please provide a description for all rubric criteria');
+        return;
+      }
+
+      const totalWeight = editingQuestion.rubricCriteria.reduce((sum, rc) => sum + Number(rc.pointWeight || 0), 0);
+      if (totalWeight !== parsedMarks) {
+        toast.error(
+          `Sum of rubric criteria point weights (${totalWeight} pts) must equal question total marks (${parsedMarks} pts).`
+        );
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       let savedId = editingQuestion.id;
+      const questionWithMarks = { ...editingQuestion, marks: parsedMarks };
 
       // Persist to backend if editing an existing examination
       if (examId) {
         if (editingQuestion.id && !editingQuestion.id.startsWith('q-')) {
           await updateQuestionMutation.mutateAsync({
             questionId: editingQuestion.id,
-            question: editingQuestion,
+            question: questionWithMarks,
             examinationId: examId,
           });
         } else {
           const res = await createQuestion.mutateAsync({
-            question: editingQuestion,
+            question: questionWithMarks,
             examinationId: examId,
           });
           savedId = res.id;
         }
       }
 
-      const qToSave: Question = { ...editingQuestion, id: savedId };
+      const qToSave: Question = { ...questionWithMarks, id: savedId };
 
       // Update local wizard state
       const existingIndex = wizardData.questions.findIndex((q) => q.id === editingQuestion.id);
@@ -174,7 +209,12 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
   function openEdit(index: number) {
     const q = wizardData.questions[index];
     if (!q) return;
-    setEditingQuestion({ ...q, options: q.options ? [...q.options] : undefined });
+    setEditingQuestion({
+      ...q,
+      options: q.options ? [...q.options] : undefined,
+      rubricCriteria: q.rubricCriteria ? [...q.rubricCriteria] : undefined,
+    });
+    setMarksInput(String(q.marks ?? 10));
     setExpandedId(q.id);
   }
 
@@ -185,6 +225,7 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       ...q,
       id: generateId(),
       options: q.options?.map((o) => ({ ...o, id: generateOptionId() })),
+      rubricCriteria: q.rubricCriteria?.map((rc) => ({ ...rc, id: generateRubricId() })),
     };
     addQuestion(copy);
   }
@@ -216,8 +257,18 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
           { id: generateOptionId(), text: '' },
         ];
       }
+      base.rubricCriteria = undefined;
     } else {
       base.options = undefined;
+      if (!base.rubricCriteria || base.rubricCriteria.length === 0) {
+        base.rubricCriteria = [
+          {
+            id: generateRubricId(),
+            criterionText: 'Understanding of the concept',
+            pointWeight: base.marks,
+          },
+        ];
+      }
     }
     setEditingQuestion(base);
   }
@@ -246,16 +297,66 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
     });
   }
 
-  function toggleMultiSelectAnswer(optId: string) {
+  function addRubricCriterion() {
     if (!editingQuestion) return;
-    const current = Array.isArray(editingQuestion.correctAnswer) ? editingQuestion.correctAnswer : [];
-    const updated = current.includes(optId)
-      ? current.filter((id) => id !== optId)
-      : [...current, optId];
-    setEditingQuestion({ ...editingQuestion, correctAnswer: updated });
+    const current = editingQuestion.rubricCriteria ?? [];
+    const usedMarks = current.reduce((sum, rc) => sum + Number(rc.pointWeight || 0), 0);
+    const remainingMarks = Math.max(1, editingQuestion.marks - usedMarks);
+    setEditingQuestion({
+      ...editingQuestion,
+      rubricCriteria: [
+        ...current,
+        {
+          id: generateRubricId(),
+          criterionText: '',
+          pointWeight: remainingMarks,
+        },
+      ],
+    });
+  }
+
+  function updateRubricCriterion(id: string, updates: Partial<RubricCriterionItem>) {
+    if (!editingQuestion?.rubricCriteria) return;
+    setEditingQuestion({
+      ...editingQuestion,
+      rubricCriteria: editingQuestion.rubricCriteria.map((rc) =>
+        rc.id === id ? { ...rc, ...updates } : rc
+      ),
+    });
+  }
+
+  function removeRubricCriterion(id: string) {
+    if (!editingQuestion?.rubricCriteria) return;
+    setEditingQuestion({
+      ...editingQuestion,
+      rubricCriteria: editingQuestion.rubricCriteria.filter((rc) => rc.id !== id),
+    });
+  }
+
+  function distributeRubricMarksEvenly() {
+    if (!editingQuestion?.rubricCriteria || editingQuestion.rubricCriteria.length === 0) return;
+    const count = editingQuestion.rubricCriteria.length;
+    const perItem = Math.floor(editingQuestion.marks / count);
+    const remainder = editingQuestion.marks % count;
+
+    setEditingQuestion({
+      ...editingQuestion,
+      rubricCriteria: editingQuestion.rubricCriteria.map((rc, idx) => ({
+        ...rc,
+        pointWeight: idx === 0 ? perItem + remainder : perItem,
+      })),
+    });
   }
 
   const totalMarksUsed = wizardData.questions.reduce((acc, q) => acc + q.marks, 0);
+  const isEssayOrShortAnswer =
+    editingQuestion?.type === 'ESSAY' ||
+    editingQuestion?.type === 'essay' ||
+    editingQuestion?.type === 'SHORT_ANSWER' ||
+    editingQuestion?.type === 'short_answer';
+
+  const rubricTotalWeight =
+    editingQuestion?.rubricCriteria?.reduce((sum, rc) => sum + Number(rc.pointWeight || 0), 0) ?? 0;
 
   // Show loading state while fetching backend questions
   if (loadingBackend) {
@@ -394,34 +495,111 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                     </div>
                   )}
 
-                {/* Short answer correct answer hint */}
-                {(editingQuestion.type === 'SHORT_ANSWER' || editingQuestion.type === 'short_answer') && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="q-correct">Expected Answer (Grading Reference)</Label>
-                    <Input
-                      id="q-correct"
-                      value={typeof editingQuestion.correctAnswer === 'string' ? editingQuestion.correctAnswer : ''}
-                      onChange={(e) =>
-                        setEditingQuestion({ ...editingQuestion, correctAnswer: e.target.value })
-                      }
-                      placeholder="e.g. O(N log N)"
-                    />
-                  </div>
-                )}
+                {/* Rubric Criteria for Essay / Short Answer */}
+                {isEssayOrShortAnswer && (
+                  <div className="space-y-3 rounded-xl border border-border p-4 bg-muted/20">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <Label className="font-semibold text-sm">Evaluation Rubric Criteria</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Define criteria and point weights for evaluating student answers.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {editingQuestion.rubricCriteria && editingQuestion.rubricCriteria.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            onClick={distributeRubricMarksEvenly}
+                          >
+                            Distribute Evenly
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="xs"
+                          onClick={addRubricCriterion}
+                          leftIcon={<Plus className="h-3 w-3" />}
+                        >
+                          Add Criterion
+                        </Button>
+                      </div>
+                    </div>
 
-                {/* Essay grading notes */}
-                {(editingQuestion.type === 'ESSAY' || editingQuestion.type === 'essay') && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="q-rubric">Marking Rubric / Notes</Label>
-                    <Textarea
-                      id="q-rubric"
-                      value={editingQuestion.explanationNote ?? ''}
-                      onChange={(e) =>
-                        setEditingQuestion({ ...editingQuestion, explanationNote: e.target.value })
-                      }
-                      placeholder="Describe how marks should be awarded..."
-                      rows={3}
-                    />
+                    {(!editingQuestion.rubricCriteria || editingQuestion.rubricCriteria.length === 0) ? (
+                      <div className="py-6 text-center rounded-lg border border-dashed border-border/80 bg-background/50">
+                        <p className="text-xs text-muted-foreground">
+                          No rubric criteria added yet.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Click &quot;Add Criterion&quot; to define evaluation metrics and point weights.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {editingQuestion.rubricCriteria.map((rc, idx) => (
+                          <div
+                            key={rc.id}
+                            className="flex items-center gap-2 bg-background p-2.5 rounded-lg border border-border"
+                          >
+                            <span className="text-xs font-mono text-muted-foreground w-6 text-center">
+                              #{idx + 1}
+                            </span>
+                            <Input
+                              value={rc.criterionText}
+                              onChange={(e) =>
+                                updateRubricCriterion(rc.id, { criterionText: e.target.value })
+                              }
+                              placeholder="e.g. Quality of explanation, Accuracy of diagram, Depth of analysis"
+                              className="flex-1 text-xs"
+                            />
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Input
+                                type="number"
+                                min={0.5}
+                                step={0.5}
+                                value={rc.pointWeight === 0 ? '0' : (rc.pointWeight ?? '')}
+                                onChange={(e) =>
+                                  updateRubricCriterion(rc.id, {
+                                    pointWeight: e.target.value === '' ? ('' as any) : Number(e.target.value),
+                                  })
+                                }
+                                className="w-20 text-xs"
+                                placeholder="Pts"
+                              />
+                              <span className="text-xs text-muted-foreground font-medium">pts</span>
+                              <button
+                                type="button"
+                                onClick={() => removeRubricCriterion(rc.id)}
+                                className="text-muted-foreground hover:text-destructive rounded-md p-1 ml-1"
+                                aria-label="Remove criterion"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Weight comparison banner */}
+                        <div
+                          className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${
+                            rubricTotalWeight === (marksInput ? Number(marksInput) : editingQuestion.marks)
+                              ? 'bg-success/10 text-success border border-success/20'
+                              : 'bg-destructive/10 text-destructive border border-destructive/20'
+                          }`}
+                        >
+                          <span>
+                            Total Criteria Weight: <strong>{rubricTotalWeight} pts</strong>
+                          </span>
+                          <span>
+                            Question Total Marks: <strong>{marksInput || editingQuestion.marks} pts</strong>
+                            {rubricTotalWeight !== (marksInput ? Number(marksInput) : editingQuestion.marks) && ' (Must match)'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -434,13 +612,8 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                       type="number"
                       min={1}
                       className="w-28"
-                      value={editingQuestion.marks}
-                      onChange={(e) =>
-                        setEditingQuestion({
-                          ...editingQuestion,
-                          marks: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
+                      value={marksInput}
+                      onChange={(e) => setMarksInput(e.target.value)}
                     />
                   </div>
                   <div className="flex items-center gap-2 pb-1">

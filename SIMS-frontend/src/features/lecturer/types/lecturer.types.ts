@@ -13,6 +13,12 @@ export interface QuestionOption {
   text: string;
 }
 
+export interface RubricCriterionItem {
+  id: string;
+  criterionText: string;
+  pointWeight: number;
+}
+
 export interface Question {
   id: string;
   type: QuestionType;
@@ -22,6 +28,7 @@ export interface Question {
   options?: QuestionOption[];
   correctAnswer?: string | string[];
   explanationNote?: string;
+  rubricCriteria?: RubricCriterionItem[];
 }
 
 export interface LecturerExam {

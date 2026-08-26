@@ -121,7 +121,13 @@ export function ExaminationManagement() {
   const [formError, setFormError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
 
-  const [formData, setFormData] = React.useState({
+  const [formData, setFormData] = React.useState<{
+    course_offering: string;
+    title: string;
+    start_window: string;
+    end_window: string;
+    duration_minutes: string | number;
+  }>({
     course_offering: '',
     title: '',
     start_window: '',
@@ -207,7 +213,8 @@ export function ExaminationManagement() {
         errors.end_window = 'End window must be after the start window.';
       }
     }
-    if (!formData.duration_minutes || Number(formData.duration_minutes) <= 0) {
+    const duration = formData.duration_minutes === '' ? NaN : Number(formData.duration_minutes);
+    if (formData.duration_minutes === '' || isNaN(duration) || duration <= 0) {
       errors.duration_minutes = 'Duration must be at least 1 minute.';
     }
 
@@ -1001,9 +1008,9 @@ export function ExaminationManagement() {
                     type="number"
                     min={1}
                     max={1440}
-                    value={formData.duration_minutes}
+                    value={formData.duration_minutes === '' ? '' : formData.duration_minutes}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }));
+                      setFormData((prev) => ({ ...prev, duration_minutes: e.target.value }));
                       if (fieldErrors.duration_minutes) setFieldErrors((p) => ({ ...p, duration_minutes: '' }));
                     }}
                     error={!!fieldErrors.duration_minutes}
@@ -1125,9 +1132,9 @@ export function ExaminationManagement() {
                     type="number"
                     min={1}
                     max={1440}
-                    value={formData.duration_minutes}
+                    value={formData.duration_minutes === '' ? '' : formData.duration_minutes}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }));
+                      setFormData((prev) => ({ ...prev, duration_minutes: e.target.value }));
                       if (fieldErrors.duration_minutes) setFieldErrors((p) => ({ ...p, duration_minutes: '' }));
                     }}
                     error={!!fieldErrors.duration_minutes}
@@ -1238,9 +1245,9 @@ export function ExaminationManagement() {
                     type="number"
                     min={1}
                     max={1440}
-                    value={formData.duration_minutes}
+                    value={formData.duration_minutes === '' ? '' : formData.duration_minutes}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }));
+                      setFormData((prev) => ({ ...prev, duration_minutes: e.target.value }));
                       if (fieldErrors.duration_minutes) setFieldErrors((p) => ({ ...p, duration_minutes: '' }));
                     }}
                     error={!!fieldErrors.duration_minutes}

@@ -11,7 +11,10 @@ import {
   createQuestionOption,
   patchQuestionOption,
   deleteQuestionOption,
+  listRubricCriteria,
   createRubricCriterion,
+  patchRubricCriterion,
+  deleteRubricCriterion,
 } from '../services/questions-api';
 import type { Question as FrontendQuestion, QuestionType as FrontendQuestionType } from '../types';
 
@@ -19,6 +22,8 @@ import type {
   Question as BackendQuestion,
   CreateQuestionRequest,
   UpdateQuestionRequest,
+  CreateRubricCriterionRequest,
+  UpdateRubricCriterionRequest,
   QuestionType as BackendQuestionType
 } from '@/types/lecturer';
 
@@ -60,6 +65,11 @@ export function transformBackendToFrontend(backendQ: BackendQuestion): FrontendQ
       text: opt.option_text,
     })),
     correctAnswer: backendQ.options?.find(opt => opt.is_correct)?.id,
+    rubricCriteria: backendQ.rubric_criteria?.map(rc => ({
+      id: rc.id,
+      criterionText: rc.criterion_text,
+      pointWeight: Number(rc.point_weight),
+    })),
     explanationNote: backendQ.rubric_criteria
       ?.map(rc => `${rc.criterion_text} (${rc.point_weight} pts)`)
       .join('\n'),
@@ -84,6 +94,7 @@ export function transformFrontendToBackend(
 // ─── React Query Hooks ────────────────────────────────────────────────────────
 
 export const QUESTIONS_QUERY_KEY = 'exam-questions';
+export const RUBRIC_CRITERIA_QUERY_KEY = 'rubric-criteria';
 
 /**
  * Fetch all questions (optionally filtered by examination)
@@ -97,6 +108,78 @@ export function useExamQuestions(examinationId?: string) {
       return backendQuestions.map(transformBackendToFrontend);
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+/**
+ * Hook to fetch rubric criteria filtered by question ID
+ */
+export function useRubricCriteria(questionId?: string) {
+  return useQuery({
+    queryKey: [RUBRIC_CRITERIA_QUERY_KEY, questionId],
+    queryFn: () => listRubricCriteria(questionId ? { question: questionId } : undefined),
+    enabled: !!questionId && !questionId.startsWith('q-'),
+  });
+}
+
+/**
+ * Hook to create a single rubric criterion
+ */
+export function useCreateRubricCriterion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateRubricCriterionRequest) => createRubricCriterion(data),
+    onSuccess: (newCriterion) => {
+      queryClient.invalidateQueries({ queryKey: [RUBRIC_CRITERIA_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
+      toast.success('Rubric criterion created successfully');
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(err?.response?.data?.detail || err?.message || 'Failed to create rubric criterion');
+    },
+  });
+}
+
+/**
+ * Hook to update an existing rubric criterion
+ */
+export function useUpdateRubricCriterion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateRubricCriterionRequest }) =>
+      patchRubricCriterion(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [RUBRIC_CRITERIA_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
+      toast.success('Rubric criterion updated successfully');
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(err?.response?.data?.detail || err?.message || 'Failed to update rubric criterion');
+    },
+  });
+}
+
+/**
+ * Hook to delete a rubric criterion
+ */
+export function useDeleteRubricCriterion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteRubricCriterion(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [RUBRIC_CRITERIA_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
+      toast.success('Rubric criterion removed successfully');
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(err?.response?.data?.detail || err?.message || 'Failed to delete rubric criterion');
+    },
   });
 }
 
@@ -143,7 +226,15 @@ export function useCreateExamQuestion() {
 
       // 3. Create rubric criteria if essay/short answer
       if (backendType === 'ESSAY' || backendType === 'SHORT_ANSWER') {
-        if (question.explanationNote) {
+        if (question.rubricCriteria && question.rubricCriteria.length > 0) {
+          for (const rc of question.rubricCriteria) {
+            await createRubricCriterion({
+              question: createdQuestion.id,
+              criterion_text: rc.criterionText,
+              point_weight: Number(rc.pointWeight),
+            });
+          }
+        } else if (question.explanationNote) {
           const rubricLines = question.explanationNote.split('\n').filter(line => line.trim());
           for (const line of rubricLines) {
             const match = line.match(/^(.+?)\s*\((\d+(?:\.\d+)?)\s*pts?\)$/);
@@ -181,7 +272,7 @@ export function useCreateExamQuestion() {
 }
 
 /**
- * Update an existing question and its options
+ * Update an existing question and its options / rubric criteria
  */
 export function useUpdateExamQuestion() {
   const queryClient = useQueryClient();
@@ -247,10 +338,43 @@ export function useUpdateExamQuestion() {
         }
       }
 
+      // If Essay/Short Answer, synchronize rubric criteria
+      if (backendType === 'ESSAY' || backendType === 'SHORT_ANSWER') {
+        if (question.rubricCriteria) {
+          const existingCriteria = await listRubricCriteria({ question: questionId }).catch(() => []);
+          const existingCriteriaMap = new Map(existingCriteria.map((c) => [c.id, c]));
+          const currentCriteriaIds = new Set(question.rubricCriteria.map((c) => c.id));
+
+          // Delete removed criteria
+          for (const existingCrit of existingCriteria) {
+            if (!currentCriteriaIds.has(existingCrit.id)) {
+              await deleteRubricCriterion(existingCrit.id).catch(() => {});
+            }
+          }
+
+          // Create or update criteria
+          for (const crit of question.rubricCriteria) {
+            if (existingCriteriaMap.has(crit.id)) {
+              await patchRubricCriterion(crit.id, {
+                criterion_text: crit.criterionText,
+                point_weight: Number(crit.pointWeight),
+              }).catch(() => {});
+            } else {
+              await createRubricCriterion({
+                question: questionId,
+                criterion_text: crit.criterionText,
+                point_weight: Number(crit.pointWeight),
+              });
+            }
+          }
+        }
+      }
+
       return updatedQuestion;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [RUBRIC_CRITERIA_QUERY_KEY] });
       toast.success('Question updated successfully');
     },
     onError: (error: unknown) => {
@@ -270,6 +394,7 @@ export function useDeleteExamQuestion() {
     mutationFn: (questionId: string) => deleteQuestion(questionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [RUBRIC_CRITERIA_QUERY_KEY] });
       toast.success('Question deleted successfully');
     },
     onError: (error: unknown) => {

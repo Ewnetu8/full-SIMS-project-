@@ -179,7 +179,7 @@ function createApiClient(): AxiosInstance {
           const newAccessToken = refreshRes.tokens?.accessToken || '';
 
           if (newAccessToken) {
-            useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
+            useAuthStore.getState().refreshSession(refreshRes.tokens);
             originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
 
             // Resolve all queued requests with the new access token

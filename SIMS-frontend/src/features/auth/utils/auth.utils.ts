@@ -99,6 +99,45 @@ export function getPasswordStrength(password: string): PasswordStrengthResult {
 
 // ─── Token Utilities ──────────────────────────────────────────────────────────
 
+/**
+ * Decodes the JWT payload without signature verification in the browser
+ * to extract the `exp` (expiration) timestamp in milliseconds.
+ * Returns null if the token is malformed or does not contain `exp`.
+ */
+export function parseJwtExp(token: string | null | undefined): number | null {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (typeof payload?.exp === 'number') {
+      return payload.exp * 1000;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether an access token is present and currently valid according to its JWT `exp` timestamp.
+ */
+export function isAccessTokenValid(token?: string | null, expiresAt?: number | null): boolean {
+  if (!token) return false;
+  const expMs = expiresAt || parseJwtExp(token);
+  if (!expMs) return false;
+  return Date.now() < expMs;
+}
+
 /** Returns true if the token expiry timestamp (ms) is in the past. */
 export function isTokenExpired(expiresAt: number): boolean {
   return Date.now() >= expiresAt;

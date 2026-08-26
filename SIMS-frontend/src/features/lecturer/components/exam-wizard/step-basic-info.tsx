@@ -29,6 +29,25 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
   const { wizardData, updateWizardData } = useLecturerStore();
   const [courses, setCourses] = React.useState<Course[]>([]);
 
+  // String state for raw numeric editing
+  const [durationInput, setDurationInput] = React.useState(
+    wizardData.durationMinutes !== undefined && wizardData.durationMinutes !== null
+      ? String(wizardData.durationMinutes)
+      : '60',
+  );
+  const [totalMarksInput, setTotalMarksInput] = React.useState(
+    wizardData.totalMarks !== undefined && wizardData.totalMarks !== null
+      ? String(wizardData.totalMarks)
+      : '100',
+  );
+  const [passingScoreInput, setPassingScoreInput] = React.useState(
+    wizardData.passingScore !== undefined && wizardData.passingScore !== null
+      ? String(wizardData.passingScore)
+      : '50',
+  );
+
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+
   React.useEffect(() => {
     lecturerService.getCourses().then((loadedCourses) => {
       setCourses(loadedCourses);
@@ -41,18 +60,57 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
     });
   }, []);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    onNext();
+  function validate(): boolean {
+    const newErrors: Record<string, string> = {};
+
+    if (!wizardData.title.trim()) {
+      newErrors.title = 'Exam title is required.';
+    } else if (wizardData.title.trim().length < 5) {
+      newErrors.title = 'Exam title must be at least 5 characters.';
+    }
+
+    if (!wizardData.courseId) {
+      newErrors.course = 'Please select a course.';
+    }
+
+    const duration = durationInput.trim() === '' ? NaN : Number(durationInput);
+    if (durationInput.trim() === '' || isNaN(duration)) {
+      newErrors.duration = 'Duration is required.';
+    } else if (duration <= 0) {
+      newErrors.duration = 'Duration must be greater than 0 minutes.';
+    }
+
+    const totalMarks = totalMarksInput.trim() === '' ? NaN : Number(totalMarksInput);
+    if (totalMarksInput.trim() === '' || isNaN(totalMarks)) {
+      newErrors.totalMarks = 'Total marks is required.';
+    } else if (totalMarks <= 0) {
+      newErrors.totalMarks = 'Total marks must be greater than 0.';
+    }
+
+    const passingScore = passingScoreInput.trim() === '' ? NaN : Number(passingScoreInput);
+    if (passingScoreInput.trim() === '' || isNaN(passingScore)) {
+      newErrors.passingScore = 'Passing score is required.';
+    } else if (passingScore < 0) {
+      newErrors.passingScore = 'Passing score must be 0 or greater.';
+    } else if (!isNaN(totalMarks) && passingScore > totalMarks) {
+      newErrors.passingScore = 'Passing score cannot be greater than total marks.';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   }
 
-  const isValid =
-    wizardData.title.trim().length >= 5 &&
-    !!wizardData.courseId &&
-    wizardData.durationMinutes > 0 &&
-    wizardData.totalMarks > 0 &&
-    wizardData.passingScore >= 0 &&
-    wizardData.passingScore <= wizardData.totalMarks;
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validate()) return;
+
+    updateWizardData({
+      durationMinutes: Number(durationInput),
+      totalMarks: Number(totalMarksInput),
+      passingScore: Number(passingScoreInput),
+    });
+    onNext();
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -66,16 +124,28 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
             <Input
               id="exam-title"
               value={wizardData.title}
-              onChange={(e) => updateWizardData({ title: e.target.value })}
+              onChange={(e) => {
+                updateWizardData({ title: e.target.value });
+                if (errors.title) setErrors((prev) => ({ ...prev, title: '' }));
+              }}
               placeholder="e.g. Midterm Assessment: Data Structures & Algorithms"
-              required
+              error={!!errors.title}
             />
+            {errors.title && (
+              <p className="text-xs text-destructive font-medium">{errors.title}</p>
+            )}
           </div>
 
           {/* Course */}
           <div className="space-y-1.5">
             <Label htmlFor="exam-course" required>Course</Label>
-            <Select value={wizardData.courseId} onValueChange={(v) => updateWizardData({ courseId: v })}>
+            <Select
+              value={wizardData.courseId}
+              onValueChange={(v) => {
+                updateWizardData({ courseId: v });
+                if (errors.course) setErrors((prev) => ({ ...prev, course: '' }));
+              }}
+            >
               <SelectTrigger id="exam-course">
                 <SelectValue placeholder="Select a course" />
               </SelectTrigger>
@@ -87,6 +157,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 ))}
               </SelectContent>
             </Select>
+            {errors.course && (
+              <p className="text-xs text-destructive font-medium">{errors.course}</p>
+            )}
           </div>
 
           {/* Description */}
@@ -121,13 +194,17 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
               <Input
                 id="exam-duration"
                 type="number"
-                min={5}
-                max={480}
-                value={wizardData.durationMinutes}
-                onChange={(e) =>
-                  updateWizardData({ durationMinutes: parseInt(e.target.value, 10) || 60 })
-                }
+                min={1}
+                value={durationInput}
+                onChange={(e) => {
+                  setDurationInput(e.target.value);
+                  if (errors.duration) setErrors((prev) => ({ ...prev, duration: '' }));
+                }}
+                error={!!errors.duration}
               />
+              {errors.duration && (
+                <p className="text-xs text-destructive font-medium">{errors.duration}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="exam-total-marks" required>Total Marks</Label>
@@ -135,11 +212,16 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 id="exam-total-marks"
                 type="number"
                 min={1}
-                value={wizardData.totalMarks}
-                onChange={(e) =>
-                  updateWizardData({ totalMarks: parseInt(e.target.value, 10) || 100 })
-                }
+                value={totalMarksInput}
+                onChange={(e) => {
+                  setTotalMarksInput(e.target.value);
+                  if (errors.totalMarks) setErrors((prev) => ({ ...prev, totalMarks: '' }));
+                }}
+                error={!!errors.totalMarks}
               />
+              {errors.totalMarks && (
+                <p className="text-xs text-destructive font-medium">{errors.totalMarks}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="exam-passing" required>Passing Score</Label>
@@ -147,19 +229,23 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 id="exam-passing"
                 type="number"
                 min={0}
-                max={wizardData.totalMarks}
-                value={wizardData.passingScore}
-                onChange={(e) =>
-                  updateWizardData({ passingScore: parseInt(e.target.value, 10) || 50 })
-                }
+                value={passingScoreInput}
+                onChange={(e) => {
+                  setPassingScoreInput(e.target.value);
+                  if (errors.passingScore) setErrors((prev) => ({ ...prev, passingScore: '' }));
+                }}
+                error={!!errors.passingScore}
               />
+              {errors.passingScore && (
+                <p className="text-xs text-destructive font-medium">{errors.passingScore}</p>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={!isValid} size="lg">
+        <Button type="submit" size="lg">
           Continue to Settings →
         </Button>
       </div>
