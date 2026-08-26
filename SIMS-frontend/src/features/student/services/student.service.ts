@@ -55,7 +55,11 @@ export const studentService = {
    * Starts an examination attempt for the logged-in student.
    */
   startExam: async (id: string): Promise<ExamAttempt> => {
-    return await api.post<ExamAttempt>(API_ENDPOINTS.EXAMS.START(id), {});
+    const res = await api.post<any>(API_ENDPOINTS.EXAMS.START(id), {});
+    if (res && res.attempt) {
+      return res.attempt;
+    }
+    return res;
   },
 
   /**
