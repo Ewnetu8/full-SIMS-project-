@@ -12,6 +12,9 @@ import { lecturerService } from '../services';
 import type { LecturerExam } from '../types';
 
 const TYPE_LABELS: Record<string, string> = {
+  MCQ: 'Multiple Choice',
+  SHORT_ANSWER: 'Short Answer',
+  ESSAY: 'Essay',
   multiple_choice: 'Multiple Choice',
   multiple_select: 'Multiple Select',
   true_false: 'True / False',
@@ -123,7 +126,7 @@ export function ExamPreview({ examId }: ExamPreviewProps) {
               </div>
 
               {/* Answer input simulation */}
-              {(q.type === 'multiple_choice' || q.type === 'true_false') && q.options && (
+              {(q.type === 'MCQ' || q.type === 'multiple_choice') && q.options && (
                 <div className="space-y-2">
                   {q.options.map((opt) => (
                     <label
@@ -137,21 +140,7 @@ export function ExamPreview({ examId }: ExamPreviewProps) {
                 </div>
               )}
 
-              {q.type === 'multiple_select' && q.options && (
-                <div className="space-y-2">
-                  {q.options.map((opt) => (
-                    <label
-                      key={opt.id}
-                      className="flex items-center gap-3 rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                    >
-                      <input type="checkbox" className="accent-primary" disabled />
-                      <span className="text-sm">{opt.text}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {q.type === 'short_answer' && (
+              {(q.type === 'SHORT_ANSWER' || q.type === 'short_answer') && (
                 <input
                   type="text"
                   disabled
@@ -160,7 +149,7 @@ export function ExamPreview({ examId }: ExamPreviewProps) {
                 />
               )}
 
-              {q.type === 'essay' && (
+              {(q.type === 'ESSAY' || q.type === 'essay') && (
                 <textarea
                   disabled
                   rows={5}

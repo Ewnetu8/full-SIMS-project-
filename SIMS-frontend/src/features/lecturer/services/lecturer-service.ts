@@ -26,7 +26,11 @@ import {
 } from './examinations-api';
 import {
   createQuestion,
+  patchQuestion,
   createQuestionOption,
+  listQuestionOptions,
+  patchQuestionOption,
+  deleteQuestionOption,
 } from './questions-api';
 
 import type {
@@ -390,32 +394,75 @@ export const lecturerService = {
     // Persist questions if provided
     if (data.questions && data.questions.length > 0) {
       for (const q of data.questions) {
-        let backendType: 'MCQ' | 'SHORT_ANSWER' | 'ESSAY' = 'ESSAY';
-        if (q.type === 'multiple_choice' || q.type === 'multiple_select' || q.type === 'true_false') {
-          backendType = 'MCQ';
-        } else if (q.type === 'short_answer') {
+        let backendType: 'MCQ' | 'SHORT_ANSWER' | 'ESSAY' = 'MCQ';
+        if (q.type === 'SHORT_ANSWER' || q.type === 'short_answer') {
           backendType = 'SHORT_ANSWER';
+        } else if (q.type === 'ESSAY' || q.type === 'essay') {
+          backendType = 'ESSAY';
+        } else {
+          backendType = 'MCQ';
         }
 
-        const createdQuestion = await createQuestion({
-          examination: exam.id,
-          question_text: q.prompt,
-          question_type: backendType,
-          total_points: q.marks,
-        });
+        let questionId = q.id;
 
-        // Add MCQ options if available
+        if (q.id && !q.id.startsWith('q-')) {
+          await patchQuestion(q.id, {
+            examination: exam.id,
+            question_text: q.prompt,
+            question_type: backendType,
+            total_points: q.marks,
+          });
+        } else {
+          const createdQuestion = await createQuestion({
+            examination: exam.id,
+            question_text: q.prompt,
+            question_type: backendType,
+            total_points: q.marks,
+          });
+          questionId = createdQuestion.id;
+        }
+
+        // Add or sync MCQ options if available
         if (backendType === 'MCQ' && q.options && q.options.length > 0) {
-          for (const opt of q.options) {
+          const existingOptions = await listQuestionOptions({ question: questionId }).catch(() => []);
+          const existingOptionMap = new Map(existingOptions.map((o) => [o.id, o]));
+          const currentOptionIds = new Set(q.options.map((o) => o.id));
+
+          // Delete removed options
+          for (const existingOpt of existingOptions) {
+            if (!currentOptionIds.has(existingOpt.id)) {
+              await deleteQuestionOption(existingOpt.id).catch(() => {});
+            }
+          }
+
+          // Sort so correct option is created/updated first
+          const sortedOptions = [...q.options].sort((a, b) => {
+            const isCorrectA = Array.isArray(q.correctAnswer)
+              ? q.correctAnswer.includes(a.id)
+              : q.correctAnswer === a.id;
+            const isCorrectB = Array.isArray(q.correctAnswer)
+              ? q.correctAnswer.includes(b.id)
+              : q.correctAnswer === b.id;
+            return (isCorrectB ? 1 : 0) - (isCorrectA ? 1 : 0);
+          });
+
+          for (const opt of sortedOptions) {
             const isCorrect = Array.isArray(q.correctAnswer)
               ? q.correctAnswer.includes(opt.id)
               : q.correctAnswer === opt.id;
 
-            await createQuestionOption({
-              question: createdQuestion.id,
-              option_text: opt.text,
-              is_correct: Boolean(isCorrect),
-            });
+            if (existingOptionMap.has(opt.id)) {
+              await patchQuestionOption(opt.id, {
+                option_text: opt.text,
+                is_correct: Boolean(isCorrect),
+              }).catch(() => {});
+            } else {
+              await createQuestionOption({
+                question: questionId,
+                option_text: opt.text,
+                is_correct: Boolean(isCorrect),
+              });
+            }
           }
         }
       }
@@ -461,7 +508,10 @@ export const lecturerService = {
           });
 
           if (q.options && q.options.length > 0) {
-            for (const opt of q.options) {
+            const sortedOptions = [...q.options].sort(
+              (a, b) => (b.is_correct ? 1 : 0) - (a.is_correct ? 1 : 0)
+            );
+            for (const opt of sortedOptions) {
               await createQuestionOption({
                 question: createdQ.id,
                 option_text: opt.option_text,

@@ -33,15 +33,18 @@ import { useLecturerStore } from '../../store';
 import { 
   useExamQuestions,
   useCreateExamQuestion,
+  useUpdateExamQuestion,
   useDeleteExamQuestion 
 } from '../../hooks/use-exam-questions';
+import { toast } from '@/components/feedback';
 
 import type { Question, QuestionOption, QuestionType } from '../../types';
 
-const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
-  multiple_choice: 'Multiple Choice (single answer)',
-  multiple_select: 'Multiple Select (many answers)',
-  true_false: 'True / False',
+export const QUESTION_TYPE_LABELS: Record<string, string> = {
+  MCQ: 'Multiple Choice (MCQ)',
+  SHORT_ANSWER: 'Short Answer',
+  ESSAY: 'Essay',
+  multiple_choice: 'Multiple Choice (MCQ)',
   short_answer: 'Short Answer',
   essay: 'Essay',
 };
@@ -57,7 +60,7 @@ function generateOptionId() {
 function createDefaultQuestion(): Question {
   return {
     id: generateId(),
-    type: 'multiple_choice',
+    type: 'MCQ',
     prompt: '',
     marks: 10,
     required: true,
@@ -77,22 +80,23 @@ interface StepQuestionBuilderProps {
 }
 
 export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps) {
-  const { wizardData, addQuestion, updateQuestion, removeQuestion, reorderQuestions } =
+  const { wizardData, addQuestion, updateQuestion, removeQuestion, reorderQuestions, editingExamId } =
     useLecturerStore();
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = React.useState<Question | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Backend integration hooks
-  const examinationId = (wizardData as any).examinationId; // ID if editing existing exam
-  const { data: backendQuestions, isLoading: loadingBackend } = useExamQuestions(examinationId);
+  const examId = editingExamId || (wizardData as any).examinationId || (wizardData as any).id;
+  const { data: backendQuestions, isLoading: loadingBackend } = useExamQuestions(examId);
   const createQuestion = useCreateExamQuestion();
+  const updateQuestionMutation = useUpdateExamQuestion();
   const deleteQuestion = useDeleteExamQuestion();
 
   // Load backend questions into wizard on mount (if editing existing exam)
   React.useEffect(() => {
     if (backendQuestions && backendQuestions.length > 0 && wizardData.questions.length === 0) {
-      backendQuestions.forEach(q => addQuestion(q));
+      backendQuestions.forEach((q) => addQuestion(q));
     }
   }, [backendQuestions]);
 
@@ -104,29 +108,64 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
 
   async function saveQuestion() {
     if (!editingQuestion) return;
-    
+
+    if (!editingQuestion.prompt.trim()) {
+      toast.error('Question text is required');
+      return;
+    }
+
+    if (
+      (editingQuestion.type === 'MCQ' || editingQuestion.type === 'multiple_choice') &&
+      (!editingQuestion.options || editingQuestion.options.length < 2)
+    ) {
+      toast.error('At least 2 options are required for MCQ questions');
+      return;
+    }
+
+    if (
+      (editingQuestion.type === 'MCQ' || editingQuestion.type === 'multiple_choice') &&
+      !editingQuestion.correctAnswer
+    ) {
+      toast.error('Please select the correct option for this MCQ question');
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // Save to backend if we have an examination ID
-      if (examinationId) {
-        await createQuestion.mutateAsync({
-          question: editingQuestion,
-          examinationId,
-        });
+      let savedId = editingQuestion.id;
+
+      // Persist to backend if editing an existing examination
+      if (examId) {
+        if (editingQuestion.id && !editingQuestion.id.startsWith('q-')) {
+          await updateQuestionMutation.mutateAsync({
+            questionId: editingQuestion.id,
+            question: editingQuestion,
+            examinationId: examId,
+          });
+        } else {
+          const res = await createQuestion.mutateAsync({
+            question: editingQuestion,
+            examinationId: examId,
+          });
+          savedId = res.id;
+        }
       }
+
+      const qToSave: Question = { ...editingQuestion, id: savedId };
 
       // Update local wizard state
       const existingIndex = wizardData.questions.findIndex((q) => q.id === editingQuestion.id);
       if (existingIndex >= 0) {
-        updateQuestion(existingIndex, editingQuestion);
+        updateQuestion(existingIndex, qToSave);
       } else {
-        addQuestion(editingQuestion);
+        addQuestion(qToSave);
       }
 
       setEditingQuestion(null);
       setExpandedId(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save question:', error);
+      toast.error(error?.response?.data?.detail || error?.message || 'Failed to save question');
     } finally {
       setIsSaving(false);
     }
@@ -147,7 +186,6 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       id: generateId(),
       options: q.options?.map((o) => ({ ...o, id: generateOptionId() })),
     };
-    // Note: Duplicated questions are only in local state until manually saved to backend
     addQuestion(copy);
   }
 
@@ -155,19 +193,21 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
     const q = wizardData.questions[index];
     if (!q) return;
 
-    // If question exists in backend (has valid UUID), soft delete it
-    if (examinationId && q.id && !q.id.startsWith('q-')) {
-      await deleteQuestion.mutateAsync(q.id);
+    if (q.id && !q.id.startsWith('q-')) {
+      try {
+        await deleteQuestion.mutateAsync(q.id);
+      } catch (err) {
+        console.error('Failed to delete question from backend:', err);
+      }
     }
 
-    // Remove from local state
     removeQuestion(index);
   }
 
   function updateEditingType(type: QuestionType) {
     if (!editingQuestion) return;
     const base = { ...editingQuestion, type, correctAnswer: undefined };
-    if (type === 'multiple_choice' || type === 'multiple_select') {
+    if (type === 'MCQ' || type === 'multiple_choice') {
       if (!base.options || base.options.length === 0) {
         base.options = [
           { id: generateOptionId(), text: '' },
@@ -176,11 +216,6 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
           { id: generateOptionId(), text: '' },
         ];
       }
-    } else if (type === 'true_false') {
-      base.options = [
-        { id: 'opt-true', text: 'True' },
-        { id: 'opt-false', text: 'False' },
-      ];
     } else {
       base.options = undefined;
     }
@@ -312,76 +347,55 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                   />
                 </div>
 
-                {/* Options for MCQ / Multiple Select */}
-                {(editingQuestion.type === 'multiple_choice' ||
-                  editingQuestion.type === 'multiple_select' ||
-                  editingQuestion.type === 'true_false') &&
+                {/* Options for MCQ */}
+                {(editingQuestion.type === 'MCQ' || editingQuestion.type === 'multiple_choice') &&
                   editingQuestion.options && (
                     <div className="space-y-2">
-                      <Label>Answer Options</Label>
+                      <Label required>Answer Options (Select correct answer)</Label>
                       {editingQuestion.options.map((opt) => (
                         <div key={opt.id} className="flex items-center gap-2">
-                          {/* Select correct indicator */}
-                          {editingQuestion.type === 'multiple_choice' || editingQuestion.type === 'true_false' ? (
-                            <input
-                              type="radio"
-                              name="correct"
-                              value={opt.id}
-                              checked={editingQuestion.correctAnswer === opt.id}
-                              onChange={() =>
-                                setEditingQuestion({ ...editingQuestion, correctAnswer: opt.id })
-                              }
-                              className="accent-primary"
-                              aria-label={`Mark "${opt.text || opt.id}" as correct`}
-                            />
-                          ) : (
-                            <input
-                              type="checkbox"
-                              checked={
-                                Array.isArray(editingQuestion.correctAnswer) &&
-                                editingQuestion.correctAnswer.includes(opt.id)
-                              }
-                              onChange={() => toggleMultiSelectAnswer(opt.id)}
-                              className="accent-primary"
-                              aria-label={`Mark "${opt.text}" as correct`}
-                            />
-                          )}
+                          <input
+                            type="radio"
+                            name="correct"
+                            value={opt.id}
+                            checked={editingQuestion.correctAnswer === opt.id}
+                            onChange={() =>
+                              setEditingQuestion({ ...editingQuestion, correctAnswer: opt.id })
+                            }
+                            className="accent-primary h-4 w-4 cursor-pointer"
+                            aria-label={`Mark "${opt.text || opt.id}" as correct`}
+                          />
                           <Input
                             value={opt.text}
                             onChange={(e) => updateOption(opt.id, e.target.value)}
                             placeholder="Option text"
                             className="flex-1"
-                            disabled={editingQuestion.type === 'true_false'}
                           />
-                          {editingQuestion.type !== 'true_false' && (
-                            <button
-                              type="button"
-                              onClick={() => removeOption(opt.id)}
-                              className="text-muted-foreground hover:text-destructive rounded-md p-1"
-                              aria-label="Remove option"
-                              disabled={editingQuestion.options!.length <= 2}
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeOption(opt.id)}
+                            className="text-muted-foreground hover:text-destructive rounded-md p-1"
+                            aria-label="Remove option"
+                            disabled={editingQuestion.options!.length <= 2}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
                         </div>
                       ))}
-                      {editingQuestion.type !== 'true_false' && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={addOption}
-                          leftIcon={<Plus className="h-3.5 w-3.5" />}
-                        >
-                          Add Option
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={addOption}
+                        leftIcon={<Plus className="h-3.5 w-3.5" />}
+                      >
+                        Add Option
+                      </Button>
                     </div>
                   )}
 
                 {/* Short answer correct answer hint */}
-                {editingQuestion.type === 'short_answer' && (
+                {(editingQuestion.type === 'SHORT_ANSWER' || editingQuestion.type === 'short_answer') && (
                   <div className="space-y-1.5">
                     <Label htmlFor="q-correct">Expected Answer (Grading Reference)</Label>
                     <Input
@@ -390,13 +404,13 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                       onChange={(e) =>
                         setEditingQuestion({ ...editingQuestion, correctAnswer: e.target.value })
                       }
-                      placeholder="e.g. T(N) = 2T(N/2) + O(N)"
+                      placeholder="e.g. O(N log N)"
                     />
                   </div>
                 )}
 
                 {/* Essay grading notes */}
-                {editingQuestion.type === 'essay' && (
+                {(editingQuestion.type === 'ESSAY' || editingQuestion.type === 'essay') && (
                   <div className="space-y-1.5">
                     <Label htmlFor="q-rubric">Marking Rubric / Notes</Label>
                     <Textarea

@@ -1,9 +1,10 @@
 export type ExamStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
 
 export type QuestionType =
+  | 'MCQ'
+  | 'SHORT_ANSWER'
+  | 'ESSAY'
   | 'multiple_choice'
-  | 'multiple_select'
-  | 'true_false'
   | 'short_answer'
   | 'essay';
 

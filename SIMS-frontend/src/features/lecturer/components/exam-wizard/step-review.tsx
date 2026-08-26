@@ -28,7 +28,7 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
   const marksMismatch = totalMarks !== wizardData.totalMarks;
 
   const hasSubjectiveQuestions = wizardData.questions.some(
-    (q) => q.type === 'essay' || q.type === 'short_answer'
+    (q) => q.type === 'essay' || q.type === 'short_answer' || q.type === 'ESSAY' || q.type === 'SHORT_ANSWER'
   );
 
   async function handleSaveDraft() {
