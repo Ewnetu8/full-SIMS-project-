@@ -469,8 +469,8 @@ def ensure_can_manage_offering(offering, request):
 class TeachingAssignmentListCreateView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
-            return [IsAuthenticated(), HasRole("ADMIN")()]
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+            return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
 
     @extend_schema(
         tags=["Teaching Assignments"],
@@ -522,7 +522,7 @@ class TeachingAssignmentListCreateView(APIView):
 
 
 class TeachingAssignmentDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    permission_classes = [IsAuthenticated, HasRole("ADMIN", "SYSTEM_ADMIN")]
 
     def get_object(self, pk):
         try:

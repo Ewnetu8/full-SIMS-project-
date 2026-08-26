@@ -17,13 +17,13 @@ from questions.serializers import (
 
 def get_admin_write_permissions(request):
     if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-        return [IsAuthenticated(), HasRole("ADMIN")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN")()]
     return [IsAuthenticated()]
 
 
 def get_lecturer_write_permissions(request):
     if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
     return [IsAuthenticated()]
 
 

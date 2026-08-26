@@ -10,7 +10,7 @@ class UserCompactSerializer(serializers.ModelSerializer):
     """Compact user representation for list views."""
     class Meta:
         model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'created_at')
+        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'university', 'created_at')
         read_only_fields = ('id', 'created_at')
 
 
@@ -43,7 +43,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'email', 'first_name', 'last_name', 'national_id_fan',
-            'role', 'is_active', 'is_staff', 'student_profile',
+            'role', 'is_active', 'is_staff', 'university', 'student_profile',
             'lecturer_profile', 'created_at', 'updated_at',
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
@@ -55,7 +55,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'first_name', 'last_name', 'national_id_fan',
-            'role', 'is_active', 'is_staff',
+            'role', 'is_active', 'university',
         )
 
     def validate_role(self, value):
@@ -67,9 +67,10 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         user = self.instance
         role = attrs.get('role', user.role)
         is_active = attrs.get('is_active', user.is_active)
+        request_user = self.context['request'].user
 
         # Prevent admin from deactivating themselves
-        if self.context['request'].user.pk == user.pk:
+        if request_user.pk == user.pk:
             if 'is_active' in attrs and not is_active:
                 raise serializers.ValidationError(
                     {"is_active": "You cannot deactivate your own account."}
@@ -79,9 +80,23 @@ class UserUpdateSerializer(serializers.ModelSerializer):
                     {"role": "You cannot change your own role."}
                 )
 
-        # If role changes away from ADMIN, ensure is_staff follows
-        if role == RoleChoices.ADMIN:
-            attrs['is_staff'] = True
+        # Only System Admin can assign SYSTEM_ADMIN role
+        if role == RoleChoices.SYSTEM_ADMIN and request_user.role != RoleChoices.SYSTEM_ADMIN:
+            raise serializers.ValidationError(
+                {"role": "Only System Admin can assign the System Admin role."}
+            )
+
+        # Only System Admin can change university assignment
+        if 'university' in attrs and request_user.role != RoleChoices.SYSTEM_ADMIN:
+            raise serializers.ValidationError(
+                {"university": "Only System Admin can change university assignment."}
+            )
+
+        # Admin cannot assign SYSTEM_ADMIN role
+        if role == RoleChoices.SYSTEM_ADMIN and request_user.role == RoleChoices.ADMIN:
+            raise serializers.ValidationError(
+                {"role": "Admin cannot assign the System Admin role."}
+            )
 
         return attrs
 

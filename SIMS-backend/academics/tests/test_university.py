@@ -14,7 +14,7 @@ LIST_URL = reverse("university_list")
 
 
 def create_user(
-    email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.ADMIN
+    email="admin@aastu.edu.et", password="strongpass123", role=RoleChoices.SYSTEM_ADMIN
 ):
     return User.objects.create_user(email=email, password=password, role=role)
 
@@ -93,6 +93,20 @@ def test_non_admin_gets_403(client):
 
     response = client.get(
         LIST_URL,
+        HTTP_AUTHORIZATION=f"Bearer {token}",
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_admin_gets_403_for_university_create(client):
+    """Admin (not system admin) cannot create universities."""
+    admin = create_user(email="admin2@aastu.edu.et", role=RoleChoices.ADMIN)
+    token = auth_client(client, admin)
+
+    response = client.post(
+        LIST_URL,
+        {"name": "Test University", "code": "TSTU"},
+        content_type="application/json",
         HTTP_AUTHORIZATION=f"Bearer {token}",
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN

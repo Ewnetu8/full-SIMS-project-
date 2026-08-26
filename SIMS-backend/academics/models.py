@@ -89,6 +89,13 @@ class Program(BaseModel):
 
 
 class AcademicYear(BaseModel):
+    university = models.ForeignKey(
+        University,
+        on_delete=models.CASCADE,
+        related_name='academic_years',
+        null=True,
+        blank=True
+    )
     display_label = models.CharField(max_length=100)
     start_boundary = models.DateField()
     end_boundary = models.DateField()
@@ -203,13 +210,22 @@ class CourseOffering(BaseModel):
 
 
 class CreditHourPolicy(BaseModel):
+    university = models.ForeignKey(
+        University,
+        on_delete=models.CASCADE,
+        related_name='credit_hour_policies',
+        null=True,
+        blank=True
+    )
     class_standing = models.CharField(
         max_length=20,
-        choices=ClassStandingChoices.choices,
-        unique=True
+        choices=ClassStandingChoices.choices
     )
     min_credit_hours = models.PositiveIntegerField(default=12)
     max_credit_hours = models.PositiveIntegerField(default=18)
+
+    class Meta:
+        unique_together = ('university', 'class_standing')
 
     def __str__(self):
         return f"{self.class_standing}: {self.min_credit_hours}-{self.max_credit_hours} hrs"

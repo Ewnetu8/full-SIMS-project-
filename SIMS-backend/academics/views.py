@@ -7,6 +7,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_seriali
 from rest_framework import serializers as drf_serializers
 
 from accounts.permissions import HasRole
+from accounts.models import RoleChoices
 from academics.models import (
     University,
     College,
@@ -39,10 +40,32 @@ from academics.serializers import (
 from academics.tasks import process_batch_enrollment_csv
 
 
-# Helper function for permission checks based on HTTP method
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _is_system_admin(request):
+    return request.user.is_superuser or request.user.role == RoleChoices.SYSTEM_ADMIN
+
+
+def _get_user_university(request):
+    """Return the user's university or None."""
+    if _is_system_admin(request):
+        return None
+    return getattr(request.user, 'university', None)
+
+
+def _check_university_ownership(request, obj_university_id):
+    """Return True if the object belongs to the user's university (or user is system admin)."""
+    if _is_system_admin(request):
+        return True
+    uni = _get_user_university(request)
+    if uni and obj_university_id == uni.pk:
+        return True
+    return False
+
+
 def get_admin_write_permissions(request):
     if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-        return [IsAuthenticated(), HasRole("ADMIN")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN")()]
     return [IsAuthenticated()]
 
 
@@ -50,7 +73,10 @@ def get_admin_write_permissions(request):
 # UNIVERSITY VIEWS
 # ==========================================
 class UniversityListView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated(), HasRole("SYSTEM_ADMIN")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN")()]
 
     @extend_schema(
         tags=["University"],
@@ -58,7 +84,14 @@ class UniversityListView(APIView):
         responses={200: UniversitySerializer(many=True)},
     )
     def get(self, request):
-        queryset = University.objects.all().order_by("-created_at")
+        if _is_system_admin(request):
+            queryset = University.objects.all().order_by("-created_at")
+        else:
+            uni = _get_user_university(request)
+            if uni:
+                queryset = University.objects.filter(pk=uni.pk)
+            else:
+                queryset = University.objects.none()
         serializer = UniversitySerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -77,7 +110,10 @@ class UniversityListView(APIView):
 
 
 class UniversityDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    def get_permissions(self):
+        if self.request.method in ("PUT", "PATCH", "DELETE"):
+            return [IsAuthenticated(), HasRole("SYSTEM_ADMIN")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN")()]
 
     def get_object(self, pk):
         try:
@@ -89,6 +125,8 @@ class UniversityDetailView(APIView):
     def get(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "University not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.pk):
             return Response({"detail": "University not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(UniversitySerializer(obj).data)
 
@@ -133,11 +171,18 @@ class CollegeListView(APIView):
     @extend_schema(tags=["College"], summary="List colleges", responses={200: CollegeSerializer(many=True)})
     def get(self, request):
         queryset = College.objects.all().select_related("university").order_by("-created_at")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(university=uni)
         return Response(CollegeSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["College"], summary="Create college", request=CollegeSerializer, responses={201: CollegeSerializer})
     def post(self, request):
-        serializer = CollegeSerializer(data=request.data)
+        data = request.data.copy()
+        uni = _get_user_university(request)
+        if uni:
+            data['university'] = str(uni.pk)
+        serializer = CollegeSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -150,7 +195,7 @@ class CollegeDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return College.objects.get(pk=pk)
+            return College.objects.select_related("university").get(pk=pk)
         except College.DoesNotExist:
             return None
 
@@ -159,12 +204,16 @@ class CollegeDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
+            return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(CollegeSerializer(obj).data)
 
     @extend_schema(tags=["College"], summary="Update college", request=CollegeSerializer, responses={200: CollegeSerializer})
     def put(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
             return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = CollegeSerializer(obj, data=request.data)
         if serializer.is_valid():
@@ -177,6 +226,8 @@ class CollegeDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
+            return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = CollegeSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -187,6 +238,8 @@ class CollegeDetailView(APIView):
     def delete(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
             return Response({"detail": "College not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -202,11 +255,25 @@ class DepartmentListView(APIView):
     @extend_schema(tags=["Department"], summary="List departments", responses={200: DepartmentSerializer(many=True)})
     def get(self, request):
         queryset = Department.objects.all().select_related("college").order_by("-created_at")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(college__university=uni)
         return Response(DepartmentSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["Department"], summary="Create department", request=DepartmentSerializer, responses={201: DepartmentSerializer})
     def post(self, request):
-        serializer = DepartmentSerializer(data=request.data)
+        data = request.data.copy()
+        uni = _get_user_university(request)
+        if uni:
+            college_id = data.get('college')
+            if college_id:
+                try:
+                    college = College.objects.get(pk=college_id, university=uni)
+                except College.DoesNotExist:
+                    return Response({"college": "College not found in your university."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"college": "College is required."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = DepartmentSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -219,7 +286,7 @@ class DepartmentDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return Department.objects.get(pk=pk)
+            return Department.objects.select_related("college").get(pk=pk)
         except Department.DoesNotExist:
             return None
 
@@ -228,12 +295,16 @@ class DepartmentDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.college.university_id):
+            return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(DepartmentSerializer(obj).data)
 
     @extend_schema(tags=["Department"], summary="Update department", request=DepartmentSerializer, responses={200: DepartmentSerializer})
     def put(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.college.university_id):
             return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = DepartmentSerializer(obj, data=request.data)
         if serializer.is_valid():
@@ -246,6 +317,8 @@ class DepartmentDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.college.university_id):
+            return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = DepartmentSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -256,6 +329,8 @@ class DepartmentDetailView(APIView):
     def delete(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.college.university_id):
             return Response({"detail": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -271,11 +346,25 @@ class ProgramListView(APIView):
     @extend_schema(tags=["Program"], summary="List programs", responses={200: ProgramSerializer(many=True)})
     def get(self, request):
         queryset = Program.objects.all().select_related("department").order_by("-created_at")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(department__college__university=uni)
         return Response(ProgramSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["Program"], summary="Create program", request=ProgramSerializer, responses={201: ProgramSerializer})
     def post(self, request):
-        serializer = ProgramSerializer(data=request.data)
+        data = request.data.copy()
+        uni = _get_user_university(request)
+        if uni:
+            dept_id = data.get('department')
+            if dept_id:
+                try:
+                    dept = Department.objects.get(pk=dept_id, college__university=uni)
+                except Department.DoesNotExist:
+                    return Response({"department": "Department not found in your university."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"department": "Department is required."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = ProgramSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -288,14 +377,24 @@ class ProgramDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return Program.objects.get(pk=pk)
+            return Program.objects.select_related("department").get(pk=pk)
         except Program.DoesNotExist:
             return None
+
+    def _check_uni(self, request, obj):
+        if _is_system_admin(request):
+            return True
+        uni = _get_user_university(request)
+        if uni and obj.department and obj.department.college.university_id == uni.pk:
+            return True
+        return False
 
     @extend_schema(tags=["Program"], summary="Retrieve program", responses={200: ProgramSerializer})
     def get(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
             return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(ProgramSerializer(obj).data)
 
@@ -303,6 +402,8 @@ class ProgramDetailView(APIView):
     def put(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
             return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = ProgramSerializer(obj, data=request.data)
         if serializer.is_valid():
@@ -315,6 +416,8 @@ class ProgramDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
+            return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = ProgramSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -325,6 +428,8 @@ class ProgramDetailView(APIView):
     def delete(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
             return Response({"detail": "Program not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -340,11 +445,18 @@ class AcademicYearListView(APIView):
     @extend_schema(tags=["AcademicYear"], summary="List academic years", responses={200: AcademicYearSerializer(many=True)})
     def get(self, request):
         queryset = AcademicYear.objects.all().order_by("-start_boundary")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(university=uni)
         return Response(AcademicYearSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["AcademicYear"], summary="Create academic year", request=AcademicYearSerializer, responses={201: AcademicYearSerializer})
     def post(self, request):
-        serializer = AcademicYearSerializer(data=request.data)
+        data = request.data.copy()
+        uni = _get_user_university(request)
+        if uni:
+            data['university'] = str(uni.pk)
+        serializer = AcademicYearSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -366,12 +478,16 @@ class AcademicYearDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
+            return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(AcademicYearSerializer(obj).data)
 
     @extend_schema(tags=["AcademicYear"], summary="Update academic year", request=AcademicYearSerializer, responses={200: AcademicYearSerializer})
     def put(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
             return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = AcademicYearSerializer(obj, data=request.data)
         if serializer.is_valid():
@@ -384,6 +500,8 @@ class AcademicYearDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
+            return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = AcademicYearSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -394,6 +512,8 @@ class AcademicYearDetailView(APIView):
     def delete(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
             return Response({"detail": "Academic year not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -406,11 +526,25 @@ class SemesterListView(APIView):
     @extend_schema(tags=["Semester"], summary="List semesters", responses={200: SemesterSerializer(many=True)})
     def get(self, request):
         queryset = Semester.objects.all().select_related("academic_year").order_by("-created_at")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(academic_year__university=uni)
         return Response(SemesterSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["Semester"], summary="Create semester", request=SemesterSerializer, responses={201: SemesterSerializer})
     def post(self, request):
-        serializer = SemesterSerializer(data=request.data)
+        data = request.data.copy()
+        uni = _get_user_university(request)
+        if uni:
+            ay_id = data.get('academic_year')
+            if ay_id:
+                try:
+                    AcademicYear.objects.get(pk=ay_id, university=uni)
+                except AcademicYear.DoesNotExist:
+                    return Response({"academic_year": "Academic year not found in your university."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"academic_year": "Academic year is required."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = SemesterSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -423,7 +557,7 @@ class SemesterDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return Semester.objects.get(pk=pk)
+            return Semester.objects.select_related("academic_year").get(pk=pk)
         except Semester.DoesNotExist:
             return None
 
@@ -432,12 +566,16 @@ class SemesterDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.academic_year.university_id):
+            return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(SemesterSerializer(obj).data)
 
     @extend_schema(tags=["Semester"], summary="Update semester", request=SemesterSerializer, responses={200: SemesterSerializer})
     def put(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.academic_year.university_id):
             return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = SemesterSerializer(obj, data=request.data)
         if serializer.is_valid():
@@ -450,6 +588,8 @@ class SemesterDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.academic_year.university_id):
+            return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = SemesterSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -460,6 +600,8 @@ class SemesterDetailView(APIView):
     def delete(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.academic_year.university_id):
             return Response({"detail": "Semester not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -475,11 +617,23 @@ class CourseListView(APIView):
     @extend_schema(tags=["Course"], summary="List courses", responses={200: CourseSerializer(many=True)})
     def get(self, request):
         queryset = Course.objects.all().select_related("program").order_by("-created_at")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(program__department__college__university=uni)
         return Response(CourseSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["Course"], summary="Create course", request=CourseSerializer, responses={201: CourseSerializer})
     def post(self, request):
-        serializer = CourseSerializer(data=request.data)
+        data = request.data.copy()
+        uni = _get_user_university(request)
+        if uni:
+            program_id = data.get('program')
+            if program_id:
+                try:
+                    Program.objects.get(pk=program_id, department__college__university=uni)
+                except Program.DoesNotExist:
+                    return Response({"program": "Program not found in your university."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = CourseSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -492,14 +646,24 @@ class CourseDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return Course.objects.get(pk=pk)
+            return Course.objects.select_related("program").get(pk=pk)
         except Course.DoesNotExist:
             return None
+
+    def _check_uni(self, request, obj):
+        if _is_system_admin(request):
+            return True
+        uni = _get_user_university(request)
+        if uni and obj.program and obj.program.department.college.university_id == uni.pk:
+            return True
+        return False
 
     @extend_schema(tags=["Course"], summary="Retrieve course", responses={200: CourseSerializer})
     def get(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
             return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(CourseSerializer(obj).data)
 
@@ -507,6 +671,8 @@ class CourseDetailView(APIView):
     def put(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
             return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = CourseSerializer(obj, data=request.data)
         if serializer.is_valid():
@@ -519,6 +685,8 @@ class CourseDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = CourseSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -529,6 +697,8 @@ class CourseDetailView(APIView):
     def delete(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not self._check_uni(request, obj):
             return Response({"detail": "Course not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -541,6 +711,9 @@ class CoursePrerequisiteListView(APIView):
     @extend_schema(tags=["CoursePrerequisite"], summary="List prerequisites", responses={200: CoursePrerequisiteSerializer(many=True)})
     def get(self, request):
         queryset = CoursePrerequisite.objects.all().select_related("course", "prerequisite_course")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(course__program__department__college__university=uni)
         return Response(CoursePrerequisiteSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["CoursePrerequisite"], summary="Create prerequisite", request=CoursePrerequisiteSerializer, responses={201: CoursePrerequisiteSerializer})
@@ -553,11 +726,11 @@ class CoursePrerequisiteListView(APIView):
 
 
 class CoursePrerequisiteDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    permission_classes = [IsAuthenticated, HasRole("ADMIN", "SYSTEM_ADMIN")]
 
     def get_object(self, pk):
         try:
-            return CoursePrerequisite.objects.get(pk=pk)
+            return CoursePrerequisite.objects.select_related("course").get(pk=pk)
         except CoursePrerequisite.DoesNotExist:
             return None
 
@@ -587,6 +760,9 @@ class CourseOfferingListView(APIView):
     @extend_schema(tags=["CourseOffering"], summary="List course offerings", responses={200: CourseOfferingSerializer(many=True)})
     def get(self, request):
         queryset = CourseOffering.objects.all().select_related("course", "semester")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(course__program__department__college__university=uni)
         return Response(CourseOfferingSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["CourseOffering"], summary="Create course offering", request=CourseOfferingSerializer, responses={201: CourseOfferingSerializer})
@@ -604,7 +780,7 @@ class CourseOfferingDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return CourseOffering.objects.get(pk=pk)
+            return CourseOffering.objects.select_related("course").get(pk=pk)
         except CourseOffering.DoesNotExist:
             return None
 
@@ -650,16 +826,23 @@ class CourseOfferingDetailView(APIView):
 # CREDIT HOUR POLICY & OVERRIDE VIEWS
 # ==========================================
 class CreditHourPolicyListView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    permission_classes = [IsAuthenticated, HasRole("ADMIN", "SYSTEM_ADMIN")]
 
     @extend_schema(tags=["CreditHourPolicy"], summary="List credit hour policies", responses={200: CreditHourPolicySerializer(many=True)})
     def get(self, request):
         queryset = CreditHourPolicy.objects.all()
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(university=uni)
         return Response(CreditHourPolicySerializer(queryset, many=True).data)
 
     @extend_schema(tags=["CreditHourPolicy"], summary="Create credit hour policy", request=CreditHourPolicySerializer, responses={201: CreditHourPolicySerializer})
     def post(self, request):
-        serializer = CreditHourPolicySerializer(data=request.data)
+        data = request.data.copy()
+        uni = _get_user_university(request)
+        if uni:
+            data['university'] = str(uni.pk)
+        serializer = CreditHourPolicySerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -667,7 +850,7 @@ class CreditHourPolicyListView(APIView):
 
 
 class CreditHourPolicyDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    permission_classes = [IsAuthenticated, HasRole("ADMIN", "SYSTEM_ADMIN")]
 
     def get_object(self, pk):
         try:
@@ -680,12 +863,16 @@ class CreditHourPolicyDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Policy not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
+            return Response({"detail": "Policy not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(CreditHourPolicySerializer(obj).data)
 
     @extend_schema(tags=["CreditHourPolicy"], summary="Update policy", request=CreditHourPolicySerializer, responses={200: CreditHourPolicySerializer})
     def put(self, request, pk):
         obj = self.get_object(pk)
         if not obj:
+            return Response({"detail": "Policy not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
             return Response({"detail": "Policy not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = CreditHourPolicySerializer(obj, data=request.data)
         if serializer.is_valid():
@@ -698,16 +885,21 @@ class CreditHourPolicyDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Policy not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _check_university_ownership(request, obj.university_id):
+            return Response({"detail": "Policy not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EnrollmentOverrideListView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    permission_classes = [IsAuthenticated, HasRole("ADMIN", "SYSTEM_ADMIN")]
 
     @extend_schema(tags=["EnrollmentOverride"], summary="List enrollment overrides", responses={200: EnrollmentOverrideSerializer(many=True)})
     def get(self, request):
         queryset = EnrollmentOverride.objects.all().select_related("student", "semester", "approved_by")
+        uni = _get_user_university(request)
+        if uni:
+            queryset = queryset.filter(student__user__university=uni)
         return Response(EnrollmentOverrideSerializer(queryset, many=True).data)
 
     @extend_schema(tags=["EnrollmentOverride"], summary="Create enrollment override", request=EnrollmentOverrideSerializer, responses={201: EnrollmentOverrideSerializer})
@@ -720,11 +912,11 @@ class EnrollmentOverrideListView(APIView):
 
 
 class EnrollmentOverrideDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    permission_classes = [IsAuthenticated, HasRole("ADMIN", "SYSTEM_ADMIN")]
 
     def get_object(self, pk):
         try:
-            return EnrollmentOverride.objects.get(pk=pk)
+            return EnrollmentOverride.objects.select_related("student").get(pk=pk)
         except EnrollmentOverride.DoesNotExist:
             return None
 
@@ -754,6 +946,8 @@ class EnrollmentListView(APIView):
     def get(self, request):
         if request.user.role == "STUDENT":
             queryset = Enrollment.objects.filter(student__user=request.user)
+        elif request.user.role == "ADMIN" and request.user.university:
+            queryset = Enrollment.objects.filter(student__user__university=request.user.university)
         else:
             queryset = Enrollment.objects.all()
         queryset = queryset.select_related("student", "course_offering")
@@ -772,7 +966,7 @@ class EnrollmentListView(APIView):
 class EnrollmentDetailView(APIView):
     def get_permissions(self):
         if self.request.method in ("PUT", "PATCH", "DELETE"):
-            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+            return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
         return [IsAuthenticated()]
 
     def get_object(self, pk):
@@ -826,7 +1020,7 @@ _BatchImportAsyncOut = inline_serializer(
 
 
 class BatchEnrollmentImportView(APIView):
-    permission_classes = [IsAuthenticated, HasRole("ADMIN")]
+    permission_classes = [IsAuthenticated, HasRole("ADMIN", "SYSTEM_ADMIN")]
 
     @extend_schema(
         tags=["Enrollment"],
