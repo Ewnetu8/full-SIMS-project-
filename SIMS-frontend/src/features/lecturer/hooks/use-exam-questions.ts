@@ -4,6 +4,7 @@ import { toast } from '@/components/feedback';
 
 import { 
   listQuestions,
+  getQuestion,
   createQuestion,
   patchQuestion,
   deleteQuestion,
@@ -258,7 +259,8 @@ export function useCreateExamQuestion() {
         }
       }
 
-      return createdQuestion;
+      const freshQuestion = await getQuestion(createdQuestion.id);
+      return transformBackendToFrontend(freshQuestion);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
@@ -295,7 +297,7 @@ export function useUpdateExamQuestion() {
         examination: examinationId,
       };
 
-      const updatedQuestion = await patchQuestion(questionId, updateData);
+      await patchQuestion(questionId, updateData);
 
       // If MCQ, synchronize options
       if (backendType === 'MCQ' && question.options && question.options.length > 0) {
@@ -370,7 +372,8 @@ export function useUpdateExamQuestion() {
         }
       }
 
-      return updatedQuestion;
+      const freshQuestion = await getQuestion(questionId);
+      return transformBackendToFrontend(freshQuestion);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });

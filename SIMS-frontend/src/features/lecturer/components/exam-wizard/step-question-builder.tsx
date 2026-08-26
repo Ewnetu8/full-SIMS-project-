@@ -16,9 +16,16 @@ import * as React from 'react';
 
 import { Label } from '@/components/forms';
 import {
+  Badge,
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Select,
   SelectContent,
@@ -91,6 +98,8 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
   const [editingQuestion, setEditingQuestion] = React.useState<Question | null>(null);
   const [marksInput, setMarksInput] = React.useState<string>('10');
   const [isSaving, setIsSaving] = React.useState(false);
+  const [deletingQuestion, setDeletingQuestion] = React.useState<{ question: Question; index: number } | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   // Backend integration hooks
   const examId = editingExamId || (wizardData as any).examinationId || (wizardData as any).id;
@@ -123,7 +132,7 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
 
     const parsedMarks = marksInput.trim() === '' ? NaN : Number(marksInput);
     if (marksInput.trim() === '' || isNaN(parsedMarks) || parsedMarks <= 0) {
-      toast.error('Marks must be greater than 0');
+      toast.error('Total marks must be greater than 0');
       return;
     }
 
@@ -166,41 +175,39 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
 
     setIsSaving(true);
     try {
-      let savedId = editingQuestion.id;
       const questionWithMarks = { ...editingQuestion, marks: parsedMarks };
+      let savedQ: Question = questionWithMarks;
 
       // Persist to backend if editing an existing examination
       if (examId) {
         if (editingQuestion.id && !editingQuestion.id.startsWith('q-')) {
-          await updateQuestionMutation.mutateAsync({
+          savedQ = await updateQuestionMutation.mutateAsync({
             questionId: editingQuestion.id,
             question: questionWithMarks,
             examinationId: examId,
           });
         } else {
-          const res = await createQuestion.mutateAsync({
+          savedQ = await createQuestion.mutateAsync({
             question: questionWithMarks,
             examinationId: examId,
           });
-          savedId = res.id;
         }
       }
 
-      const qToSave: Question = { ...questionWithMarks, id: savedId };
-
-      // Update local wizard state
+      // Update local wizard state with authoritative saved question
       const existingIndex = wizardData.questions.findIndex((q) => q.id === editingQuestion.id);
       if (existingIndex >= 0) {
-        updateQuestion(existingIndex, qToSave);
+        updateQuestion(existingIndex, savedQ);
       } else {
-        addQuestion(qToSave);
+        addQuestion(savedQ);
       }
 
       setEditingQuestion(null);
       setExpandedId(null);
     } catch (error: any) {
       console.error('Failed to save question:', error);
-      toast.error(error?.response?.data?.detail || error?.message || 'Failed to save question');
+      const detail = error?.response?.data?.detail || error?.message || 'Failed to save question';
+      toast.error(detail);
     } finally {
       setIsSaving(false);
     }
@@ -211,8 +218,8 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
     if (!q) return;
     setEditingQuestion({
       ...q,
-      options: q.options ? [...q.options] : undefined,
-      rubricCriteria: q.rubricCriteria ? [...q.rubricCriteria] : undefined,
+      options: q.options ? q.options.map((o) => ({ ...o })) : undefined,
+      rubricCriteria: q.rubricCriteria ? q.rubricCriteria.map((rc) => ({ ...rc })) : undefined,
     });
     setMarksInput(String(q.marks ?? 10));
     setExpandedId(q.id);
@@ -230,19 +237,24 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
     addQuestion(copy);
   }
 
-  async function handleRemoveQuestion(index: number) {
-    const q = wizardData.questions[index];
-    if (!q) return;
+  async function handleConfirmDelete() {
+    if (!deletingQuestion) return;
+    const { question, index } = deletingQuestion;
 
-    if (q.id && !q.id.startsWith('q-')) {
-      try {
-        await deleteQuestion.mutateAsync(q.id);
-      } catch (err) {
-        console.error('Failed to delete question from backend:', err);
+    setIsDeleting(true);
+    try {
+      if (question.id && !question.id.startsWith('q-')) {
+        await deleteQuestion.mutateAsync(question.id);
       }
+      removeQuestion(index);
+      setDeletingQuestion(null);
+    } catch (err: any) {
+      console.error('Failed to delete question from backend:', err);
+      const detail = err?.response?.data?.detail || err?.message || 'Unable to delete question. Please try again.';
+      toast.error(detail);
+    } finally {
+      setIsDeleting(false);
     }
-
-    removeQuestion(index);
   }
 
   function updateEditingType(type: QuestionType) {
@@ -719,8 +731,8 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                         type="button"
                         variant="ghost"
                         size="xs"
-                        onClick={() => handleRemoveQuestion(index)}
-                        aria-label="Remove question"
+                        onClick={() => setDeletingQuestion({ question: q, index })}
+                        aria-label={`Delete Question ${index + 1}`}
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -733,6 +745,54 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
           ))}
         </div>
       )}
+
+      {/* Delete Question Confirmation Dialog */}
+      <Dialog open={!!deletingQuestion} onOpenChange={(open) => !open && !isDeleting && setDeletingQuestion(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Question?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this question? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deletingQuestion && (
+            <div className="p-3.5 bg-muted/40 rounded-lg border border-border/70 text-xs space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                  Q{deletingQuestion.index + 1}
+                </span>
+                <Badge variant="secondary" className="text-xs">
+                  {QUESTION_TYPE_LABELS[deletingQuestion.question.type] || deletingQuestion.question.type}
+                </Badge>
+                <span className="text-muted-foreground">
+                  {deletingQuestion.question.marks} mark{deletingQuestion.question.marks !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-foreground font-medium line-clamp-2">
+                {deletingQuestion.question.prompt || '(No question text)'}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeletingQuestion(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              loading={isDeleting}
+            >
+              Delete Question
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Navigation buttons */}
       <div className="flex justify-between border-t border-border pt-4">
