@@ -200,7 +200,11 @@ export function ExamList() {
       });
       setSchedulingExam(null);
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || err?.message;
+      const responseData = err?.response?.data;
+      const detail =
+        responseData?.detail ||
+        (Array.isArray(responseData?.errors) ? responseData.errors.join('. ') : undefined) ||
+        err?.message;
       setScheduleError(detail || 'Failed to schedule exam. Ensure all questions are objective/auto-gradable.');
       toast.error('Scheduling Failed', {
         description: detail || 'Validation error while scheduling.',

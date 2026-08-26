@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
 import { toast } from '@/components/feedback';
+
 import { 
   listQuestions,
   createQuestion,
-  updateQuestion,
   patchQuestion,
   deleteQuestion,
   listQuestionOptions,
@@ -12,15 +13,14 @@ import {
   deleteQuestionOption,
   createRubricCriterion,
 } from '../services/questions-api';
+import type { Question as FrontendQuestion, QuestionType as FrontendQuestionType } from '../types';
+
 import type { 
   Question as BackendQuestion,
   CreateQuestionRequest,
   UpdateQuestionRequest,
-  CreateQuestionOptionRequest,
-  CreateRubricCriterionRequest,
   QuestionType as BackendQuestionType
 } from '@/types/lecturer';
-import type { Question as FrontendQuestion, QuestionType as FrontendQuestionType } from '../types';
 
 // ─── Type Mapping ─────────────────────────────────────────────────────────────
 
@@ -173,8 +173,9 @@ export function useCreateExamQuestion() {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
       toast.success('Question created successfully');
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || error?.message || 'Failed to create question');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(err?.response?.data?.detail || err?.message || 'Failed to create question');
     },
   });
 }
@@ -252,8 +253,9 @@ export function useUpdateExamQuestion() {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
       toast.success('Question updated successfully');
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || error?.message || 'Failed to update question');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(err?.response?.data?.detail || err?.message || 'Failed to update question');
     },
   });
 }
@@ -270,8 +272,9 @@ export function useDeleteExamQuestion() {
       queryClient.invalidateQueries({ queryKey: [QUESTIONS_QUERY_KEY] });
       toast.success('Question deleted successfully');
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || error?.message || 'Failed to delete question');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(err?.response?.data?.detail || err?.message || 'Failed to delete question');
     },
   });
 }

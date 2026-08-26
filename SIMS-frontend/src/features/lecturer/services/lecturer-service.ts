@@ -56,9 +56,9 @@ import type {
  * Maps a Django backend Question object to the UI Question interface
  */
 function transformQuestionToUi(q: BackendQuestion): UiQuestion {
-  let uiType: UiQuestion['type'] = 'essay';
-  if (q.question_type === 'MCQ') uiType = 'multiple_choice';
-  else if (q.question_type === 'SHORT_ANSWER') uiType = 'short_answer';
+  let uiType: UiQuestion['type'] = 'MCQ';
+  if (q.question_type === 'SHORT_ANSWER') uiType = 'SHORT_ANSWER';
+  else if (q.question_type === 'ESSAY') uiType = 'ESSAY';
 
   return {
     id: q.id,
@@ -67,7 +67,7 @@ function transformQuestionToUi(q: BackendQuestion): UiQuestion {
     marks: Number(q.total_points) || 1,
     required: true,
     options: q.options?.map((o) => ({ id: o.id, text: o.option_text })),
-    correctAnswer: q.options?.filter((o) => o.is_correct).map((o) => o.id),
+    correctAnswer: q.options?.find((o) => o.is_correct)?.id,
   };
 }
 
@@ -368,18 +368,32 @@ export const lecturerService = {
     }
 
     const now = new Date();
-    const startWindow = data.startDate || now.toISOString();
-    const endDateObj = data.endDate ? new Date(data.endDate) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const endWindow = endDateObj.toISOString();
+    let startWindow: string;
+    let endWindow: string;
+
+    if (data.startDate && !isNaN(new Date(data.startDate).getTime())) {
+      startWindow = new Date(data.startDate).toISOString();
+    } else {
+      startWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    if (data.endDate && !isNaN(new Date(data.endDate).getTime())) {
+      endWindow = new Date(data.endDate).toISOString();
+    } else {
+      endWindow = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    const durationMinutes = Number(data.durationMinutes) || 60;
 
     let exam: Examination;
 
     if (data.id) {
       exam = await patchExamination(data.id, {
+        course_offering: courseOfferingId,
         title: data.title || 'Untitled Exam',
         start_window: startWindow,
         end_window: endWindow,
-        duration_minutes: data.durationMinutes || 60,
+        duration_minutes: durationMinutes,
       });
     } else {
       exam = await createExamination({
@@ -387,7 +401,7 @@ export const lecturerService = {
         title: data.title || 'Untitled Exam',
         start_window: startWindow,
         end_window: endWindow,
-        duration_minutes: data.durationMinutes || 60,
+        duration_minutes: durationMinutes,
       });
     }
 
@@ -595,17 +609,24 @@ export const lecturerService = {
       durationMinutes?: number;
     }
   ): Promise<LecturerExam> {
-    const startWindow = data.start_window || data.startDate;
-    const endWindow = data.end_window || data.endDate;
+    const rawStart = data.start_window || data.startDate;
+    const rawEnd = data.end_window || data.endDate;
     const durationMinutes = data.duration_minutes ?? data.durationMinutes ?? 60;
 
-    if (!startWindow || !endWindow) {
+    if (!rawStart || !rawEnd) {
       throw new Error('Start and End dates are required for scheduling.');
     }
 
+    const startDate = new Date(rawStart);
+    const endDate = new Date(rawEnd);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new Error('Please enter valid start and end dates/times.');
+    }
+
     const scheduled = await scheduleExamination(examId, {
-      start_window: new Date(startWindow).toISOString(),
-      end_window: new Date(endWindow).toISOString(),
+      start_window: startDate.toISOString(),
+      end_window: endDate.toISOString(),
       duration_minutes: Number(durationMinutes),
     });
 
