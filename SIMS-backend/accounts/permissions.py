@@ -11,7 +11,7 @@ def HasRole(*allowed_roles):
             if not request.user or not request.user.is_authenticated:
                 return False
 
-            if request.user.is_superuser or request.user.role == RoleChoices.ADMIN:
+            if request.user.is_superuser:
                 return True
 
             user_role = getattr(request.user, 'role', None)
@@ -24,6 +24,7 @@ def HasRole(*allowed_roles):
 
 
 # Convenience aliases for direct role use
+IsSystemAdmin = HasRole(RoleChoices.SYSTEM_ADMIN)
 IsAdmin = HasRole(RoleChoices.ADMIN)
 IsLecturer = HasRole(RoleChoices.LECTURER)
 IsStudent = HasRole(RoleChoices.STUDENT)

@@ -8,8 +8,8 @@ from academics.models import University, College, Department, Program, Course, D
 pytestmark = pytest.mark.django_db
 
 
-def create_admin():
-    return User.objects.create_user(email="admin_hier@aastu.edu.et", password="password123", role=RoleChoices.ADMIN)
+def create_admin(university=None):
+    return User.objects.create_user(email="admin_hier@aastu.edu.et", password="password123", role=RoleChoices.ADMIN, university=university)
 
 
 def get_token(client, user):
@@ -18,11 +18,10 @@ def get_token(client, user):
 
 
 def test_college_crud(client):
-    admin = create_admin()
+    uni = University.objects.create(name="Tech University", code="TECHU")
+    admin = create_admin(university=uni)
     token = get_token(client, admin)
     headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-
-    uni = University.objects.create(name="Tech University", code="TECHU")
 
     # Create
     res = client.post(
@@ -47,11 +46,11 @@ def test_college_crud(client):
 
 
 def test_department_and_program_crud(client):
-    admin = create_admin()
+    uni = University.objects.create(name="Tech University 2", code="TECHU2")
+    admin = create_admin(university=uni)
     token = get_token(client, admin)
     headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
 
-    uni = University.objects.create(name="Tech University 2", code="TECHU2")
     college = College.objects.create(university=uni, name="College of Science", code="COS")
 
     # Department Create

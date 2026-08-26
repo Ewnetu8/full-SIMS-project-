@@ -41,8 +41,8 @@ def get_examination(pk):
 class ExaminationListView(APIView):
     def get_permissions(self):
         if self.request.method in ("POST",):
-            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER", "STUDENT")()]
+            return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER", "STUDENT")()]
 
     @extend_schema(
         tags=["Examination"],
@@ -116,8 +116,8 @@ class ExaminationListView(APIView):
 class ExaminationDetailView(APIView):
     def get_permissions(self):
         if self.request.method in ("PUT", "PATCH", "DELETE"):
-            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER", "STUDENT")()]
+            return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER", "STUDENT")()]
 
     def get_object(self, pk):
         return get_examination(pk)
@@ -236,7 +236,7 @@ class ExaminationDetailView(APIView):
 
 class ScheduleExaminationView(APIView):
     def get_permissions(self):
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
 
     @extend_schema(
         tags=["Examination"],

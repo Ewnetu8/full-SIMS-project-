@@ -36,10 +36,12 @@ def auth_client(client, user):
 
 def make_admin():
     n = next_id()
+    uni = University.objects.create(name=f"Admin Uni {n}", code=f"AU{n}")
     user = User.objects.create_user(
         email=f"admin{n}@example.com",
         password="strongpass123",
         role=RoleChoices.ADMIN,
+        university=uni,
     )
     return user
 
@@ -88,6 +90,7 @@ def make_course_offering():
         credit_hours=3,
     )
     academic_year = AcademicYear.objects.create(
+        university=uni,
         display_label=f"2026-{n}",
         start_boundary="2026-01-01",
         end_boundary="2026-12-31",
