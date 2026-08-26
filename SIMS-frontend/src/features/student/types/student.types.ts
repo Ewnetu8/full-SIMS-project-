@@ -192,4 +192,24 @@ export interface AcademicProfileDetails {
   totalEnrolledCourses: number;
 }
 
+export interface CourseAssessmentMarkItem {
+  assessment_id: string;
+  title: string;
+  assessment_type: string;
+  max_marks: string | number;
+  weight: string | number;
+  due_date: string | null;
+  mark_id: string | null;
+  score: string | number | null;
+  remarks: string;
+}
+
+export interface CourseOfferingMarksGroup {
+  enrollment_id: string;
+  course_offering: CourseOffering;
+  assessments: CourseAssessmentMarkItem[];
+  total_percent: number | null;
+  letter_grade: string | null;
+}
+
 export type { Result } from '@/types/api';

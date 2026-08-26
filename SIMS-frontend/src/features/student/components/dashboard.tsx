@@ -66,7 +66,8 @@ export function StudentDashboard() {
     void fetchEnrollments();
     void fetchActiveExams();
     void fetchResults();
-  }, [fetchEnrollments, fetchActiveExams, fetchResults]);
+    void fetchNotifications();
+  }, [fetchEnrollments, fetchActiveExams, fetchResults, fetchNotifications]);
 
   const currentHour = new Date().getHours();
   const greeting =
