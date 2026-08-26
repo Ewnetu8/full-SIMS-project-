@@ -248,8 +248,26 @@ export interface CourseOffering extends BaseModel {
 
 export type EnrollmentStatus = 'ENROLLED' | 'PASSED' | 'FAILED' | 'DROPPED';
 
+export interface StudentBrief {
+  id: string;
+  student_identifier: string;
+  full_name: string;
+}
+
+export interface StudentListItem {
+  id: string;
+  student_identifier: string;
+  user_full_name: string;
+  user_email: string;
+  class_standing?: string;
+  department?: string | null;
+}
+
 export interface Enrollment extends BaseModel {
   student: string; // UUID reference
+  student_detail?: StudentBrief | StudentListItem | null;
+  student_identifier?: string;
+  student_name?: string;
   course_offering: string; // UUID reference
   course_offering_detail: CourseOffering;
   status: EnrollmentStatus;

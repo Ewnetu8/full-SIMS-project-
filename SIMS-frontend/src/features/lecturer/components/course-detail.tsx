@@ -345,7 +345,8 @@ export function CourseDetail({ courseId }: CourseDetailProps) {
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-border bg-muted/40 text-xs font-semibold text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-3">Student UUID / Reference</th>
+                      <th className="px-4 py-3">Student ID</th>
+                      <th className="px-4 py-3">Student Name</th>
                       <th className="px-4 py-3">Enrollment Status</th>
                       <th className="px-4 py-3">Type</th>
                       <th className="px-4 py-3">Final Grade</th>
@@ -353,42 +354,57 @@ export function CourseDetail({ courseId }: CourseDetailProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {enrollments.map((enr) => (
-                      <tr key={enr.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3 font-mono text-xs text-foreground font-medium">
-                          {enr.student}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge
-                            variant={
-                              enr.status === 'ENROLLED' || enr.status === 'PASSED'
-                                ? 'success'
-                                : enr.status === 'FAILED'
-                                ? 'destructive'
-                                : 'secondary'
-                            }
-                            className="text-xs uppercase"
-                          >
-                            {enr.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {enr.is_retake ? (
-                            <Badge variant="warning" className="text-2xs">
-                              Retake
+                    {enrollments.map((enr) => {
+                      const studentId =
+                        enr.student_identifier ||
+                        (enr.student_detail as any)?.student_identifier ||
+                        '—';
+                      const studentName =
+                        enr.student_name ||
+                        (enr.student_detail as any)?.user_full_name ||
+                        (enr.student_detail as any)?.full_name ||
+                        '—';
+
+                      return (
+                        <tr key={enr.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3 font-mono text-xs font-bold text-primary">
+                            {studentId}
+                          </td>
+                          <td className="px-4 py-3 text-xs font-medium text-foreground">
+                            {studentName}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge
+                              variant={
+                                enr.status === 'ENROLLED' || enr.status === 'PASSED'
+                                  ? 'success'
+                                  : enr.status === 'FAILED'
+                                  ? 'destructive'
+                                  : 'secondary'
+                              }
+                              className="text-xs uppercase"
+                            >
+                              {enr.status}
                             </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">Regular</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs font-mono font-semibold text-foreground">
-                          {enr.grade ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">
-                          {enr.created_at ? new Date(enr.created_at).toLocaleDateString() : '—'}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {enr.is_retake ? (
+                              <Badge variant="warning" className="text-2xs">
+                                Retake
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">Regular</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs font-mono font-semibold text-foreground">
+                            {enr.grade ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {enr.created_at ? new Date(enr.created_at).toLocaleDateString() : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

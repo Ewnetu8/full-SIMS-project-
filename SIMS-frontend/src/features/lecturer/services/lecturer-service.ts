@@ -12,6 +12,7 @@ import {
   listCourseOfferings,
   getCourseOffering,
   listEnrollments,
+  listStudents,
   listDepartments,
 } from './academic-api';
 import {
@@ -42,6 +43,8 @@ import type {
   CourseOffering,
   CourseOfferingBrief,
   Enrollment,
+  StudentListItem,
+  StudentBrief,
   ListExaminationsParams,
 } from '@/types/lecturer';
 
@@ -255,13 +258,41 @@ export const lecturerService = {
     enrollments: Enrollment[];
     exams: LecturerExam[];
   }> {
-    const [offering, allEnrollments, courseExamsList] = await Promise.all([
+    const [offering, allEnrollments, courseExamsList, studentsList] = await Promise.all([
       getCourseOffering(id),
       listEnrollments().catch(() => [] as Enrollment[]),
       listExaminations({ course_offering: id }).catch(() => [] as Examination[]),
+      listStudents().catch(() => [] as StudentListItem[]),
     ]);
 
-    const courseEnrollments = allEnrollments.filter((e) => e.course_offering === id);
+    const studentMap = new Map<string, StudentListItem>();
+    studentsList.forEach((s) => {
+      if (s.id) {
+        studentMap.set(s.id, s);
+      }
+    });
+
+    const courseEnrollments: Enrollment[] = allEnrollments
+      .filter((e) => e.course_offering === id)
+      .map((e) => {
+        const studentInfo = (e.student_detail as StudentListItem | undefined) || studentMap.get(e.student);
+        const studentId =
+          (e.student_detail as StudentBrief | undefined)?.student_identifier ||
+          studentInfo?.student_identifier ||
+          undefined;
+        const studentName =
+          (e.student_detail as StudentBrief | undefined)?.full_name ||
+          studentInfo?.user_full_name ||
+          undefined;
+
+        return {
+          ...e,
+          student_identifier: studentId,
+          student_name: studentName,
+          student_detail: studentInfo || e.student_detail,
+        };
+      });
+
     const courseExams = courseExamsList.map(transformExamToUi);
     const course = transformOfferingToUiCourse(offering, allEnrollments, courseExamsList);
 

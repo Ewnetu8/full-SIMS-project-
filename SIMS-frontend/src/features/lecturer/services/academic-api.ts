@@ -13,6 +13,7 @@ import type {
   CourseOffering,
   CourseOfferingBrief,
   Enrollment,
+  StudentListItem,
 } from '@/types/lecturer';
 
 /**
@@ -274,6 +275,17 @@ export async function listEnrollments(): Promise<Enrollment[]> {
  */
 export async function getEnrollment(id: string): Promise<Enrollment> {
   return api.get<Enrollment>(API_ENDPOINTS.ENROLLMENTS.BY_ID(id));
+}
+
+/**
+ * List all students.
+ * Supports retrieving student profiles including student_identifier and user_full_name.
+ */
+export async function listStudents(): Promise<StudentListItem[]> {
+  const res = await api.get<StudentListItem[] | { results?: StudentListItem[] }>(
+    API_ENDPOINTS.STUDENTS.ROOT
+  );
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
