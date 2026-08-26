@@ -58,10 +58,34 @@ export const studentService = {
 
   /**
    * GET /api/v1/exams/active
-   * Returns active examinations available to the student.
+   * Returns active examinations available to the student for their enrolled courses.
    */
   getActiveExams: async (): Promise<Examination[]> => {
-    const data = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ACTIVE);
+    try {
+      const activeData = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ACTIVE);
+      if (Array.isArray(activeData) && activeData.length > 0) {
+        return activeData;
+      }
+    } catch (err) {
+      console.warn('GET /api/v1/exams/active failed or returned error, falling back to /exams:', err);
+    }
+
+    try {
+      const listData = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ROOT, {
+        params: { status: 'ACTIVE' },
+      });
+      return Array.isArray(listData) ? listData : [];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * GET /api/v1/exams
+   * Lists examinations for student's enrolled courses.
+   */
+  getExams: async (params?: { status?: string; course_offering?: string }): Promise<Examination[]> => {
+    const data = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ROOT, { params });
     return Array.isArray(data) ? data : [];
   },
 
