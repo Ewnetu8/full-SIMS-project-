@@ -6,6 +6,7 @@
  */
 
 import { getExamAnalytics, getExamResults } from '@/features/analytics/services/analytics-api';
+import { calculateDurationMinutes, toIsoStringFromDatetimeLocal } from '@/utils/date';
 
 import {
   listMyCourses,
@@ -83,12 +84,57 @@ function transformQuestionToUi(q: BackendQuestion): UiQuestion {
   };
 }
 
+const examMetaCache = new Map<string, { totalMarks?: number; passingScore?: number }>();
+
+export function getExamMeta(id?: string | null): { totalMarks?: number; passingScore?: number } | null {
+  if (!id) return null;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(`sims_exam_meta_${id}`);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+  }
+  return examMetaCache.get(id) ?? null;
+}
+
+export function setExamMeta(id: string, meta: { totalMarks?: number; passingScore?: number }) {
+  if (!id) return;
+  const existing = getExamMeta(id) || {};
+  const merged = { ...existing, ...meta };
+  examMetaCache.set(id, merged);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`sims_exam_meta_${id}`, JSON.stringify(merged));
+    } catch {}
+  }
+}
+
 /**
  * Maps a Django backend Examination object to the UI LecturerExam interface
  */
 function transformExamToUi(exam: Examination): LecturerExam {
+  const meta = getExamMeta(exam.id);
   const questions = (exam.questions || []).map(transformQuestionToUi);
-  const totalMarks = questions.reduce((sum, q) => sum + q.marks, 0) || 100;
+  const questionsSum = questions.reduce((sum, q) => sum + q.marks, 0);
+
+  // 1. Backend response fields take primary precedence, followed by stored metadata
+  const rawTotalMarks = (exam as any).total_marks ?? (exam as any).totalMarks ?? meta?.totalMarks;
+  const rawPassingScore = (exam as any).passing_score ?? (exam as any).passingScore ?? meta?.passingScore;
+
+  const totalMarks =
+    rawTotalMarks !== undefined && rawTotalMarks !== null && !isNaN(Number(rawTotalMarks))
+      ? Number(rawTotalMarks)
+      : questionsSum > 0
+      ? questionsSum
+      : 100;
+
+  // Passing score can legitimately be 0
+  const passingScore =
+    rawPassingScore !== undefined && rawPassingScore !== null && !isNaN(Number(rawPassingScore))
+      ? Number(rawPassingScore)
+      : Math.round(totalMarks * 0.5);
+
+  const calculatedDuration = calculateDurationMinutes(exam.start_window, exam.end_window);
 
   return {
     id: exam.id,
@@ -101,9 +147,9 @@ function transformExamToUi(exam: Examination): LecturerExam {
       'Ensure a stable internet connection.',
       'Answer all required questions before the timer expires.',
     ],
-    durationMinutes: exam.duration_minutes || 60,
+    durationMinutes: calculatedDuration ?? exam.duration_minutes ?? 0,
     totalMarks,
-    passingScore: Math.round(totalMarks * 0.5),
+    passingScore,
     status: exam.status,
     startDate: exam.start_window || '',
     endDate: exam.end_window || '',
@@ -379,42 +425,65 @@ export const lecturerService = {
       throw new Error('Course offering is required to save an examination.');
     }
 
-    const now = new Date();
-    let startWindow: string;
-    let endWindow: string;
+    const rawStart = data.startDate || (data as any).start_window;
+    const rawEnd = data.endDate || (data as any).end_window;
 
-    if (data.startDate && !isNaN(new Date(data.startDate).getTime())) {
-      startWindow = new Date(data.startDate).toISOString();
-    } else {
-      startWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    }
-
-    if (data.endDate && !isNaN(new Date(data.endDate).getTime())) {
-      endWindow = new Date(data.endDate).toISOString();
-    } else {
-      endWindow = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
-    }
-
-    const durationMinutes = Number(data.durationMinutes) || 60;
+    const startWindow = rawStart ? toIsoStringFromDatetimeLocal(rawStart) : '';
+    const endWindow = rawEnd ? toIsoStringFromDatetimeLocal(rawEnd) : '';
+    const calculatedDuration = calculateDurationMinutes(rawStart, rawEnd);
+    const durationMinutes = calculatedDuration ?? data.durationMinutes ?? (data as any).duration_minutes ?? 0;
 
     let exam: Examination;
 
     if (data.id) {
-      exam = await patchExamination(data.id, {
+      const patchPayload: Record<string, any> = {
         course_offering: courseOfferingId,
         title: data.title || 'Untitled Exam',
-        start_window: startWindow,
-        end_window: endWindow,
-        duration_minutes: durationMinutes,
-      });
+      };
+      if (startWindow) patchPayload.start_window = startWindow;
+      if (endWindow) patchPayload.end_window = endWindow;
+      if (durationMinutes > 0) patchPayload.duration_minutes = durationMinutes;
+      if (data.totalMarks !== undefined && data.totalMarks !== null) {
+        patchPayload.total_marks = Number(data.totalMarks);
+      }
+      if (data.passingScore !== undefined && data.passingScore !== null) {
+        patchPayload.passing_score = Number(data.passingScore);
+      }
+
+      console.log('[SCHEDULE DEBUG] Saving draft update payload', patchPayload);
+      exam = await patchExamination(data.id, patchPayload as any);
+      if (data.totalMarks !== undefined || data.passingScore !== undefined) {
+        setExamMeta(data.id, {
+          totalMarks: data.totalMarks !== undefined && data.totalMarks !== null ? Number(data.totalMarks) : undefined,
+          passingScore: data.passingScore !== undefined && data.passingScore !== null ? Number(data.passingScore) : undefined,
+        });
+      }
     } else {
-      exam = await createExamination({
+      if (!startWindow || !endWindow) {
+        throw new Error('Start window and End window are required to create an examination.');
+      }
+      const createPayload: Record<string, any> = {
         course_offering: courseOfferingId,
         title: data.title || 'Untitled Exam',
         start_window: startWindow,
         end_window: endWindow,
-        duration_minutes: durationMinutes,
-      });
+        duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+      };
+      if (data.totalMarks !== undefined && data.totalMarks !== null) {
+        createPayload.total_marks = Number(data.totalMarks);
+      }
+      if (data.passingScore !== undefined && data.passingScore !== null) {
+        createPayload.passing_score = Number(data.passingScore);
+      }
+
+      console.log('[SCHEDULE DEBUG] Creating draft payload', createPayload);
+      exam = await createExamination(createPayload as any);
+      if (data.totalMarks !== undefined || data.passingScore !== undefined) {
+        setExamMeta(exam.id, {
+          totalMarks: data.totalMarks !== undefined && data.totalMarks !== null ? Number(data.totalMarks) : undefined,
+          passingScore: data.passingScore !== undefined && data.passingScore !== null ? Number(data.passingScore) : undefined,
+        });
+      }
     }
 
     // Persist questions if provided
@@ -541,17 +610,18 @@ export const lecturerService = {
       const original = await getExamination(examId);
       if (!original) return null;
 
-      const now = new Date();
-      const defaultStart = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-      const defaultEnd = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
-
       const duplicated = await createExamination({
         course_offering: original.course_offering,
         title: `${original.title} (Copy)`,
-        start_window: original.start_window || defaultStart,
-        end_window: original.end_window || defaultEnd,
+        start_window: original.start_window,
+        end_window: original.end_window,
         duration_minutes: original.duration_minutes || 60,
       });
+
+      const origMeta = getExamMeta(examId);
+      if (origMeta) {
+        setExamMeta(duplicated.id, origMeta);
+      }
 
       // Clone questions if present
       if (original.questions && original.questions.length > 0) {
@@ -648,7 +718,15 @@ export const lecturerService = {
   },
 
   /**
-   * Schedule exam window via POST /api/v1/exams/{id}/schedule
+   * Publish examination results via POST /api/v1/exams/{id}/publish
+   */
+  async publishExam(examId: string): Promise<LecturerExam> {
+    const published = await publishExamination(examId);
+    return transformExamToUi(published);
+  },
+
+  /**
+   * Schedule exam window via POST /api/v1/exams/{id}/schedule (or PATCH if already SCHEDULED)
    */
   async scheduleExam(
     examId: string,
@@ -661,28 +739,73 @@ export const lecturerService = {
       durationMinutes?: number;
     }
   ): Promise<LecturerExam> {
-    const rawStart = data.start_window || data.startDate;
-    const rawEnd = data.end_window || data.endDate;
-    const durationMinutes = data.duration_minutes ?? data.durationMinutes ?? 60;
+    const rawStart = data.startDate || data.start_window;
+    const rawEnd = data.endDate || data.end_window;
 
     if (!rawStart || !rawEnd) {
       throw new Error('Start and End dates are required for scheduling.');
     }
 
-    const startDate = new Date(rawStart);
-    const endDate = new Date(rawEnd);
+    const startIso = toIsoStringFromDatetimeLocal(rawStart);
+    const endIso = toIsoStringFromDatetimeLocal(rawEnd);
+    const calculatedDuration = calculateDurationMinutes(rawStart, rawEnd);
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    if (!startIso || !endIso) {
       throw new Error('Please enter valid start and end dates/times.');
     }
 
-    const scheduled = await scheduleExamination(examId, {
-      start_window: startDate.toISOString(),
-      end_window: endDate.toISOString(),
-      duration_minutes: Number(durationMinutes),
+    const durationMinutes = calculatedDuration ?? data.duration_minutes ?? data.durationMinutes ?? 60;
+
+    try {
+      const scheduled = await scheduleExamination(examId, {
+        start_window: startIso,
+        end_window: endIso,
+        duration_minutes: Number(durationMinutes),
+      });
+
+      return transformExamToUi(scheduled);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (typeof detail === 'string' && detail.toLowerCase().includes('only draft')) {
+        // If already SCHEDULED, update via PATCH
+        const patched = await patchExamination(examId, {
+          start_window: startIso,
+          end_window: endIso,
+          duration_minutes: Number(durationMinutes),
+        });
+        return transformExamToUi(patched);
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Update an existing examination's schedule via PATCH /api/v1/exams/{id}
+   */
+  async updateExamSchedule(
+    examId: string,
+    data: {
+      startDate: string;
+      endDate: string;
+      durationMinutes?: number;
+    }
+  ): Promise<LecturerExam> {
+    const startIso = toIsoStringFromDatetimeLocal(data.startDate);
+    const endIso = toIsoStringFromDatetimeLocal(data.endDate);
+    const calculatedDuration = calculateDurationMinutes(data.startDate, data.endDate);
+    const duration = calculatedDuration ?? data.durationMinutes ?? 60;
+
+    if (!startIso || !endIso) {
+      throw new Error('Please enter valid start and end dates/times.');
+    }
+
+    const patched = await patchExamination(examId, {
+      start_window: startIso,
+      end_window: endIso,
+      duration_minutes: Number(duration),
     });
 
-    return transformExamToUi(scheduled);
+    return transformExamToUi(patched);
   },
 
   /**

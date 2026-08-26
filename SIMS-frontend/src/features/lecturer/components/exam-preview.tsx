@@ -6,6 +6,7 @@ import * as React from 'react';
 
 import { Badge, Button, Card, CardContent } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { formatDurationMinutes } from '@/utils/date';
 
 import { lecturerService } from '../services';
 
@@ -79,7 +80,7 @@ export function ExamPreview({ examId }: ExamPreviewProps) {
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 text-sm rounded-xl border border-border bg-muted/30 p-4">
           <div>
             <p className="text-xs text-muted-foreground">Duration</p>
-            <p className="font-medium">{exam.durationMinutes} minutes</p>
+            <p className="font-medium">{formatDurationMinutes(exam.durationMinutes)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Marks</p>

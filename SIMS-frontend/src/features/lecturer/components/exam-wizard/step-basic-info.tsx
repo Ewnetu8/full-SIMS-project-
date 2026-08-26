@@ -29,12 +29,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
   const { wizardData, updateWizardData } = useLecturerStore();
   const [courses, setCourses] = React.useState<Course[]>([]);
 
-  // String state for raw numeric editing
-  const [durationInput, setDurationInput] = React.useState(
-    wizardData.durationMinutes !== undefined && wizardData.durationMinutes !== null
-      ? String(wizardData.durationMinutes)
-      : '60',
-  );
+  // String state for raw numeric editing of marks & score
   const [totalMarksInput, setTotalMarksInput] = React.useState(
     wizardData.totalMarks !== undefined && wizardData.totalMarks !== null
       ? String(wizardData.totalMarks)
@@ -45,6 +40,19 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
       ? String(wizardData.passingScore)
       : '50',
   );
+
+  // Sync inputs with wizardData whenever store values change (e.g. when loading an existing exam)
+  React.useEffect(() => {
+    if (wizardData.totalMarks !== undefined && wizardData.totalMarks !== null) {
+      setTotalMarksInput(String(wizardData.totalMarks));
+    }
+  }, [wizardData.totalMarks]);
+
+  React.useEffect(() => {
+    if (wizardData.passingScore !== undefined && wizardData.passingScore !== null) {
+      setPassingScoreInput(String(wizardData.passingScore));
+    }
+  }, [wizardData.passingScore]);
 
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
@@ -73,13 +81,6 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
       newErrors.course = 'Please select a course.';
     }
 
-    const duration = durationInput.trim() === '' ? NaN : Number(durationInput);
-    if (durationInput.trim() === '' || isNaN(duration)) {
-      newErrors.duration = 'Duration is required.';
-    } else if (duration <= 0) {
-      newErrors.duration = 'Duration must be greater than 0 minutes.';
-    }
-
     const totalMarks = totalMarksInput.trim() === '' ? NaN : Number(totalMarksInput);
     if (totalMarksInput.trim() === '' || isNaN(totalMarks)) {
       newErrors.totalMarks = 'Total marks is required.';
@@ -105,7 +106,6 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
     if (!validate()) return;
 
     updateWizardData({
-      durationMinutes: Number(durationInput),
       totalMarks: Number(totalMarksInput),
       passingScore: Number(passingScoreInput),
     });
@@ -187,25 +187,8 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
             <p className="text-xs text-muted-foreground">Students will see these instructions before beginning the exam.</p>
           </div>
 
-          {/* Duration, Marks, Passing */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="exam-duration" required>Duration (Minutes)</Label>
-              <Input
-                id="exam-duration"
-                type="number"
-                min={1}
-                value={durationInput}
-                onChange={(e) => {
-                  setDurationInput(e.target.value);
-                  if (errors.duration) setErrors((prev) => ({ ...prev, duration: '' }));
-                }}
-                error={!!errors.duration}
-              />
-              {errors.duration && (
-                <p className="text-xs text-destructive font-medium">{errors.duration}</p>
-              )}
-            </div>
+          {/* Marks & Passing Score */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="exam-total-marks" required>Total Marks</Label>
               <Input

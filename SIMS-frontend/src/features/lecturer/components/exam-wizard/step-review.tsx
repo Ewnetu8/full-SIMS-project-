@@ -8,6 +8,7 @@ import * as React from 'react';
 import { toast } from '@/components/feedback';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { calculateDurationMinutes, formatDurationMinutes } from '@/utils/date';
 
 import { lecturerService } from '../../services';
 import { useLecturerStore } from '../../store';
@@ -24,6 +25,8 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
   const [scheduling, setScheduling] = React.useState(false);
   const [savedMessage, setSavedMessage] = React.useState<string | null>(null);
 
+  const durationMinutes =
+    calculateDurationMinutes(wizardData.startDate, wizardData.endDate) ?? wizardData.durationMinutes ?? 0;
   const totalMarks = wizardData.questions.reduce((acc, q) => acc + q.marks, 0);
   const marksMismatch = totalMarks !== wizardData.totalMarks;
 
@@ -35,12 +38,16 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
     setSavingDraft(true);
     try {
       const instructions = wizardData.instructions.split('\n').filter(Boolean);
-      await lecturerService.saveExam({
+      const payload = {
         ...wizardData,
+        durationMinutes,
         id: editingExamId ?? undefined,
         instructions,
-        status: 'DRAFT',
-      });
+        status: 'DRAFT' as const,
+      };
+      console.log('[SCHEDULE DEBUG] Draft payload', payload);
+      const response = await lecturerService.saveExam(payload);
+      console.log('[SCHEDULE DEBUG] Draft response', response);
 
       setSavedMessage('Examination saved as Draft successfully!');
       setTimeout(() => {
@@ -94,6 +101,7 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
       const instructions = wizardData.instructions.split('\n').filter(Boolean);
       const exam = await lecturerService.saveExam({
         ...wizardData,
+        durationMinutes,
         id: editingExamId ?? undefined,
         instructions,
         status: 'DRAFT',
@@ -102,7 +110,7 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
       await lecturerService.scheduleExam(exam.id, {
         startDate: wizardData.startDate,
         endDate: wizardData.endDate,
-        durationMinutes: wizardData.durationMinutes,
+        durationMinutes,
       });
 
       setSavedMessage('Examination created and scheduled successfully!');
@@ -146,7 +154,7 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
             <div className="space-y-2 text-sm">
               <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">Exam Details</p>
               <p><span className="text-muted-foreground">Title: </span>{wizardData.title || '—'}</p>
-              <p><span className="text-muted-foreground">Duration: </span>{wizardData.durationMinutes} minutes</p>
+              <p><span className="text-muted-foreground">Duration: </span>{formatDurationMinutes(durationMinutes)}</p>
               <p><span className="text-muted-foreground">Total Marks: </span>{wizardData.totalMarks}</p>
               <p><span className="text-muted-foreground">Passing Score: </span>{wizardData.passingScore}</p>
               <p>

@@ -1,29 +1,28 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
+  AlertCircle,
   Calendar,
+  CheckCircle2,
   Clock,
   Copy,
   Eye,
-  FileCheck,
-  Filter,
+  FileQuestion,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
-  Search,
+  RefreshCw,
   Trash2,
   Upload,
   Users,
-  X,
-  AlertCircle,
-  CheckCircle2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
-import { EmptyState, ErrorState, SkeletonCard, toast } from '@/components/feedback';
+import { EmptyState, toast } from '@/components/feedback';
 import {
   Badge,
   Button,
@@ -31,12 +30,14 @@ import {
   CardContent,
   Dialog,
   DialogBody,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   Input,
+  SearchInput,
   Select,
   SelectContent,
   SelectItem,
@@ -44,6 +45,11 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import {
+  calculateDurationMinutes,
+  formatDurationMinutes,
+  toDatetimeLocalValue,
+} from '@/utils/date';
 
 import { lecturerService } from '../services';
 import { useLecturerStore } from '../store';
@@ -70,8 +76,7 @@ export function ExamList() {
   const [scheduleForm, setScheduleForm] = React.useState<{
     startDate: string;
     endDate: string;
-    durationMinutes: string | number;
-  }>({ startDate: '', endDate: '', durationMinutes: 60 });
+  }>({ startDate: '', endDate: '' });
   const [scheduleError, setScheduleError] = React.useState<string | null>(null);
   const [isScheduling, setIsScheduling] = React.useState(false);
 
@@ -126,6 +131,22 @@ export function ExamList() {
     );
   }, [exams, searchQuery]);
 
+  function handleOpenScheduleModal(exam: LecturerExam) {
+    console.log('[SCHEDULE DEBUG] Selected exam', exam);
+    const startDate = exam.startDate ? toDatetimeLocalValue(exam.startDate) : '';
+    const endDate = exam.endDate ? toDatetimeLocalValue(exam.endDate) : '';
+    console.log('[SCHEDULE DEBUG] Schedule form', { startDate, endDate });
+
+    setSchedulingExam(exam);
+    setScheduleForm({
+      startDate,
+      endDate,
+    });
+    setScheduleError(null);
+  }
+
+  const calculatedDuration = calculateDurationMinutes(scheduleForm.startDate, scheduleForm.endDate);
+
   async function handleDeleteConfirm() {
     if (!deletingExam) return;
     setIsDeleting(true);
@@ -166,44 +187,46 @@ export function ExamList() {
     if (!schedulingExam) return;
     setScheduleError(null);
 
+    if (!scheduleForm.startDate || !scheduleForm.endDate) {
+      setScheduleError('Please enter both start and end dates/times.');
+      return;
+    }
+
     const start = new Date(scheduleForm.startDate);
     const end = new Date(scheduleForm.endDate);
-    const now = new Date();
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       setScheduleError('Please enter valid start and end dates/times.');
       return;
     }
 
-    if (start <= now) {
-      setScheduleError('Examination start window must be in the future (server clock).');
-      return;
-    }
-
     if (end <= start) {
-      setScheduleError('Examination end window must be after the start window.');
+      setScheduleError('End time must be after start time.');
       return;
     }
 
-    const duration = scheduleForm.durationMinutes === '' ? NaN : Number(scheduleForm.durationMinutes);
-    if (scheduleForm.durationMinutes === '' || isNaN(duration) || duration < 1) {
-      setScheduleError('Duration must be at least 1 minute.');
+    if (!calculatedDuration || calculatedDuration <= 0) {
+      setScheduleError('Duration must be greater than 0 minutes.');
       return;
     }
 
     setIsScheduling(true);
     try {
-      const updated = await lecturerService.scheduleExam(schedulingExam.id, {
+      const schedulePayload = {
         startDate: scheduleForm.startDate,
         endDate: scheduleForm.endDate,
-        durationMinutes: Number(scheduleForm.durationMinutes),
-      });
+        durationMinutes: calculatedDuration,
+      };
+      console.log('[SCHEDULE DEBUG] Schedule payload', schedulePayload);
+      const updated = await lecturerService.scheduleExam(schedulingExam.id, schedulePayload);
+      console.log('[SCHEDULE DEBUG] Updated exam', updated);
 
       setExams((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      toast.success('Examination Scheduled', {
-        description: `Examination moved from DRAFT to SCHEDULED (${updated.durationMinutes} mins window).`,
+      toast.success(schedulingExam.status === 'SCHEDULED' ? 'Schedule Updated' : 'Examination Scheduled', {
+        description: `Examination window set to ${formatDurationMinutes(updated.durationMinutes)}.`,
       });
       setSchedulingExam(null);
+      fetchExams();
     } catch (err: any) {
       const responseData = err?.response?.data;
       const detail =
@@ -223,17 +246,16 @@ export function ExamList() {
     if (!publishingExam) return;
     setIsPublishing(true);
     try {
-      const updated = await lecturerService.publishExamResults(publishingExam.id);
-      setExams((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      toast.success('Results Published', {
-        description: `Results for "${publishingExam.title}" are now published to students.`,
+      const published = await lecturerService.publishExam(publishingExam.id);
+      setExams((prev) => prev.map((item) => (item.id === published.id ? published : item)));
+      toast.success('Examination Published', {
+        description: 'Grades released and enrolled students notified.',
       });
       setPublishingExam(null);
     } catch (err: any) {
       const detail = err?.response?.data?.detail || err?.message;
-      toast.error('Cannot Publish Results', {
-        description:
-          detail || 'Publish requires all student attempts to be fully graded with Results created.',
+      toast.error('Publish Gate Rejected', {
+        description: detail || 'All attempts must be fully graded before publishing.',
       });
     } finally {
       setIsPublishing(false);
@@ -241,61 +263,39 @@ export function ExamList() {
   }
 
   async function handleDuplicate(examId: string) {
+    setActionMenuId(null);
     try {
-      const duplicated = await lecturerService.duplicateExam(examId);
-      if (duplicated) {
-        setExams((prev) => [duplicated, ...prev]);
-        toast.success('Exam Duplicated', {
-          description: `Created new draft copy: "${duplicated.title}".`,
+      const dup = await lecturerService.duplicateExam(examId);
+      if (dup) {
+        setExams((prev) => [dup, ...prev]);
+        toast.success('Exam duplicated', {
+          description: `Created "${dup.title}". Saved as Draft.`,
         });
       }
     } catch (err: any) {
       toast.error('Failed to duplicate exam', {
-        description: err?.message || 'Could not duplicate exam.',
+        description: err?.message || 'Please check backend logs.',
       });
     }
-    setActionMenuId(null);
   }
 
-  if (loading) {
+  if (loading && exams.length === 0) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Examination Management</h1>
-            <p className="text-sm text-muted-foreground">
-              Create, manage, schedule, and publish results for your course examinations.
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} className="min-h-[160px]" />
-          ))}
-        </div>
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Examination Management</h1>
-          <p className="text-sm text-muted-foreground">
-            Create, manage, schedule, and publish results for your course examinations.
-          </p>
-        </div>
-        <Card className="border-destructive/20 bg-destructive/5">
-          <CardContent className="p-6">
-            <ErrorState
-              title="Unable to load examinations"
-              description={error}
-              onRetry={fetchExams}
-              retryLabel="Retry loading exams"
-            />
-          </CardContent>
-        </Card>
+      <div className="p-6 text-center">
+        <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-3" />
+        <h3 className="text-base font-semibold text-foreground">Could not load examinations</h3>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">{error}</p>
+        <Button onClick={() => fetchExams()} variant="outline" size="sm" leftIcon={<RefreshCw className="h-4 w-4" />}>
+          Try Again
+        </Button>
       </div>
     );
   }
@@ -304,33 +304,28 @@ export function ExamList() {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Examination Management</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Examination Management
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Create, manage, schedule, and publish results for your academic course examinations.
+              Author, schedule, manage, and publish course examinations across their lifecycle.
             </p>
           </div>
-          <Button asChild leftIcon={<Plus className="h-4 w-4" />}>
+          <Button asChild size="sm" leftIcon={<Plus className="h-4 w-4" />}>
             <Link href={ROUTES.LECTURER.EXAM_CREATE}>Create New Exam</Link>
           </Button>
         </div>
 
-        {/* Filters row */}
-        <div className="flex flex-wrap gap-3">
-          <div className="flex-1 min-w-52">
-            <Input
-              placeholder="Search exams by title or code..."
+        {/* Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by title, code, or course name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              leadingIcon={<Search className="h-4 w-4" />}
-              trailingIcon={
-                searchQuery ? (
-                  <button onClick={() => setSearchQuery('')} className="rounded-full p-0.5 hover:bg-muted">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ) : undefined
-              }
+              onClear={() => setSearchQuery('')}
             />
           </div>
 
@@ -339,8 +334,7 @@ export function ExamList() {
             onValueChange={(v) => setStatusFilter(v as ExamStatus | 'ALL')}
           >
             <SelectTrigger className="w-40">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Statuses</SelectItem>
@@ -401,12 +395,12 @@ export function ExamList() {
                             <Badge
                               variant={
                                 isPublished || isActive
-                                  ? 'success'
-                                  : isScheduled
-                                  ? 'info'
-                                  : isDraft
-                                  ? 'warning'
-                                  : 'secondary'
+                                    ? 'success'
+                                    : isScheduled
+                                    ? 'info'
+                                    : isDraft
+                                    ? 'warning'
+                                    : 'secondary'
                               }
                             >
                               {exam.status}
@@ -418,16 +412,24 @@ export function ExamList() {
                           </p>
                           <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-0.5">
                             <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" /> {exam.durationMinutes} mins
+                              <Clock className="h-3 w-3" /> {formatDurationMinutes(exam.durationMinutes)}
                             </span>
                             <span>·</span>
                             <span>{exam.totalMarks} total marks</span>
                             <span>·</span>
                             <span>{exam.questions.length} questions</span>
-                            {exam.startDate && (
+                            {exam.startDate ? (
                               <>
                                 <span>·</span>
-                                <span>Window: {new Date(exam.startDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                <span>
+                                  Window: {new Date(exam.startDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                  {exam.endDate ? ` — ${new Date(exam.endDate).toLocaleTimeString([], { timeStyle: 'short' })}` : ''}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span>·</span>
+                                <span className="italic">Not Scheduled</span>
                               </>
                             )}
                           </div>
@@ -461,25 +463,37 @@ export function ExamList() {
                                 variant="default"
                                 size="sm"
                                 leftIcon={<Calendar className="h-3.5 w-3.5" />}
-                                onClick={() => {
-                                  setSchedulingExam(exam);
-                                  const now = new Date();
-                                  const defaultStart = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-                                  const defaultEnd = new Date(now.getTime() + 26 * 60 * 60 * 1000);
-                                  setScheduleForm({
-                                    startDate: exam.startDate ? exam.startDate.slice(0, 16) : defaultStart.toISOString().slice(0, 16),
-                                    endDate: exam.endDate ? exam.endDate.slice(0, 16) : defaultEnd.toISOString().slice(0, 16),
-                                    durationMinutes: exam.durationMinutes || 60,
-                                  });
-                                  setScheduleError(null);
-                                }}
+                                onClick={() => handleOpenScheduleModal(exam)}
                               >
                                 Schedule
                               </Button>
                             </>
                           )}
 
-                          {/* 3. ACTIVE / CLOSED / PUBLISHED States: Submissions & Results */}
+                          {/* 3. SCHEDULED State: Edit, Edit Schedule */}
+                          {isScheduled && (
+                            <>
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                leftIcon={<Pencil className="h-3.5 w-3.5" />}
+                              >
+                                <Link href={ROUTES.LECTURER.EXAM_EDIT(exam.id)}>Edit</Link>
+                              </Button>
+
+                              <Button
+                                variant="default"
+                                size="sm"
+                                leftIcon={<Calendar className="h-3.5 w-3.5" />}
+                                onClick={() => handleOpenScheduleModal(exam)}
+                              >
+                                Edit Schedule
+                              </Button>
+                            </>
+                          )}
+
+                          {/* 4. ACTIVE / CLOSED / PUBLISHED States: Submissions & Results */}
                           {(isActive || isClosed || isPublished) && (
                             <Button
                               asChild
@@ -493,7 +507,7 @@ export function ExamList() {
                             </Button>
                           )}
 
-                          {/* 4. CLOSED State: Publish Results Gate */}
+                          {/* 5. CLOSED State: Publish Results Gate */}
                           {isClosed && (
                             <Button
                               variant="default"
@@ -562,17 +576,10 @@ export function ExamList() {
                   action={
                     exams.length === 0
                       ? {
-                          label: 'Create New Exam',
+                          label: 'Create First Exam',
                           onClick: () => router.push(ROUTES.LECTURER.EXAM_CREATE),
                         }
-                      : {
-                          label: 'Clear Filters',
-                          onClick: () => {
-                            setSearchQuery('');
-                            setStatusFilter('ALL');
-                            setCourseFilter('ALL');
-                          },
-                        }
+                      : undefined
                   }
                 />
               </CardContent>
@@ -581,76 +588,72 @@ export function ExamList() {
         </div>
       </div>
 
-      {/* ─── Confirm Delete Dialog (DRAFT only) ─────────────────────────────── */}
-      <Dialog open={!!deletingExam} onOpenChange={() => setDeletingExam(null)}>
-        <DialogContent size="md">
+      {/* Delete Exam Confirmation Dialog */}
+      <Dialog open={!!deletingExam} onOpenChange={(open) => !open && setDeletingExam(null)}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Examination</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
+            <DialogTitle>Delete Examination?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{' '}
-              <strong className="text-foreground">{deletingExam?.title}</strong>? This action will permanently remove the examination and its associated question configurations.
+              Are you sure you want to delete <strong className="text-foreground">{deletingExam?.title}</strong>?
+              This action cannot be undone. Examinations with student attempts cannot be deleted.
             </DialogDescription>
-          </DialogBody>
+          </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeletingExam(null)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteConfirm}
-              loading={isDeleting}
-            >
-              Delete Examination
+            <Button variant="destructive" onClick={handleDeleteConfirm} loading={isDeleting}>
+              Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Confirm Publish Results Dialog (CLOSED only) ───────────────────── */}
-      <Dialog open={!!publishingExam} onOpenChange={() => setPublishingExam(null)}>
-        <DialogContent size="md">
+      {/* Publish Results Confirmation Dialog */}
+      <Dialog open={!!publishingExam} onOpenChange={(open) => !open && setPublishingExam(null)}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Publish Examination Results</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
+            <DialogTitle>Publish Examination Results?</DialogTitle>
             <DialogDescription>
-              Are you ready to publish final results for{' '}
-              <strong className="text-foreground">{publishingExam?.title}</strong>?
+              Publishing will make graded results visible to all enrolled students for{' '}
+              <strong className="text-foreground">{publishingExam?.title}</strong>.
             </DialogDescription>
-            <p className="text-xs text-muted-foreground mt-3 bg-muted/40 p-3 rounded-lg border border-border/70">
-              Publishing moves the exam status from <strong>CLOSED</strong> to <strong>PUBLISHED</strong>. All enrolled students will be able to view their final scores. Ensure all student submissions are fully graded.
+          </DialogHeader>
+          <div className="p-3 bg-muted/40 rounded-lg border border-border/70 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Publish Gate Requirements:
             </p>
-          </DialogBody>
+            <ul className="list-disc pl-5 space-y-0.5">
+              <li>Status must be <strong>CLOSED</strong></li>
+              <li>Every student attempt must be in <strong>GRADED</strong> state</li>
+              <li>Status transitions: <strong>CLOSED → PUBLISHED</strong></li>
+            </ul>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPublishingExam(null)} disabled={isPublishing}>
               Cancel
             </Button>
-            <Button
-              variant="default"
-              onClick={handlePublishConfirm}
-              loading={isPublishing}
-            >
-              Publish Results Now
+            <Button onClick={handlePublishConfirm} loading={isPublishing}>
+              Confirm & Publish Results
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Schedule Window Dialog (DRAFT → SCHEDULED) ──────────────────────── */}
-      <Dialog open={!!schedulingExam} onOpenChange={() => setSchedulingExam(null)}>
-        <DialogContent size="lg">
-          <form onSubmit={handleScheduleSubmit}>
-            <DialogHeader>
-              <DialogTitle>Schedule Examination Window</DialogTitle>
-            </DialogHeader>
+      {/* Schedule Window Dialog */}
+      <Dialog open={!!schedulingExam} onOpenChange={(open) => !open && setSchedulingExam(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {schedulingExam?.status === 'SCHEDULED' ? 'Edit Examination Schedule' : 'Schedule Examination'}
+            </DialogTitle>
+            <DialogDescription>
+              Set the active time window for <strong className="text-foreground">{schedulingExam?.title}</strong>.
+              Duration is calculated automatically from the start and end times.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleScheduleSubmit} className="space-y-4">
             <DialogBody className="space-y-4">
-              <DialogDescription>
-                Set the active time window and duration for{' '}
-                <strong className="text-foreground">{schedulingExam?.title}</strong>.
-              </DialogDescription>
-
               {scheduleError && (
                 <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -669,7 +672,7 @@ export function ExamList() {
                     }
                     required
                   />
-                  <p className="text-2xs text-muted-foreground">Must be in the future.</p>
+                  <p className="text-2xs text-muted-foreground">Select start date & time.</p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -687,22 +690,16 @@ export function ExamList() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Duration (Minutes)</label>
+                <label className="text-xs font-semibold text-foreground">Duration (Calculated Automatically)</label>
                 <Input
-                  type="number"
-                  min={1}
-                  max={1440}
-                  value={scheduleForm.durationMinutes === '' ? '' : scheduleForm.durationMinutes}
-                  onChange={(e) =>
-                    setScheduleForm((prev) => ({
-                      ...prev,
-                      durationMinutes: e.target.value,
-                    }))
-                  }
-                  required
+                  type="text"
+                  readOnly
+                  disabled
+                  value={formatDurationMinutes(calculatedDuration)}
+                  className="bg-muted/50 font-medium cursor-not-allowed"
                 />
                 <p className="text-2xs text-muted-foreground">
-                  Individual student attempt time limit in minutes.
+                  Individual student attempt time limit: {calculatedDuration ? `${calculatedDuration} minutes` : 'select start & end window above'}.
                 </p>
               </div>
 
@@ -711,7 +708,7 @@ export function ExamList() {
                   <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Scheduling Gate Requirements:
                 </p>
                 <ul className="list-disc pl-5 space-y-0.5">
-                  <li>Status will advance: <strong>DRAFT → SCHEDULED</strong></li>
+                  <li>Status: <strong>{schedulingExam?.status === 'SCHEDULED' ? 'SCHEDULED (Updating Schedule)' : 'DRAFT → SCHEDULED'}</strong></li>
                   <li>Questions must be objective/auto-gradable (no Essay/Short Answer, exactly 1 correct option per MCQ)</li>
                 </ul>
               </div>
@@ -721,7 +718,7 @@ export function ExamList() {
                 Cancel
               </Button>
               <Button type="submit" loading={isScheduling}>
-                Confirm & Schedule
+                {schedulingExam?.status === 'SCHEDULED' ? 'Save Schedule Changes' : 'Confirm & Schedule'}
               </Button>
             </DialogFooter>
           </form>
