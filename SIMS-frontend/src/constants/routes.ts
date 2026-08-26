@@ -19,6 +19,7 @@ export const ROUTES = {
   STUDENT: {
     DASHBOARD: '/student/dashboard',
     COURSES: '/student/courses',
+    COURSE: (id: string) => `/student/courses/${id}`,
     EXAMS: '/student/exams',
     EXAM: (id: string) => `/student/exams/${id}`,
     EXAM_TAKE: (id: string) => `/student/exams/${id}/take`,

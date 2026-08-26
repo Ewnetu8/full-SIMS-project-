@@ -33,6 +33,30 @@ export const studentService = {
   },
 
   /**
+   * GET /api/v1/enrollments/{id}
+   * Retrieves a single enrollment record for the authenticated student.
+   */
+  getEnrollmentById: async (id: string): Promise<Enrollment> => {
+    return await api.get<Enrollment>(API_ENDPOINTS.ENROLLMENTS.BY_ID(id));
+  },
+
+  /**
+   * GET /api/v1/courses/{id}
+   * Retrieves course details.
+   */
+  getCourseById: async (id: string): Promise<Course> => {
+    return await api.get<Course>(API_ENDPOINTS.COURSES.BY_ID(id));
+  },
+
+  /**
+   * GET /api/v1/course-offerings/{id}
+   * Retrieves course offering details.
+   */
+  getCourseOfferingById: async (id: string): Promise<CourseOffering> => {
+    return await api.get<CourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
+  },
+
+  /**
    * GET /api/v1/exams/active
    * Returns active examinations available to the student.
    */

@@ -280,22 +280,29 @@ export function StudentDashboard() {
                 return (
                   <div
                     key={enrollment.id}
-                    className="rounded-xl border border-border p-4 transition hover:border-primary/50 hover:bg-accent/40"
+                    className="flex flex-col justify-between gap-3 rounded-xl border border-border p-4 transition hover:border-primary/50 hover:bg-accent/40 sm:flex-row sm:items-center"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-foreground">
-                          {course?.title || 'Enrolled Course'}
-                        </p>
-                        <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{course?.course_code || 'CODE'}</span>
-                          <span>· {course?.credit_hours || 0} credit hrs · Section {offering?.section || 'A'}</span>
-                        </p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                          {course?.course_code || 'CODE'}
+                        </span>
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono font-medium text-foreground">
+                          {enrollment.status}
+                        </span>
                       </div>
-                      <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary">
-                        {enrollment.status}
-                      </span>
+                      <p className="mt-1.5 font-semibold text-foreground truncate">
+                        {course?.title || 'Enrolled Course'}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {course?.credit_hours || 0} credit hrs · Section {offering?.section || 'A'}
+                      </p>
                     </div>
+                    <Button asChild variant="outline" size="sm" className="shrink-0 self-start sm:self-auto">
+                      <Link href={ROUTES.STUDENT.COURSE(enrollment.id)}>
+                        View details <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      </Link>
+                    </Button>
                   </div>
                 );
               })}
