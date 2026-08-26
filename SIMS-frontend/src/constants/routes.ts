@@ -63,7 +63,7 @@ export const ROUTES = {
     ACADEMIC_YEARS: '/admin/academic-years',
     SEMESTERS: '/admin/semesters',
     COURSES: '/admin/courses',
-    COURSE_OFFERINGS: '/admin/courses?tab=offerings',
+    COURSE_OFFERINGS: '/admin/course-offerings',
     COURSE_PREREQUISITES: '/admin/course-prerequisites',
     CREDIT_HOUR_POLICIES: '/admin/credit-hour-policies',
     ENROLLMENT_OVERRIDES: '/admin/enrollment-overrides',

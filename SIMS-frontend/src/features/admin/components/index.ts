@@ -21,4 +21,5 @@ export * from './course-prerequisite-management';
 export * from './credit-hour-policy-management';
 export * from './enrollment-override-management';
 export * from './teaching-assignment-management';
+export * from './course-offering-management';
 
