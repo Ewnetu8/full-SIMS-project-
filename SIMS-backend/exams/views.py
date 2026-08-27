@@ -24,7 +24,11 @@ from exams.serializers import (
     StudentExaminationSerializer,
     StudentQuestionSerializer,
 )
-from exams.services import gradeability_errors
+from exams.services import (
+    gradeability_errors,
+    sync_examination_lifecycle,
+    sync_single_exam_status,
+)
 
 
 def get_examination(pk):
@@ -55,6 +59,7 @@ class ExaminationListView(APIView):
         responses={200: ExaminationSerializer(many=True)},
     )
     def get(self, request):
+        sync_examination_lifecycle()
         queryset = (
             Examination.objects.all()
             .select_related("course_offering__course", "lecturer")
@@ -138,6 +143,7 @@ class ExaminationDetailView(APIView):
             return Response(
                 {"detail": "Examination not found."}, status=status.HTTP_404_NOT_FOUND
             )
+        obj = sync_single_exam_status(obj)
         user_role = getattr(request.user, "role", None)
         if user_role == "STUDENT":
             student = getattr(request.user, "student_profile", None)
@@ -396,13 +402,7 @@ class StudentActiveExamsView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         now = timezone.now()
-        # Automatically transition any SCHEDULED exam whose start_window has opened into ACTIVE status
-        Examination.objects.filter(
-            status=ExamStatusChoices.SCHEDULED,
-            start_window__lte=now,
-            end_window__gt=now,
-        ).update(status=ExamStatusChoices.ACTIVE)
-
+        sync_examination_lifecycle(now)
         queryset = (
             Examination.objects.filter(
                 status=ExamStatusChoices.ACTIVE,
@@ -455,9 +455,7 @@ class StartExamView(APIView):
             )
 
         now = timezone.now()
-        if exam.status == ExamStatusChoices.SCHEDULED and exam.start_window <= now < exam.end_window:
-            exam.status = ExamStatusChoices.ACTIVE
-            exam.save(update_fields=["status", "updated_at"])
+        exam = sync_single_exam_status(exam, now)
 
         if exam.status != ExamStatusChoices.ACTIVE:
             return Response(
@@ -479,22 +477,14 @@ class StartExamView(APIView):
                 {"detail": "You are not enrolled in this examination's course."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        existing_attempt = ExamAttempt.objects.filter(examination=exam, student=student).first()
-        if existing_attempt:
-            if existing_attempt.submission_time is None:
-                questions = exam.questions.all()
-                return Response(
-                    {
-                        "attempt": ExamAttemptSerializer(existing_attempt).data,
-                        "questions": StudentQuestionSerializer(questions, many=True).data,
-                    },
-                    status=status.HTTP_200_OK,
-                )
-            elif not exam.allow_retake:
-                return Response(
-                    {"detail": "You have already submitted this examination."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        if (
+            not exam.allow_retake
+            and ExamAttempt.objects.filter(examination=exam, student=student).exists()
+        ):
+            return Response(
+                {"detail": "You have already attempted this examination."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         attempt = ExamAttempt.objects.create(
             examination=exam, student=student, start_time=now

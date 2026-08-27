@@ -99,24 +99,20 @@ def grade_exam_attempt(self, attempt_id):
 
 @shared_task(name='exams.tasks.close_expired_exams_and_grade')
 def close_expired_exams_and_grade():
-    """Periodic sweep (Celery beat) enforcing timer expiry.
+    """Periodic sweep (Celery beat) enforcing examination lifecycle and timer expiry.
 
-    1. Closes any ACTIVE examination whose `end_window` has passed (→ CLOSED).
-    2. Freezes and enqueues grading for any attempt that was never submitted
+    1. Activates SCHEDULED examinations whose `start_window` has arrived (→ ACTIVE).
+    2. Closes SCHEDULED / ACTIVE examinations whose `end_window` has passed (→ CLOSED).
+    3. Freezes and enqueues grading for any attempt that was never submitted
        but whose effective deadline — `min(end_window, start_time +
        duration_minutes)`, the same formula as SubmitExamView — has passed.
        The attempt is frozen at the deadline itself, so an abandoned attempt
        can never stay stuck in GRADING_PENDING.
     """
-    now = timezone.now()
+    from exams.services import sync_examination_lifecycle
 
-    expired_exams = Examination.objects.filter(
-        status=ExamStatusChoices.ACTIVE,
-        end_window__lte=now,
-    )
-    for exam in expired_exams:
-        exam.status = ExamStatusChoices.CLOSED
-        exam.save(update_fields=["status", "updated_at"])
+    now = timezone.now()
+    sync_examination_lifecycle(now)
 
     abandoned = ExamAttempt.objects.filter(
         submission_time__isnull=True,
