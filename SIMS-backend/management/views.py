@@ -32,10 +32,20 @@ _DetailOut = inline_serializer(
 )
 
 
+def _get_user_university_filter(request):
+    """Return a Q filter for users belonging to the request user's university.
+    System Admin and superusers see everything."""
+    if request.user.is_superuser or request.user.role == RoleChoices.SYSTEM_ADMIN:
+        return Q()
+    if request.user.role == RoleChoices.ADMIN and request.user.university:
+        return Q(university=request.user.university)
+    return Q(pk__in=[])
+
+
 class UserListView(APIView):
     """List all users with optional search and role filter."""
 
-    permission_classes = [IsAuthenticated, HasRole(RoleChoices.ADMIN)]
+    permission_classes = [IsAuthenticated, HasRole(RoleChoices.ADMIN, RoleChoices.SYSTEM_ADMIN)]
 
     @extend_schema(
         tags=['User Management'],
@@ -50,10 +60,13 @@ class UserListView(APIView):
     def get(self, request):
         queryset = User.objects.all().order_by('-created_at')
 
+        # Scope by university for Admin
+        uni_filter = _get_user_university_filter(request)
+        queryset = queryset.filter(uni_filter)
+
         # Search filter
         search = request.query_params.get('search')
         if search:
-            from django.db.models import Q
             queryset = queryset.filter(
                 Q(email__icontains=search)
                 | Q(first_name__icontains=search)
@@ -72,7 +85,7 @@ class UserListView(APIView):
 class UserDetailView(APIView):
     """Retrieve, update, or deactivate a specific user."""
 
-    permission_classes = [IsAuthenticated, HasRole(RoleChoices.ADMIN)]
+    permission_classes = [IsAuthenticated, HasRole(RoleChoices.ADMIN, RoleChoices.SYSTEM_ADMIN)]
 
     def get_object(self, pk):
         try:
@@ -102,6 +115,12 @@ class UserDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Admin can only see users in their university
+        if request.user.role == RoleChoices.ADMIN and request.user.university:
+            if obj.university_id != request.user.university_id:
+                return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         return Response(UserDetailSerializer(obj).data)
 
     @extend_schema(
@@ -123,6 +142,12 @@ class UserDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Admin can only update users in their university
+        if request.user.role == RoleChoices.ADMIN and request.user.university:
+            if obj.university_id != request.user.university_id:
+                return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = UserUpdateSerializer(obj, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -143,6 +168,11 @@ class UserDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Admin can only deactivate users in their university
+        if request.user.role == RoleChoices.ADMIN and request.user.university:
+            if obj.university_id != request.user.university_id:
+                return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         if request.user.pk == obj.pk:
             return Response(
@@ -179,6 +209,10 @@ class StudentListView(APIView):
             'user', 'department'
         ).order_by('-created_at')
 
+        # Scope by university for Admin
+        if request.user.role == RoleChoices.ADMIN and request.user.university:
+            queryset = queryset.filter(user__university=request.user.university)
+
         search = request.query_params.get('search')
         if search:
             queryset = queryset.filter(
@@ -214,7 +248,7 @@ class StudentDetailView(APIView):
             return None
 
     def _can_edit(self, request):
-        return request.user.is_superuser or request.user.role == RoleChoices.ADMIN
+        return request.user.is_superuser or request.user.role in (RoleChoices.ADMIN, RoleChoices.SYSTEM_ADMIN)
 
     @extend_schema(
         tags=['Student Management'],
@@ -237,6 +271,11 @@ class StudentDetailView(APIView):
         # Students can only view their own profile
         if request.user.role == RoleChoices.STUDENT:
             if not hasattr(request.user, 'student_profile') or request.user.student_profile.pk != obj.pk:
+                return Response({'detail': 'Student not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Admin can only see students in their university
+        if request.user.role == RoleChoices.ADMIN and request.user.university:
+            if obj.user.university_id != request.user.university_id:
                 return Response({'detail': 'Student not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(StudentDetailSerializer(obj).data)
@@ -296,6 +335,10 @@ class LecturerListView(APIView):
             'user', 'department'
         ).order_by('-created_at')
 
+        # Scope by university for Admin
+        if request.user.role == RoleChoices.ADMIN and request.user.university:
+            queryset = queryset.filter(user__university=request.user.university)
+
         search = request.query_params.get('search')
         if search:
             queryset = queryset.filter(
@@ -327,7 +370,7 @@ class LecturerDetailView(APIView):
             return None
 
     def _can_edit(self, request):
-        return request.user.is_superuser or request.user.role == RoleChoices.ADMIN
+        return request.user.is_superuser or request.user.role in (RoleChoices.ADMIN, RoleChoices.SYSTEM_ADMIN)
 
     @extend_schema(
         tags=['Lecturer Management'],
@@ -350,6 +393,11 @@ class LecturerDetailView(APIView):
         # Lecturers can only view their own profile
         if request.user.role == RoleChoices.LECTURER:
             if not hasattr(request.user, 'lecturer_profile') or request.user.lecturer_profile.pk != obj.pk:
+                return Response({'detail': 'Lecturer not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Admin can only see lecturers in their university
+        if request.user.role == RoleChoices.ADMIN and request.user.university:
+            if obj.user.university_id != request.user.university_id:
                 return Response({'detail': 'Lecturer not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(LecturerDetailSerializer(obj).data)
@@ -407,7 +455,7 @@ _AdminAnalyticsOut = inline_serializer(
 class AdminAnalyticsView(APIView):
     """Aggregate counts for the admin dashboard."""
 
-    permission_classes = [IsAuthenticated, HasRole(RoleChoices.ADMIN)]
+    permission_classes = [IsAuthenticated, HasRole(RoleChoices.ADMIN, RoleChoices.SYSTEM_ADMIN)]
 
     @extend_schema(
         tags=['Analytics'],
@@ -416,13 +464,42 @@ class AdminAnalyticsView(APIView):
         responses={200: _AdminAnalyticsOut},
     )
     def get(self, request):
+        # System Admin sees global counts
+        if request.user.is_superuser or request.user.role == RoleChoices.SYSTEM_ADMIN:
+            return Response({
+                'total_users': User.objects.count(),
+                'total_students': Student.objects.count(),
+                'total_lecturers': Lecturer.objects.count(),
+                'total_colleges': College.objects.count(),
+                'total_departments': Department.objects.count(),
+                'total_programs': Program.objects.count(),
+                'total_courses': Course.objects.count(),
+                'total_exams': Examination.objects.count(),
+            })
+
+        # Admin sees counts scoped to their university
+        uni = request.user.university
+        if uni:
+            return Response({
+                'total_users': User.objects.filter(university=uni).count(),
+                'total_students': Student.objects.filter(user__university=uni).count(),
+                'total_lecturers': Lecturer.objects.filter(user__university=uni).count(),
+                'total_colleges': College.objects.filter(university=uni).count(),
+                'total_departments': Department.objects.filter(college__university=uni).count(),
+                'total_programs': Program.objects.filter(department__college__university=uni).count(),
+                'total_courses': Course.objects.filter(program__department__college__university=uni).count(),
+                'total_exams': Examination.objects.filter(
+                    course_offering__course__program__department__college__university=uni
+                ).count(),
+            })
+
         return Response({
-            'total_users': User.objects.count(),
-            'total_students': Student.objects.count(),
-            'total_lecturers': Lecturer.objects.count(),
-            'total_colleges': College.objects.count(),
-            'total_departments': Department.objects.count(),
-            'total_programs': Program.objects.count(),
-            'total_courses': Course.objects.count(),
-            'total_exams': Examination.objects.count(),
+            'total_users': 0,
+            'total_students': 0,
+            'total_lecturers': 0,
+            'total_colleges': 0,
+            'total_departments': 0,
+            'total_programs': 0,
+            'total_courses': 0,
+            'total_exams': 0,
         })

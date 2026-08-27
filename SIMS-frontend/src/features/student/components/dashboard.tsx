@@ -73,6 +73,8 @@ export function StudentDashboard() {
 
     return () => clearInterval(interval);
   }, [fetchEnrollments, fetchActiveExams, fetchResults]);
+    void fetchNotifications();
+  }, [fetchEnrollments, fetchActiveExams, fetchResults, fetchNotifications]);
 
   const currentHour = new Date().getHours();
   const greeting =

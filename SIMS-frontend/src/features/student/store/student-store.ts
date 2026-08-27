@@ -7,6 +7,7 @@ import type {
   Course,
   CourseOffering,
   Result,
+  CourseOfferingMarksGroup,
 } from '../types/student.types';
 
 function formatErrorMessage(err: any, fallback: string): string {
@@ -46,24 +47,28 @@ interface StudentState {
   courses: Course[];
   courseOfferings: CourseOffering[];
   results: Result[];
+  myMarks: CourseOfferingMarksGroup[];
 
   isLoadingEnrollments: boolean;
   isLoadingExams: boolean;
   isLoadingNotifications: boolean;
   isLoadingCourses: boolean;
   isLoadingResults: boolean;
+  isLoadingMarks: boolean;
 
   enrollmentsError: string | null;
   examsError: string | null;
   notificationsError: string | null;
   coursesError: string | null;
   resultsError: string | null;
+  marksError: string | null;
 
   fetchEnrollments: () => Promise<void>;
   fetchActiveExams: () => Promise<void>;
   fetchNotifications: () => Promise<void>;
   fetchCourses: () => Promise<void>;
   fetchResults: () => Promise<void>;
+  fetchMyMarks: () => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   reset: () => void;
@@ -76,18 +81,21 @@ const initialState = {
   courses: [],
   courseOfferings: [],
   results: [],
+  myMarks: [],
 
   isLoadingEnrollments: false,
   isLoadingExams: false,
   isLoadingNotifications: false,
   isLoadingCourses: false,
   isLoadingResults: false,
+  isLoadingMarks: false,
 
   enrollmentsError: null,
   examsError: null,
   notificationsError: null,
   coursesError: null,
   resultsError: null,
+  marksError: null,
 };
 
 export const useStudentStore = create<StudentState>()((set, get) => ({
@@ -104,6 +112,20 @@ export const useStudentStore = create<StudentState>()((set, get) => ({
         "We couldn't load your examination results. Please try again."
       );
       set({ resultsError: message, isLoadingResults: false });
+    }
+  },
+
+  fetchMyMarks: async () => {
+    set({ isLoadingMarks: true, marksError: null });
+    try {
+      const myMarks = await studentService.getMyMarks();
+      set({ myMarks, isLoadingMarks: false });
+    } catch (err: any) {
+      const message = formatErrorMessage(
+        err,
+        "We couldn't load your assessment marks. Please try again."
+      );
+      set({ marksError: message, isLoadingMarks: false });
     }
   },
 
@@ -140,8 +162,12 @@ export const useStudentStore = create<StudentState>()((set, get) => ({
     try {
       const notifications = await studentService.getNotifications();
       set({ notifications, isLoadingNotifications: false });
-    } catch {
-      set({ notifications: [], notificationsError: null, isLoadingNotifications: false });
+    } catch (err: any) {
+      const message = formatErrorMessage(
+        err,
+        "We couldn't load your notifications. Please try again."
+      );
+      set({ notificationsError: message, isLoadingNotifications: false });
     }
   },
 

@@ -3,6 +3,7 @@ from django.db import models
 from common.models import BaseModel
 
 class RoleChoices(models.TextChoices):
+    SYSTEM_ADMIN = 'SYSTEM_ADMIN', 'System Admin'
     ADMIN = 'ADMIN', 'Admin'
     LECTURER = 'LECTURER', 'Lecturer'
     STUDENT = 'STUDENT', 'Student'
@@ -25,8 +26,7 @@ class UserManager(BaseUserManager):
         else:
             user.set_unusable_password()
         
-        # Set is_staff to True if the role is Admin to allow admin login
-        if role == RoleChoices.ADMIN:
+        if role == RoleChoices.SYSTEM_ADMIN:
             user.is_staff = True
             
         user.save(using=self._db)
@@ -49,9 +49,16 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     last_name = models.CharField(max_length=150, blank=True)
     national_id_fan = models.CharField(max_length=50, unique=True, null=True, blank=True)
     role = models.CharField(
-        max_length=10,
+        max_length=13,
         choices=RoleChoices.choices,
         default=RoleChoices.STUDENT
+    )
+    university = models.ForeignKey(
+        'academics.University',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='admins'
     )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -67,9 +74,10 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
         return f"{self.email} ({self.role})"
 
     def save(self, *args, **kwargs):
-        # Enforce that is_staff is True for ADMIN roles so they can access the admin dashboard
-        if self.role == RoleChoices.ADMIN:
+        if self.role == RoleChoices.SYSTEM_ADMIN:
             self.is_staff = True
+        else:
+            self.is_staff = False
         super().save(*args, **kwargs)
 
 

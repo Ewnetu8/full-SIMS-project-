@@ -11,7 +11,7 @@ from academics.models import Department
 class UserResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'created_at')
+        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'university', 'created_at')
         read_only_fields = fields
 
 
@@ -21,11 +21,12 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     student_identifier = serializers.CharField(required=False, write_only=True)
     faculty_identifier = serializers.CharField(required=False, write_only=True)
     department_id = serializers.UUIDField(required=False, write_only=True, allow_null=True)
+    university_id = serializers.UUIDField(required=False, write_only=True, allow_null=True)
 
     class Meta:
         model = User
         fields = ('email', 'password', 'first_name', 'last_name', 'national_id_fan', 'role', 
-                  'student_identifier', 'faculty_identifier', 'department_id')
+                  'student_identifier', 'faculty_identifier', 'department_id', 'university_id')
 
     def validate_email(self, value):
         # Validate format
@@ -72,7 +73,23 @@ class UserRegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"faculty_identifier": "Faculty identifier is required for Lecturer registration."}
                 )
+        elif role == RoleChoices.ADMIN:
+            university_id = attrs.get('university_id')
+            if not university_id:
+                raise serializers.ValidationError(
+                    {"university_id": "University is required for Admin registration."}
+                )
+            try:
+                from academics.models import University
+                attrs['university'] = University.objects.get(id=university_id)
+            except University.DoesNotExist:
+                raise serializers.ValidationError({"university_id": "University not found."})
         
+        # System Admin should not have a university
+        if role == RoleChoices.SYSTEM_ADMIN:
+            attrs['university'] = None
+            attrs.pop('university_id', None)
+
         # Verify department if provided
         dep_id = attrs.get('department_id')
         if dep_id:
@@ -95,9 +112,11 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         student_id = validated_data.pop('student_identifier', None)
         faculty_id = validated_data.pop('faculty_identifier', None)
         department = validated_data.pop('department', None)
+        university = validated_data.pop('university', None)
         
-        # Pop department_id if it's there
+        # Pop fields that are not direct User model fields
         validated_data.pop('department_id', None)
+        validated_data.pop('university_id', None)
 
         # Create user
         user = User.objects.create_user(
@@ -106,6 +125,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             role=role,
             first_name=first_name,
             last_name=last_name,
+            university=university,
             **validated_data
         )
 

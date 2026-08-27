@@ -20,6 +20,7 @@ import type {
   NotificationMarkReadRequest,
   AcademicProfileDetails,
   Result,
+  CourseOfferingMarksGroup,
 } from '../types/student.types';
 
 export const studentService = {
@@ -102,7 +103,11 @@ export const studentService = {
    * Starts an examination attempt for the logged-in student.
    */
   startExam: async (id: string): Promise<ExamAttempt> => {
-    return await api.post<ExamAttempt>(API_ENDPOINTS.EXAMS.START(id), {});
+    const res = await api.post<any>(API_ENDPOINTS.EXAMS.START(id), {});
+    if (res && res.attempt) {
+      return res.attempt;
+    }
+    return res;
   },
 
   /**
@@ -183,20 +188,30 @@ export const studentService = {
   },
 
   /**
-   * Notifications endpoint is currently unavailable on the backend.
-   * Returns empty array to maintain UI stability without dispatching invalid requests.
+   * GET /api/v1/notifications/
+   * Fetches real user notifications from Django REST backend.
    */
-  getNotifications: async (_isRead?: boolean): Promise<Notification[]> => {
-    return Promise.resolve([]);
+  getNotifications: async (isRead?: boolean): Promise<Notification[]> => {
+    const query = typeof isRead === 'boolean' ? `?is_read=${isRead}` : '';
+    const response = await api.get<any>(`${API_ENDPOINTS.NOTIFICATIONS.ROOT}${query}`);
+    if (Array.isArray(response)) {
+      return response;
+    }
+    if (response && Array.isArray(response.results)) {
+      return response.results;
+    }
+    return [];
   },
 
   /**
-   * No-op implementation for notification mark-as-read since endpoint is unavailable.
+   * PATCH /api/v1/notifications/{id}/
+   * Marks a single notification as read on backend.
    */
-  markNotificationAsRead: async (
-    id: string
-  ): Promise<NotificationMarkRead> => {
-    return Promise.resolve({ id, is_read: true });
+  markNotificationAsRead: async (id: string): Promise<NotificationMarkRead> => {
+    return await api.patch<NotificationMarkRead>(
+      API_ENDPOINTS.NOTIFICATIONS.BY_ID(id),
+      { is_read: true }
+    );
   },
 
   /**
@@ -282,6 +297,15 @@ export const studentService = {
    */
   getMyResults: async (): Promise<Result[]> => {
     const data = await api.get<Result[]>(API_ENDPOINTS.RESULTS.ME);
+    return Array.isArray(data) ? data : [];
+  },
+
+  /**
+   * GET /api/v1/my-marks
+   * Retrieves continuous assessment marks grouped by course offering for the authenticated student.
+   */
+  getMyMarks: async (): Promise<CourseOfferingMarksGroup[]> => {
+    const data = await api.get<CourseOfferingMarksGroup[]>(API_ENDPOINTS.RESULTS.MY_MARKS);
     return Array.isArray(data) ? data : [];
   },
 };

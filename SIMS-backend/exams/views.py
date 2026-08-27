@@ -41,8 +41,8 @@ def get_examination(pk):
 class ExaminationListView(APIView):
     def get_permissions(self):
         if self.request.method in ("POST",):
-            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER", "STUDENT")()]
+            return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER", "STUDENT")()]
 
     @extend_schema(
         tags=["Examination"],
@@ -116,8 +116,8 @@ class ExaminationListView(APIView):
 class ExaminationDetailView(APIView):
     def get_permissions(self):
         if self.request.method in ("PUT", "PATCH", "DELETE"):
-            return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER", "STUDENT")()]
+            return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER", "STUDENT")()]
 
     def get_object(self, pk):
         return get_examination(pk)
@@ -236,7 +236,7 @@ class ExaminationDetailView(APIView):
 
 class ScheduleExaminationView(APIView):
     def get_permissions(self):
-        return [IsAuthenticated(), HasRole("ADMIN", "LECTURER")()]
+        return [IsAuthenticated(), HasRole("ADMIN", "SYSTEM_ADMIN", "LECTURER")()]
 
     @extend_schema(
         tags=["Examination"],
@@ -396,6 +396,13 @@ class StudentActiveExamsView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         now = timezone.now()
+        # Automatically transition any SCHEDULED exam whose start_window has opened into ACTIVE status
+        Examination.objects.filter(
+            status=ExamStatusChoices.SCHEDULED,
+            start_window__lte=now,
+            end_window__gt=now,
+        ).update(status=ExamStatusChoices.ACTIVE)
+
         queryset = (
             Examination.objects.filter(
                 status=ExamStatusChoices.ACTIVE,
@@ -447,12 +454,16 @@ class StartExamView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        now = timezone.now()
+        if exam.status == ExamStatusChoices.SCHEDULED and exam.start_window <= now < exam.end_window:
+            exam.status = ExamStatusChoices.ACTIVE
+            exam.save(update_fields=["status", "updated_at"])
+
         if exam.status != ExamStatusChoices.ACTIVE:
             return Response(
                 {"detail": "This examination is not currently active."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        now = timezone.now()
         if not (exam.start_window <= now < exam.end_window):
             return Response(
                 {"detail": "This examination window is not open right now."},
@@ -468,14 +479,22 @@ class StartExamView(APIView):
                 {"detail": "You are not enrolled in this examination's course."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if (
-            not exam.allow_retake
-            and ExamAttempt.objects.filter(examination=exam, student=student).exists()
-        ):
-            return Response(
-                {"detail": "You have already attempted this examination."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        existing_attempt = ExamAttempt.objects.filter(examination=exam, student=student).first()
+        if existing_attempt:
+            if existing_attempt.submission_time is None:
+                questions = exam.questions.all()
+                return Response(
+                    {
+                        "attempt": ExamAttemptSerializer(existing_attempt).data,
+                        "questions": StudentQuestionSerializer(questions, many=True).data,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            elif not exam.allow_retake:
+                return Response(
+                    {"detail": "You have already submitted this examination."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         attempt = ExamAttempt.objects.create(
             examination=exam, student=student, start_time=now
@@ -706,6 +725,12 @@ class SubmitExamView(APIView):
         # ── Enqueue async grading (handoff to Phase 4) ───────────────
         from exams.tasks import grade_exam_attempt
 
-        grade_exam_attempt.delay(str(attempt.pk))
+        try:
+            grade_exam_attempt.delay(str(attempt.pk))
+        except Exception:
+            try:
+                grade_exam_attempt(str(attempt.pk))
+            except Exception:
+                pass
 
         return Response(ExamAttemptSerializer(attempt).data)
