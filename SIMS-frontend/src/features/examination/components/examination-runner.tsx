@@ -47,9 +47,18 @@ export function ExaminationRunner({ session }: { session: ExaminationSession }) 
   const setSaved = useExaminationStore((state) => state.setSaved);
   const setReceipt = useExaminationStore((state) => state.setReceipt);
 
+  const initialSubmitted = Boolean(session.rawAttempt?.submission_time);
   const [navigatorOpen, setNavigatorOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmitted, setIsSubmitted] = React.useState(initialSubmitted);
+
+  const isSubmittedRef = React.useRef(initialSubmitted);
+
+  const markSubmitted = React.useCallback(() => {
+    isSubmittedRef.current = true;
+    setIsSubmitted(true);
+  }, []);
 
   // Initialize state when session opens
   React.useEffect(() => {
@@ -60,64 +69,117 @@ export function ExaminationRunner({ session }: { session: ExaminationSession }) 
 
   // Countdown timer effect
   React.useEffect(() => {
-    const interval = window.setInterval(tick, 1000);
-    return () => window.clearInterval(interval);
-  }, [tick]);
+    if (isSubmitted || isSubmitting) return;
 
-  // Periodic auto-save effect (every 5 seconds)
-  React.useEffect(() => {
     const interval = window.setInterval(() => {
-      void triggerAutoSave();
+      if (!isSubmittedRef.current) {
+        tick();
+      }
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [isSubmitted, isSubmitting, tick]);
+
+  // Periodic auto-save effect (every 5 seconds) - active ONLY while in progress
+  React.useEffect(() => {
+    if (isSubmitted || isSubmitting) return;
+
+    const interval = window.setInterval(() => {
+      if (!isSubmittedRef.current && !isSubmitting) {
+        void triggerAutoSave();
+      }
     }, 5000);
     return () => window.clearInterval(interval);
-  }, [answers]);
+  }, [isSubmitted, isSubmitting]);
 
   // Auto-submit modal trigger when time reaches 0
   React.useEffect(() => {
-    if (secondsRemaining === 0 && sessionState) {
+    if (secondsRemaining === 0 && sessionState && !isSubmittedRef.current && !isSubmitting) {
       setConfirmOpen(true);
     }
-  }, [secondsRemaining, sessionState]);
+  }, [secondsRemaining, sessionState, isSubmitting]);
 
   const handleAnswerChange = async (questionId: string, questionType: string, answerVal: ExaminationAnswer) => {
+    if (isSubmittedRef.current || isSubmitting || isSubmitted) return;
     setAnswer(questionId, answerVal);
     if (session.attemptId) {
       setSaving();
       try {
         await examinationService.saveSingleAnswer(session.attemptId, questionId, questionType, answerVal);
-        setSaved(new Date().toISOString());
-      } catch (e) {
+        if (!isSubmittedRef.current) {
+          setSaved(new Date().toISOString());
+        }
+      } catch (e: any) {
+        const detail = e?.detail || e?.response?.data?.detail || e?.message || '';
+        if (detail.includes('already been submitted')) {
+          markSubmitted();
+          return;
+        }
         console.error('Failed to auto-save answer:', e);
       }
     }
   };
 
   const triggerAutoSave = async () => {
-    if (!session.attemptId) return;
+    if (!session.attemptId || isSubmittedRef.current || isSubmitting || isSubmitted) return;
     setSaving();
     try {
       const currentAnswers = useExaminationStore.getState().answers;
       for (const q of session.questions) {
+        if (isSubmittedRef.current) return;
         const val = currentAnswers[q.id];
         if (val !== undefined) {
           await examinationService.saveSingleAnswer(session.attemptId, q.id, q.type, val);
         }
       }
-      setSaved(new Date().toISOString());
-    } catch (e) {
+      if (!isSubmittedRef.current) {
+        setSaved(new Date().toISOString());
+      }
+    } catch (e: any) {
+      const detail = e?.detail || e?.response?.data?.detail || e?.message || '';
+      if (detail.includes('already been submitted')) {
+        markSubmitted();
+        return;
+      }
       console.error('Auto-save sync error:', e);
     }
   };
 
   const submitExam = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
+    markSubmitted(); // Atomically lock autosave before starting submit pipeline
+
     try {
-      await triggerAutoSave();
-      const receipt = await examinationService.submit(session, useExaminationStore.getState().answers);
+      const currentAnswers = useExaminationStore.getState().answers;
+      // Best-effort final save for any unsaved answer fields before freezing
+      try {
+        if (session.attemptId) {
+          for (const q of session.questions) {
+            const val = currentAnswers[q.id];
+            if (val !== undefined) {
+              await examinationService.saveSingleAnswer(session.attemptId, q.id, q.type, val);
+            }
+          }
+        }
+      } catch (saveErr: any) {
+        const saveDetail = saveErr?.detail || saveErr?.response?.data?.detail || saveErr?.message || '';
+        if (!saveDetail.includes('already been submitted')) {
+          console.warn('Pre-submit save warning:', saveErr);
+        }
+      }
+
+      const receipt = await examinationService.submit(session, currentAnswers);
       setReceipt(receipt);
       router.replace(ROUTES.STUDENT.EXAM_SUBMITTED(session.examId));
     } catch (e: any) {
+      const detail = e?.detail || e?.response?.data?.detail || e?.message || '';
+      if (detail.includes('already been submitted')) {
+        router.replace(ROUTES.STUDENT.EXAM_SUBMITTED(session.examId));
+        return;
+      }
       setIsSubmitting(false);
+      isSubmittedRef.current = false;
+      setIsSubmitted(false);
       console.error('Submission failed:', e);
     }
   };
@@ -202,6 +264,7 @@ export function ExaminationRunner({ session }: { session: ExaminationSession }) 
                 total={session.questions.length}
                 answer={answers[activeQuestion.id]}
                 flagged={flaggedQuestionIds.includes(activeQuestion.id)}
+                disabled={isSubmitted || isSubmitting}
                 onChange={(ans) => handleAnswerChange(activeQuestion.id, activeQuestion.type, ans)}
                 onToggleFlag={() => toggleFlag(activeQuestion.id)}
               />
@@ -222,6 +285,7 @@ export function ExaminationRunner({ session }: { session: ExaminationSession }) 
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
+                disabled={isSubmitted || isSubmitting}
                 onClick={() => void triggerAutoSave()}
                 leftIcon={<Save className="h-4 w-4" />}
               >
@@ -236,7 +300,11 @@ export function ExaminationRunner({ session }: { session: ExaminationSession }) 
                   Next Question
                 </Button>
               ) : (
-                <Button onClick={() => setConfirmOpen(true)} leftIcon={<Send className="h-4 w-4" />}>
+                <Button
+                  disabled={isSubmitted || isSubmitting}
+                  onClick={() => setConfirmOpen(true)}
+                  leftIcon={<Send className="h-4 w-4" />}
+                >
                   Submit Exam
                 </Button>
               )}
