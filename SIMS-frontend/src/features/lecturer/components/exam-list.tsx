@@ -120,6 +120,20 @@ export function ExamList() {
     fetchExams();
   }, [fetchExams]);
 
+  // Lightweight polling for dynamic status updates (SCHEDULED/ACTIVE exams)
+  React.useEffect(() => {
+    const hasDynamicExams = exams.some(
+      (e) => e.status === 'SCHEDULED' || e.status === 'ACTIVE'
+    );
+    if (!hasDynamicExams) return;
+
+    const interval = setInterval(() => {
+      fetchExams();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [exams, fetchExams]);
+
   const filtered = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return exams;
@@ -149,6 +163,15 @@ export function ExamList() {
 
   async function handleDeleteConfirm() {
     if (!deletingExam) return;
+
+    if (deletingExam.status !== 'DRAFT') {
+      toast.error('Cannot Delete Examination', {
+        description: `${deletingExam.status} examinations cannot be deleted. Only DRAFT examinations can be deleted.`,
+      });
+      setDeletingExam(null);
+      return;
+    }
+
     setIsDeleting(true);
     try {
       await lecturerService.deleteExam(deletingExam.id);
@@ -158,19 +181,27 @@ export function ExamList() {
       });
       setDeletingExam(null);
     } catch (err: any) {
+      console.error('[DELETE EXAM ERROR]', {
+        status: err?.response?.status,
+        data: err?.response?.data,
+      });
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail || err?.message;
       if (status === 409) {
         toast.error('Cannot Delete Examination', {
-          description: 'This examination cannot be deleted because student attempts already exist.',
+          description: detail || 'This examination cannot be deleted because student attempts already exist.',
         });
       } else if (status === 403) {
         toast.error('Permission Denied', {
-          description: 'You do not have permission to delete this examination.',
+          description: detail || 'You do not have permission to delete this examination.',
         });
       } else if (status === 404) {
         toast.error('Not Found', {
-          description: 'Examination not found.',
+          description: 'Examination not found or already deleted.',
+        });
+      } else if (status === 400) {
+        toast.error('Cannot Delete Examination', {
+          description: detail || 'Validation error while attempting deletion.',
         });
       } else {
         toast.error('Delete Failed', {
@@ -253,9 +284,19 @@ export function ExamList() {
       });
       setPublishingExam(null);
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || err?.message;
-      toast.error('Publish Gate Rejected', {
-        description: detail || 'All attempts must be fully graded before publishing.',
+      console.error('[PUBLISH EXAM ERROR]', {
+        status: err?.response?.status,
+        data: err?.response?.data,
+      });
+      const backendErrors = err?.response?.data?.errors;
+      const backendDetail = err?.response?.data?.detail;
+      const formattedErrors = Array.isArray(backendErrors) && backendErrors.length > 0
+        ? backendErrors.join(' ')
+        : undefined;
+
+      const detail = formattedErrors || backendDetail || err?.message;
+      toast.error('Cannot Publish Examination', {
+        description: detail || 'All student attempts must be fully graded with results generated before publishing.',
       });
     } finally {
       setIsPublishing(false);
@@ -540,7 +581,7 @@ export function ExamList() {
                                 >
                                   <Copy className="h-3.5 w-3.5" /> Duplicate
                                 </button>
-                                {isDraft && (
+                                {isDraft ? (
                                   <button
                                     onClick={() => {
                                       setActionMenuId(null);
@@ -550,6 +591,30 @@ export function ExamList() {
                                   >
                                     <Trash2 className="h-3.5 w-3.5" /> Delete Exam
                                   </button>
+                                ) : (
+                                  <div
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-muted-foreground/80 bg-muted/30 cursor-not-allowed rounded-b-lg border-t border-border/50"
+                                    title={
+                                      isScheduled
+                                        ? 'Scheduled examinations cannot be deleted.'
+                                        : isActive
+                                        ? 'Active examinations cannot be deleted.'
+                                        : isClosed
+                                        ? 'Closed examinations cannot be deleted.'
+                                        : 'Published examinations cannot be deleted.'
+                                    }
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 opacity-40 shrink-0" />
+                                    <span className="truncate">
+                                      {isScheduled
+                                        ? 'Scheduled exam cannot be deleted'
+                                        : isActive
+                                        ? 'Active exam cannot be deleted'
+                                        : isClosed
+                                        ? 'Closed exam cannot be deleted'
+                                        : 'Published exam cannot be deleted'}
+                                    </span>
+                                  </div>
                                 )}
                               </div>
                             )}

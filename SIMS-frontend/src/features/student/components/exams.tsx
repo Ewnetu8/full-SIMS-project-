@@ -43,6 +43,12 @@ export function ExamsPage({ completed = false }: { completed?: boolean }) {
 
   React.useEffect(() => {
     void fetchActiveExams();
+
+    const interval = setInterval(() => {
+      void fetchActiveExams();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [fetchActiveExams]);
 
   const title = completed ? 'Completed exams' : 'Available exams';

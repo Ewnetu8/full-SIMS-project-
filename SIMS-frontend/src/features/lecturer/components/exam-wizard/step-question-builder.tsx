@@ -11,6 +11,7 @@ import {
   X,
   Save,
   Loader2,
+  Check,
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -45,15 +46,13 @@ import {
 } from '../../hooks/use-exam-questions';
 import { toast } from '@/components/feedback';
 
-import type { Question, QuestionOption, QuestionType, RubricCriterionItem } from '../../types';
+import type { Question, QuestionType } from '../../types';
 
 export const QUESTION_TYPE_LABELS: Record<string, string> = {
   MCQ: 'Multiple Choice (MCQ)',
-  SHORT_ANSWER: 'Short Answer',
-  ESSAY: 'Essay',
+  TRUE_FALSE: 'True / False (T/F)',
   multiple_choice: 'Multiple Choice (MCQ)',
-  short_answer: 'Short Answer',
-  essay: 'Essay',
+  true_false: 'True / False (T/F)',
 };
 
 function generateId() {
@@ -64,25 +63,41 @@ function generateOptionId() {
   return `opt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function generateRubricId() {
-  return `rc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function createDefaultQuestion(): Question {
+function createDefaultMcqQuestion(): Question {
+  const opt1 = generateOptionId();
+  const opt2 = generateOptionId();
+  const opt3 = generateOptionId();
+  const opt4 = generateOptionId();
   return {
     id: generateId(),
     type: 'MCQ',
     prompt: '',
-    marks: 10,
+    marks: 2,
     required: true,
     options: [
-      { id: generateOptionId(), text: '' },
-      { id: generateOptionId(), text: '' },
-      { id: generateOptionId(), text: '' },
-      { id: generateOptionId(), text: '' },
+      { id: opt1, text: '' },
+      { id: opt2, text: '' },
+      { id: opt3, text: '' },
+      { id: opt4, text: '' },
     ],
-    correctAnswer: undefined,
-    rubricCriteria: [],
+    correctAnswer: opt1,
+  };
+}
+
+function createDefaultTfQuestion(): Question {
+  const optTrue = generateOptionId();
+  const optFalse = generateOptionId();
+  return {
+    id: generateId(),
+    type: 'TRUE_FALSE',
+    prompt: '',
+    marks: 1,
+    required: true,
+    options: [
+      { id: optTrue, text: 'True' },
+      { id: optFalse, text: 'False' },
+    ],
+    correctAnswer: optTrue,
   };
 }
 
@@ -92,11 +107,10 @@ interface StepQuestionBuilderProps {
 }
 
 export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps) {
-  const { wizardData, addQuestion, updateQuestion, removeQuestion, reorderQuestions, editingExamId } =
+  const { wizardData, addQuestion, setQuestions, updateQuestion, removeQuestion, reorderQuestions, editingExamId } =
     useLecturerStore();
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = React.useState<Question | null>(null);
-  const [marksInput, setMarksInput] = React.useState<string>('10');
+  const [marksInput, setMarksInput] = React.useState<string>('2');
   const [isSaving, setIsSaving] = React.useState(false);
   const [deletingQuestion, setDeletingQuestion] = React.useState<{ question: Question; index: number } | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -108,18 +122,85 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
   const updateQuestionMutation = useUpdateExamQuestion();
   const deleteQuestion = useDeleteExamQuestion();
 
-  // Load backend questions into wizard on mount (if editing existing exam)
+  // Synchronize authoritative backend questions into wizard on load or mutation
   React.useEffect(() => {
-    if (backendQuestions && backendQuestions.length > 0 && wizardData.questions.length === 0) {
-      backendQuestions.forEach((q) => addQuestion(q));
+    if (examId && backendQuestions) {
+      setQuestions(backendQuestions);
     }
-  }, [backendQuestions]);
+  }, [examId, backendQuestions, setQuestions]);
 
-  function openNew() {
-    const q = createDefaultQuestion();
+  function openNew(type: QuestionType = 'MCQ') {
+    const q = type === 'TRUE_FALSE' || type === 'true_false' ? createDefaultTfQuestion() : createDefaultMcqQuestion();
     setEditingQuestion(q);
-    setMarksInput(String(q.marks || 10));
-    setExpandedId(q.id);
+    setMarksInput(String(q.marks || (type === 'TRUE_FALSE' ? 1 : 2)));
+  }
+
+  function updateEditingType(type: QuestionType) {
+    if (!editingQuestion) return;
+    if (type === 'TRUE_FALSE' || type === 'true_false') {
+      const optTrue = generateOptionId();
+      const optFalse = generateOptionId();
+      setEditingQuestion({
+        ...editingQuestion,
+        type: 'TRUE_FALSE',
+        marks: editingQuestion.marks || 1,
+        options: [
+          { id: optTrue, text: 'True' },
+          { id: optFalse, text: 'False' },
+        ],
+        correctAnswer: optTrue,
+      });
+      setMarksInput(String(editingQuestion.marks || 1));
+    } else {
+      const opt1 = generateOptionId();
+      const opt2 = generateOptionId();
+      const opt3 = generateOptionId();
+      const opt4 = generateOptionId();
+      setEditingQuestion({
+        ...editingQuestion,
+        type: 'MCQ',
+        marks: editingQuestion.marks || 2,
+        options: [
+          { id: opt1, text: '' },
+          { id: opt2, text: '' },
+          { id: opt3, text: '' },
+          { id: opt4, text: '' },
+        ],
+        correctAnswer: opt1,
+      });
+      setMarksInput(String(editingQuestion.marks || 2));
+    }
+  }
+
+  function addOption() {
+    if (!editingQuestion) return;
+    const newOptId = generateOptionId();
+    setEditingQuestion({
+      ...editingQuestion,
+      options: [...(editingQuestion.options ?? []), { id: newOptId, text: '' }],
+    });
+  }
+
+  function updateOption(id: string, text: string) {
+    if (!editingQuestion?.options) return;
+    setEditingQuestion({
+      ...editingQuestion,
+      options: editingQuestion.options.map((o) => (o.id === id ? { ...o, text } : o)),
+    });
+  }
+
+  function removeOption(id: string) {
+    if (!editingQuestion?.options) return;
+    const newOptions = editingQuestion.options.filter((o) => o.id !== id);
+    let newCorrect = editingQuestion.correctAnswer;
+    if (newCorrect === id && newOptions.length > 0) {
+      newCorrect = newOptions[0]?.id;
+    }
+    setEditingQuestion({
+      ...editingQuestion,
+      options: newOptions,
+      correctAnswer: newCorrect,
+    });
   }
 
   async function saveQuestion() {
@@ -132,43 +213,31 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
 
     const parsedMarks = marksInput.trim() === '' ? NaN : Number(marksInput);
     if (marksInput.trim() === '' || isNaN(parsedMarks) || parsedMarks <= 0) {
-      toast.error('Total marks must be greater than 0');
+      toast.error('Total points must be greater than 0');
       return;
     }
 
-    if (
-      (editingQuestion.type === 'MCQ' || editingQuestion.type === 'multiple_choice') &&
-      (!editingQuestion.options || editingQuestion.options.length < 2)
-    ) {
-      toast.error('At least 2 options are required for MCQ questions');
-      return;
-    }
+    const isTf = editingQuestion.type === 'TRUE_FALSE' || editingQuestion.type === 'true_false';
 
-    if (
-      (editingQuestion.type === 'MCQ' || editingQuestion.type === 'multiple_choice') &&
-      !editingQuestion.correctAnswer
-    ) {
-      toast.error('Please select the correct option for this MCQ question');
-      return;
-    }
-
-    // Validate Rubric Criteria if specified for Essay / Short Answer
-    if (
-      (editingQuestion.type === 'ESSAY' || editingQuestion.type === 'essay' || editingQuestion.type === 'SHORT_ANSWER' || editingQuestion.type === 'short_answer') &&
-      editingQuestion.rubricCriteria &&
-      editingQuestion.rubricCriteria.length > 0
-    ) {
-      const hasEmpty = editingQuestion.rubricCriteria.some((rc) => !rc.criterionText.trim());
-      if (hasEmpty) {
-        toast.error('Please provide a description for all rubric criteria');
+    if (!isTf) {
+      if (!editingQuestion.options || editingQuestion.options.length < 2) {
+        toast.error('At least 2 options are required for MCQ questions');
         return;
       }
 
-      const totalWeight = editingQuestion.rubricCriteria.reduce((sum, rc) => sum + Number(rc.pointWeight || 0), 0);
-      if (totalWeight !== parsedMarks) {
-        toast.error(
-          `Sum of rubric criteria point weights (${totalWeight} pts) must equal question total marks (${parsedMarks} pts).`
-        );
+      const emptyOption = editingQuestion.options.some((o) => !o.text.trim());
+      if (emptyOption) {
+        toast.error('Please enter text for all options or remove unused ones');
+        return;
+      }
+
+      if (!editingQuestion.correctAnswer) {
+        toast.error('Please select the correct answer option');
+        return;
+      }
+    } else {
+      if (!editingQuestion.correctAnswer) {
+        toast.error('Please select whether True or False is the correct answer');
         return;
       }
     }
@@ -203,9 +272,11 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       }
 
       setEditingQuestion(null);
-      setExpandedId(null);
     } catch (error: any) {
-      console.error('Failed to save question:', error);
+      console.error('[EXAM API ERROR] Failed to save question:', {
+        status: error?.response?.status,
+        response: error?.response?.data,
+      });
       const detail = error?.response?.data?.detail || error?.message || 'Failed to save question';
       toast.error(detail);
     } finally {
@@ -216,13 +287,21 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
   function openEdit(index: number) {
     const q = wizardData.questions[index];
     if (!q) return;
+
+    let isTf = q.type === 'TRUE_FALSE' || q.type === 'true_false';
+    if (!isTf && q.options && q.options.length === 2) {
+      const texts = q.options.map((o) => o.text.trim().toLowerCase());
+      if (texts.includes('true') && texts.includes('false')) {
+        isTf = true;
+      }
+    }
+
     setEditingQuestion({
       ...q,
+      type: isTf ? 'TRUE_FALSE' : 'MCQ',
       options: q.options ? q.options.map((o) => ({ ...o })) : undefined,
-      rubricCriteria: q.rubricCriteria ? q.rubricCriteria.map((rc) => ({ ...rc })) : undefined,
     });
-    setMarksInput(String(q.marks ?? 10));
-    setExpandedId(q.id);
+    setMarksInput(String(q.marks ?? (isTf ? 1 : 2)));
   }
 
   function duplicateQuestion(index: number) {
@@ -232,7 +311,6 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       ...q,
       id: generateId(),
       options: q.options?.map((o) => ({ ...o, id: generateOptionId() })),
-      rubricCriteria: q.rubricCriteria?.map((rc) => ({ ...rc, id: generateRubricId() })),
     };
     addQuestion(copy);
   }
@@ -249,128 +327,38 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       removeQuestion(index);
       setDeletingQuestion(null);
     } catch (err: any) {
-      console.error('Failed to delete question from backend:', err);
-      const detail = err?.response?.data?.detail || err?.message || 'Unable to delete question. Please try again.';
-      toast.error(detail);
+      console.error('[DELETE QUESTION ERROR]', {
+        status: err?.response?.status,
+        data: err?.response?.data,
+      });
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || err?.message;
+      if (status === 404) {
+        toast.error('Question not found', {
+          description: 'The question may have already been deleted.',
+        });
+        removeQuestion(index);
+        setDeletingQuestion(null);
+      } else if (status === 403) {
+        toast.error('Permission Denied', {
+          description: 'You do not have permission to delete this question.',
+        });
+      } else if (status === 409) {
+        toast.error('Cannot Delete Question', {
+          description: detail || 'This question cannot be deleted because it has referenced records.',
+        });
+      } else {
+        toast.error('Failed to delete question', {
+          description: detail || 'Unable to delete question. Please try again.',
+        });
+      }
     } finally {
       setIsDeleting(false);
     }
   }
 
-  function updateEditingType(type: QuestionType) {
-    if (!editingQuestion) return;
-    const base = { ...editingQuestion, type, correctAnswer: undefined };
-    if (type === 'MCQ' || type === 'multiple_choice') {
-      if (!base.options || base.options.length === 0) {
-        base.options = [
-          { id: generateOptionId(), text: '' },
-          { id: generateOptionId(), text: '' },
-          { id: generateOptionId(), text: '' },
-          { id: generateOptionId(), text: '' },
-        ];
-      }
-      base.rubricCriteria = undefined;
-    } else {
-      base.options = undefined;
-      if (!base.rubricCriteria || base.rubricCriteria.length === 0) {
-        base.rubricCriteria = [
-          {
-            id: generateRubricId(),
-            criterionText: 'Understanding of the concept',
-            pointWeight: base.marks,
-          },
-        ];
-      }
-    }
-    setEditingQuestion(base);
-  }
-
-  function addOption() {
-    if (!editingQuestion) return;
-    setEditingQuestion({
-      ...editingQuestion,
-      options: [...(editingQuestion.options ?? []), { id: generateOptionId(), text: '' }],
-    });
-  }
-
-  function updateOption(id: string, text: string) {
-    if (!editingQuestion?.options) return;
-    setEditingQuestion({
-      ...editingQuestion,
-      options: editingQuestion.options.map((o) => (o.id === id ? { ...o, text } : o)),
-    });
-  }
-
-  function removeOption(id: string) {
-    if (!editingQuestion?.options) return;
-    setEditingQuestion({
-      ...editingQuestion,
-      options: editingQuestion.options.filter((o) => o.id !== id),
-    });
-  }
-
-  function addRubricCriterion() {
-    if (!editingQuestion) return;
-    const current = editingQuestion.rubricCriteria ?? [];
-    const usedMarks = current.reduce((sum, rc) => sum + Number(rc.pointWeight || 0), 0);
-    const remainingMarks = Math.max(1, editingQuestion.marks - usedMarks);
-    setEditingQuestion({
-      ...editingQuestion,
-      rubricCriteria: [
-        ...current,
-        {
-          id: generateRubricId(),
-          criterionText: '',
-          pointWeight: remainingMarks,
-        },
-      ],
-    });
-  }
-
-  function updateRubricCriterion(id: string, updates: Partial<RubricCriterionItem>) {
-    if (!editingQuestion?.rubricCriteria) return;
-    setEditingQuestion({
-      ...editingQuestion,
-      rubricCriteria: editingQuestion.rubricCriteria.map((rc) =>
-        rc.id === id ? { ...rc, ...updates } : rc
-      ),
-    });
-  }
-
-  function removeRubricCriterion(id: string) {
-    if (!editingQuestion?.rubricCriteria) return;
-    setEditingQuestion({
-      ...editingQuestion,
-      rubricCriteria: editingQuestion.rubricCriteria.filter((rc) => rc.id !== id),
-    });
-  }
-
-  function distributeRubricMarksEvenly() {
-    if (!editingQuestion?.rubricCriteria || editingQuestion.rubricCriteria.length === 0) return;
-    const count = editingQuestion.rubricCriteria.length;
-    const perItem = Math.floor(editingQuestion.marks / count);
-    const remainder = editingQuestion.marks % count;
-
-    setEditingQuestion({
-      ...editingQuestion,
-      rubricCriteria: editingQuestion.rubricCriteria.map((rc, idx) => ({
-        ...rc,
-        pointWeight: idx === 0 ? perItem + remainder : perItem,
-      })),
-    });
-  }
-
   const totalMarksUsed = wizardData.questions.reduce((acc, q) => acc + q.marks, 0);
-  const isEssayOrShortAnswer =
-    editingQuestion?.type === 'ESSAY' ||
-    editingQuestion?.type === 'essay' ||
-    editingQuestion?.type === 'SHORT_ANSWER' ||
-    editingQuestion?.type === 'short_answer';
 
-  const rubricTotalWeight =
-    editingQuestion?.rubricCriteria?.reduce((sum, rc) => sum + Number(rc.pointWeight || 0), 0) ?? 0;
-
-  // Show loading state while fetching backend questions
   if (loadingBackend) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -395,9 +383,14 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
               / {wizardData.totalMarks} marks allocated
             </p>
           </div>
-          <Button onClick={openNew} leftIcon={<Plus className="h-4 w-4" />}>
-            Add Question
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => openNew('MCQ')} leftIcon={<Plus className="h-4 w-4" />}>
+              Add MCQ
+            </Button>
+            <Button onClick={() => openNew('TRUE_FALSE')} variant="outline" leftIcon={<Plus className="h-4 w-4" />}>
+              Add True / False
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -437,11 +430,8 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(QUESTION_TYPE_LABELS).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>
-                          {label}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="MCQ">Multiple Choice (MCQ)</SelectItem>
+                      <SelectItem value="TRUE_FALSE">True / False (T/F)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -460,41 +450,116 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                   />
                 </div>
 
-                {/* Options for MCQ */}
+                {/* Options for True / False */}
+                {(editingQuestion.type === 'TRUE_FALSE' || editingQuestion.type === 'true_false') && (
+                  <div className="space-y-2 rounded-xl border border-border p-4 bg-muted/20">
+                    <Label required className="font-semibold text-sm">Correct Answer</Label>
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      {['True', 'False'].map((tfVal) => {
+                        const isSelected =
+                          editingQuestion.correctAnswer === tfVal ||
+                          editingQuestion.options?.find((o) => o.id === editingQuestion.correctAnswer)?.text.toLowerCase() === tfVal.toLowerCase();
+
+                        return (
+                          <label
+                            key={tfVal}
+                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition ${
+                              isSelected
+                                ? 'border-primary bg-primary/10 text-primary font-semibold'
+                                : 'border-border bg-background hover:border-border/80'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="radio"
+                                name="tf-correct"
+                                value={tfVal}
+                                checked={isSelected}
+                                onChange={() => {
+                                  const matchingOpt = editingQuestion.options?.find(
+                                    (o) => o.text.toLowerCase() === tfVal.toLowerCase()
+                                  );
+                                  setEditingQuestion({
+                                    ...editingQuestion,
+                                    correctAnswer: matchingOpt ? matchingOpt.id : tfVal,
+                                  });
+                                }}
+                                className="accent-primary h-4 w-4"
+                              />
+                              <span className="text-sm">{tfVal}</span>
+                            </div>
+                            {isSelected && <Check className="h-4 w-4 text-primary" />}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Options for Multiple Choice */}
                 {(editingQuestion.type === 'MCQ' || editingQuestion.type === 'multiple_choice') &&
                   editingQuestion.options && (
-                    <div className="space-y-2">
-                      <Label required>Answer Options (Select correct answer)</Label>
-                      {editingQuestion.options.map((opt) => (
-                        <div key={opt.id} className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="correct"
-                            value={opt.id}
-                            checked={editingQuestion.correctAnswer === opt.id}
-                            onChange={() =>
-                              setEditingQuestion({ ...editingQuestion, correctAnswer: opt.id })
-                            }
-                            className="accent-primary h-4 w-4 cursor-pointer"
-                            aria-label={`Mark "${opt.text || opt.id}" as correct`}
-                          />
-                          <Input
-                            value={opt.text}
-                            onChange={(e) => updateOption(opt.id, e.target.value)}
-                            placeholder="Option text"
-                            className="flex-1"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeOption(opt.id)}
-                            className="text-muted-foreground hover:text-destructive rounded-md p-1"
-                            aria-label="Remove option"
-                            disabled={editingQuestion.options!.length <= 2}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label required className="font-semibold text-sm">
+                          Answer Options (Select the correct answer)
+                        </Label>
+                        <span className="text-xs text-muted-foreground">
+                          {editingQuestion.options.length} options
+                        </span>
+                      </div>
+                      <div className="space-y-2.5">
+                        {editingQuestion.options.map((opt, idx) => {
+                          const optionLetter = String.fromCharCode(65 + idx);
+                          const isCorrect = editingQuestion.correctAnswer === opt.id;
+
+                          return (
+                            <div
+                              key={opt.id}
+                              className={`flex items-center gap-2 p-2.5 rounded-lg border transition ${
+                                isCorrect ? 'border-primary/60 bg-primary/5' : 'border-border bg-background'
+                              }`}
+                            >
+                              <label className="flex items-center gap-2 cursor-pointer shrink-0">
+                                <input
+                                  type="radio"
+                                  name="mcq-correct"
+                                  value={opt.id}
+                                  checked={isCorrect}
+                                  onChange={() =>
+                                    setEditingQuestion({ ...editingQuestion, correctAnswer: opt.id })
+                                  }
+                                  className="accent-primary h-4 w-4 cursor-pointer"
+                                  aria-label={`Mark Option ${optionLetter} as correct`}
+                                />
+                                <span className="font-mono text-xs font-bold text-muted-foreground w-5">
+                                  {optionLetter}.
+                                </span>
+                              </label>
+                              <Input
+                                value={opt.text}
+                                onChange={(e) => updateOption(opt.id, e.target.value)}
+                                placeholder={`Option ${optionLetter} text`}
+                                className="flex-1 text-sm"
+                              />
+                              {isCorrect && (
+                                <Badge variant="success" className="text-2xs shrink-0">
+                                  Correct
+                                </Badge>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeOption(opt.id)}
+                                className="text-muted-foreground hover:text-destructive rounded-md p-1 shrink-0 disabled:opacity-30"
+                                aria-label="Remove option"
+                                disabled={editingQuestion.options!.length <= 2}
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                       <Button
                         type="button"
                         variant="ghost"
@@ -507,118 +572,10 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
                     </div>
                   )}
 
-                {/* Rubric Criteria for Essay / Short Answer */}
-                {isEssayOrShortAnswer && (
-                  <div className="space-y-3 rounded-xl border border-border p-4 bg-muted/20">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <Label className="font-semibold text-sm">Evaluation Rubric Criteria</Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Define criteria and point weights for evaluating student answers.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {editingQuestion.rubricCriteria && editingQuestion.rubricCriteria.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            onClick={distributeRubricMarksEvenly}
-                          >
-                            Distribute Evenly
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="xs"
-                          onClick={addRubricCriterion}
-                          leftIcon={<Plus className="h-3 w-3" />}
-                        >
-                          Add Criterion
-                        </Button>
-                      </div>
-                    </div>
-
-                    {(!editingQuestion.rubricCriteria || editingQuestion.rubricCriteria.length === 0) ? (
-                      <div className="py-6 text-center rounded-lg border border-dashed border-border/80 bg-background/50">
-                        <p className="text-xs text-muted-foreground">
-                          No rubric criteria added yet.
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Click &quot;Add Criterion&quot; to define evaluation metrics and point weights.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {editingQuestion.rubricCriteria.map((rc, idx) => (
-                          <div
-                            key={rc.id}
-                            className="flex items-center gap-2 bg-background p-2.5 rounded-lg border border-border"
-                          >
-                            <span className="text-xs font-mono text-muted-foreground w-6 text-center">
-                              #{idx + 1}
-                            </span>
-                            <Input
-                              value={rc.criterionText}
-                              onChange={(e) =>
-                                updateRubricCriterion(rc.id, { criterionText: e.target.value })
-                              }
-                              placeholder="e.g. Quality of explanation, Accuracy of diagram, Depth of analysis"
-                              className="flex-1 text-xs"
-                            />
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Input
-                                type="number"
-                                min={0.5}
-                                step={0.5}
-                                value={rc.pointWeight === 0 ? '0' : (rc.pointWeight ?? '')}
-                                onChange={(e) =>
-                                  updateRubricCriterion(rc.id, {
-                                    pointWeight: e.target.value === '' ? ('' as any) : Number(e.target.value),
-                                  })
-                                }
-                                className="w-20 text-xs"
-                                placeholder="Pts"
-                              />
-                              <span className="text-xs text-muted-foreground font-medium">pts</span>
-                              <button
-                                type="button"
-                                onClick={() => removeRubricCriterion(rc.id)}
-                                className="text-muted-foreground hover:text-destructive rounded-md p-1 ml-1"
-                                aria-label="Remove criterion"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* Weight comparison banner */}
-                        <div
-                          className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${
-                            rubricTotalWeight === (marksInput ? Number(marksInput) : editingQuestion.marks)
-                              ? 'bg-success/10 text-success border border-success/20'
-                              : 'bg-destructive/10 text-destructive border border-destructive/20'
-                          }`}
-                        >
-                          <span>
-                            Total Criteria Weight: <strong>{rubricTotalWeight} pts</strong>
-                          </span>
-                          <span>
-                            Question Total Marks: <strong>{marksInput || editingQuestion.marks} pts</strong>
-                            {rubricTotalWeight !== (marksInput ? Number(marksInput) : editingQuestion.marks) && ' (Must match)'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Marks + Required toggle */}
-                <div className="flex flex-wrap items-end gap-4">
+                <div className="flex flex-wrap items-end gap-4 border-t border-border pt-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="q-marks" required>Marks</Label>
+                    <Label htmlFor="q-marks" required>Points / Marks</Label>
                     <Input
                       id="q-marks"
                       type="number"
@@ -664,85 +621,125 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
       {wizardData.questions.length === 0 && !editingQuestion ? (
         <div className="py-16 text-center rounded-2xl border border-dashed border-border">
           <p className="text-muted-foreground font-medium">No questions added yet.</p>
-          <p className="text-xs text-muted-foreground mt-1">Click "Add Question" to build your examination.</p>
+          <p className="text-xs text-muted-foreground mt-1">Click &quot;Add MCQ&quot; or &quot;Add True / False&quot; to build your examination.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {wizardData.questions.map((q, index) => (
-            <motion.div key={q.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex flex-col items-center gap-1 pt-0.5">
-                      <button
-                        type="button"
-                        aria-label="Move up"
-                        onClick={() => index > 0 && reorderQuestions(index, index - 1)}
-                        disabled={index === 0}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </button>
-                      <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-                      <button
-                        type="button"
-                        aria-label="Move down"
-                        onClick={() => index < wizardData.questions.length - 1 && reorderQuestions(index, index + 1)}
-                        disabled={index === wizardData.questions.length - 1}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </button>
-                    </div>
+          {wizardData.questions.map((q, index) => {
+            const isTf = q.type === 'TRUE_FALSE' || q.type === 'true_false';
+            const typeLabel = isTf ? 'True / False' : 'Multiple Choice';
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">
-                          Q{index + 1}
-                        </span>
-                        <span className="text-xs text-muted-foreground bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">
-                          {QUESTION_TYPE_LABELS[q.type]}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{q.marks} mark{q.marks !== 1 ? 's' : ''}</span>
+            return (
+              <motion.div key={q.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className="hover:border-primary/40 transition">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col items-center gap-1 pt-0.5">
+                        <button
+                          type="button"
+                          aria-label="Move up"
+                          onClick={() => index > 0 && reorderQuestions(index, index - 1)}
+                          disabled={index === 0}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </button>
+                        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+                        <button
+                          type="button"
+                          aria-label="Move down"
+                          onClick={() => index < wizardData.questions.length - 1 && reorderQuestions(index, index + 1)}
+                          disabled={index === wizardData.questions.length - 1}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
                       </div>
-                      <p className="text-sm font-medium text-foreground line-clamp-2">{q.prompt || '(No question text)'}</p>
-                    </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => openEdit(index)}
-                        aria-label="Edit question"
-                      >
-                        <span className="text-xs">Edit</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => duplicateQuestion(index)}
-                        aria-label="Duplicate question"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => setDeletingQuestion({ question: q, index })}
-                        aria-label={`Delete Question ${index + 1}`}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground font-semibold">
+                            Q{index + 1}
+                          </span>
+                          <Badge variant="secondary" className="text-xs font-medium">
+                            {typeLabel}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {q.marks} pt{q.marks !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+
+                        <p className="text-sm font-semibold text-foreground">{q.prompt || '(No question text)'}</p>
+
+                        {/* Options display */}
+                        {isTf ? (
+                          <div className="text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">Correct answer:</span>{' '}
+                            <Badge variant="success" className="text-2xs font-mono ml-1">
+                              {q.options?.find((o) => o.id === q.correctAnswer)?.text ||
+                               (q.correctAnswer === 'True' || q.correctAnswer === 'opt-true' ? 'True' : 'False')}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                            {q.options?.map((opt, optIdx) => {
+                              const letter = String.fromCharCode(65 + optIdx);
+                              const isCorrect = q.correctAnswer === opt.id;
+                              return (
+                                <div
+                                  key={opt.id || optIdx}
+                                  className={`text-xs px-2.5 py-1 rounded flex items-center gap-1.5 ${
+                                    isCorrect
+                                      ? 'bg-success/10 text-success font-semibold border border-success/30'
+                                      : 'bg-muted/40 text-muted-foreground'
+                                  }`}
+                                >
+                                  <span className="font-mono font-bold">{letter}.</span>
+                                  <span className="truncate">{opt.text}</span>
+                                  {isCorrect && <Check className="h-3 w-3 ml-auto text-success" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => openEdit(index)}
+                          aria-label="Edit question"
+                        >
+                          <span className="text-xs">Edit</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => duplicateQuestion(index)}
+                          aria-label="Duplicate question"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => setDeletingQuestion({ question: q, index })}
+                          aria-label={`Delete Question ${index + 1}`}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
@@ -752,7 +749,7 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
           <DialogHeader>
             <DialogTitle>Delete Question?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this question? This action cannot be undone.
+              Are you sure you want to delete this question? This action will remove it from the examination.
             </DialogDescription>
           </DialogHeader>
           {deletingQuestion && (
@@ -805,7 +802,7 @@ export function StepQuestionBuilder({ onBack, onNext }: StepQuestionBuilderProps
           disabled={wizardData.questions.length === 0}
           size="lg"
         >
-          Review & Publish →
+          Review & Confirm →
         </Button>
       </div>
     </div>

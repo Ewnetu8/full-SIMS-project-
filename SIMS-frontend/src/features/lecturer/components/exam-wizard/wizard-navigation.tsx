@@ -10,7 +10,7 @@ const STEPS: { key: ExamWizardStep; label: string; description: string }[] = [
   { key: 'basic_info', label: 'Basic Info', description: 'Title, course & marks' },
   { key: 'settings', label: 'Settings', description: 'Dates & access options' },
   { key: 'questions', label: 'Questions', description: 'Build question paper' },
-  { key: 'review', label: 'Review', description: 'Preview & publish' },
+  { key: 'review', label: 'Review', description: 'Preview & confirm' },
 ];
 
 interface WizardNavigationProps {

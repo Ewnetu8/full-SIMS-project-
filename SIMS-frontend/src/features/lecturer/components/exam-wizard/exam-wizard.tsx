@@ -95,7 +95,7 @@ export function ExamWizard({ initialExam }: ExamWizardProps) {
             {initialExam ? 'Edit Examination' : 'Create New Examination'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Complete all steps to build and publish your exam.
+            Complete all steps to build and schedule your exam.
           </p>
         </div>
         <Button

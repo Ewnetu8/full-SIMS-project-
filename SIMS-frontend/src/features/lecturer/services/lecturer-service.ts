@@ -62,8 +62,12 @@ import type {
  */
 function transformQuestionToUi(q: BackendQuestion): UiQuestion {
   let uiType: UiQuestion['type'] = 'MCQ';
-  if (q.question_type === 'SHORT_ANSWER') uiType = 'SHORT_ANSWER';
-  else if (q.question_type === 'ESSAY') uiType = 'ESSAY';
+  if (q.options && q.options.length === 2) {
+    const texts = q.options.map((o) => o.option_text.trim().toLowerCase());
+    if ((texts.includes('true') && texts.includes('false')) || (texts.includes('t') && texts.includes('f'))) {
+      uiType = 'TRUE_FALSE';
+    }
+  }
 
   return {
     id: q.id,
@@ -114,7 +118,9 @@ export function setExamMeta(id: string, meta: { totalMarks?: number; passingScor
  */
 function transformExamToUi(exam: Examination): LecturerExam {
   const meta = getExamMeta(exam.id);
-  const questions = (exam.questions || []).map(transformQuestionToUi);
+  const questions = (exam.questions || [])
+    .filter((q) => (q as any).is_active !== false)
+    .map(transformQuestionToUi);
   const questionsSum = questions.reduce((sum, q) => sum + q.marks, 0);
 
   // 1. Backend response fields take primary precedence, followed by stored metadata
@@ -489,105 +495,59 @@ export const lecturerService = {
     // Persist questions if provided
     if (data.questions && data.questions.length > 0) {
       for (const q of data.questions) {
-        let backendType: 'MCQ' | 'SHORT_ANSWER' | 'ESSAY' = 'MCQ';
-        if (q.type === 'SHORT_ANSWER' || q.type === 'short_answer') {
-          backendType = 'SHORT_ANSWER';
-        } else if (q.type === 'ESSAY' || q.type === 'essay') {
-          backendType = 'ESSAY';
-        } else {
-          backendType = 'MCQ';
-        }
-
         let questionId = q.id;
 
         if (q.id && !q.id.startsWith('q-')) {
           await patchQuestion(q.id, {
             examination: exam.id,
             question_text: q.prompt,
-            question_type: backendType,
+            question_type: 'MCQ',
             total_points: q.marks,
           });
         } else {
           const createdQuestion = await createQuestion({
             examination: exam.id,
             question_text: q.prompt,
-            question_type: backendType,
+            question_type: 'MCQ',
             total_points: q.marks,
           });
           questionId = createdQuestion.id;
         }
 
-        // Add or sync MCQ options if available
-        if (backendType === 'MCQ' && q.options && q.options.length > 0) {
+        // Add or sync MCQ / True-False options
+        if (q.options && q.options.length > 0) {
+          // Delete existing options first to prevent validation conflict during updates
           const existingOptions = await listQuestionOptions({ question: questionId }).catch(() => []);
-          const existingOptionMap = new Map(existingOptions.map((o) => [o.id, o]));
-          const currentOptionIds = new Set(q.options.map((o) => o.id));
-
-          // Delete removed options
           for (const existingOpt of existingOptions) {
-            if (!currentOptionIds.has(existingOpt.id)) {
-              await deleteQuestionOption(existingOpt.id).catch(() => {});
-            }
+            await deleteQuestionOption(existingOpt.id).catch(() => {});
           }
 
-          // Sort so correct option is created/updated first
-          const sortedOptions = [...q.options].sort((a, b) => {
-            const isCorrectA = Array.isArray(q.correctAnswer)
-              ? q.correctAnswer.includes(a.id)
-              : q.correctAnswer === a.id;
-            const isCorrectB = Array.isArray(q.correctAnswer)
-              ? q.correctAnswer.includes(b.id)
-              : q.correctAnswer === b.id;
-            return (isCorrectB ? 1 : 0) - (isCorrectA ? 1 : 0);
-          });
+          let optionsToCreate: { text: string; isCorrect: boolean }[] = [];
+          if (q.type === 'TRUE_FALSE' || q.type === 'true_false') {
+            const isTrueCorrect = q.correctAnswer === 'True' || 
+              q.options.find((o) => o.id === q.correctAnswer)?.text.toLowerCase() === 'true';
+            optionsToCreate = [
+              { text: 'True', isCorrect: isTrueCorrect },
+              { text: 'False', isCorrect: !isTrueCorrect },
+            ];
+          } else {
+            optionsToCreate = q.options.map((opt) => ({
+              text: opt.text,
+              isCorrect: Array.isArray(q.correctAnswer)
+                ? q.correctAnswer.includes(opt.id)
+                : q.correctAnswer === opt.id,
+            }));
+          }
+
+          // Sort so correct option is created first (satisfying backend single-correct validation)
+          const sortedOptions = [...optionsToCreate].sort((a, b) => (b.isCorrect ? 1 : 0) - (a.isCorrect ? 1 : 0));
 
           for (const opt of sortedOptions) {
-            const isCorrect = Array.isArray(q.correctAnswer)
-              ? q.correctAnswer.includes(opt.id)
-              : q.correctAnswer === opt.id;
-
-            if (existingOptionMap.has(opt.id)) {
-              await patchQuestionOption(opt.id, {
-                option_text: opt.text,
-                is_correct: Boolean(isCorrect),
-              }).catch(() => {});
-            } else {
-              await createQuestionOption({
-                question: questionId,
-                option_text: opt.text,
-                is_correct: Boolean(isCorrect),
-              });
-            }
-          }
-        }
-
-        // Add or sync Rubric Criteria for Essay / Short Answer
-        if ((backendType === 'ESSAY' || backendType === 'SHORT_ANSWER') && q.rubricCriteria && q.rubricCriteria.length > 0) {
-          const existingCriteria = await listRubricCriteria({ question: questionId }).catch(() => []);
-          const existingCriteriaMap = new Map(existingCriteria.map((c) => [c.id, c]));
-          const currentCriteriaIds = new Set(q.rubricCriteria.map((c) => c.id));
-
-          // Delete removed criteria
-          for (const existingCrit of existingCriteria) {
-            if (!currentCriteriaIds.has(existingCrit.id)) {
-              await deleteRubricCriterion(existingCrit.id).catch(() => {});
-            }
-          }
-
-          // Create or update criteria
-          for (const crit of q.rubricCriteria) {
-            if (existingCriteriaMap.has(crit.id)) {
-              await patchRubricCriterion(crit.id, {
-                criterion_text: crit.criterionText,
-                point_weight: Number(crit.pointWeight),
-              }).catch(() => {});
-            } else {
-              await createRubricCriterion({
-                question: questionId,
-                criterion_text: crit.criterionText,
-                point_weight: Number(crit.pointWeight),
-              });
-            }
+            await createQuestionOption({
+              question: questionId,
+              option_text: opt.text,
+              is_correct: Boolean(opt.isCorrect),
+            });
           }
         }
       }

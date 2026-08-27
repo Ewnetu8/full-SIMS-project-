@@ -66,6 +66,12 @@ export function StudentDashboard() {
     void fetchEnrollments();
     void fetchActiveExams();
     void fetchResults();
+
+    const interval = setInterval(() => {
+      void fetchActiveExams();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [fetchEnrollments, fetchActiveExams, fetchResults]);
 
   const currentHour = new Date().getHours();

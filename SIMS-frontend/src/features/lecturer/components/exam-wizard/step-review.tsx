@@ -30,10 +30,6 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
   const totalMarks = wizardData.questions.reduce((acc, q) => acc + q.marks, 0);
   const marksMismatch = totalMarks !== wizardData.totalMarks;
 
-  const hasSubjectiveQuestions = wizardData.questions.some(
-    (q) => q.type === 'essay' || q.type === 'short_answer' || q.type === 'ESSAY' || q.type === 'SHORT_ANSWER'
-  );
-
   async function handleSaveDraft() {
     setSavingDraft(true);
     try {
@@ -85,13 +81,6 @@ export function StepReview({ onBack, editingExamId }: StepReviewProps) {
     if (end <= start) {
       toast.error('Invalid Date Window', {
         description: 'End window must be after start window.',
-      });
-      return;
-    }
-
-    if (hasSubjectiveQuestions) {
-      toast.error('Objective Questions Required for Auto-Scheduling', {
-        description: 'Scheduling requires objective/auto-gradable questions (MCQ). Save as Draft first if using Essay/Short Answer questions.',
       });
       return;
     }

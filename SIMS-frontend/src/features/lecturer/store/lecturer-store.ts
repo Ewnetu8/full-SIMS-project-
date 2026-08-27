@@ -20,6 +20,7 @@ interface LecturerStoreState {
   setEditingExam: (id: string | null, data?: ExamWizardData) => void;
 
   addQuestion: (question: Question) => void;
+  setQuestions: (questions: Question[]) => void;
   updateQuestion: (index: number, question: Question) => void;
   removeQuestion: (index: number) => void;
   reorderQuestions: (startIndex: number, endIndex: number) => void;
@@ -81,6 +82,14 @@ export const useLecturerStore = create<LecturerStoreState>((set) => ({
       wizardData: {
         ...state.wizardData,
         questions: [...state.wizardData.questions, question],
+      },
+    })),
+
+  setQuestions: (questions) =>
+    set((state) => ({
+      wizardData: {
+        ...state.wizardData,
+        questions,
       },
     })),
 

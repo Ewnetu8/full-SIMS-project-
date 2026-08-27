@@ -2,11 +2,9 @@ export type ExamStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHE
 
 export type QuestionType =
   | 'MCQ'
-  | 'SHORT_ANSWER'
-  | 'ESSAY'
+  | 'TRUE_FALSE'
   | 'multiple_choice'
-  | 'short_answer'
-  | 'essay';
+  | 'true_false';
 
 export interface QuestionOption {
   id: string;
