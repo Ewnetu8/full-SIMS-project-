@@ -63,9 +63,20 @@ class ProgramSerializer(serializers.ModelSerializer):
 
 
 class AcademicYearSerializer(serializers.ModelSerializer):
+    university_detail = UniversitySerializer(source="university", read_only=True)
+
     class Meta:
         model = AcademicYear
-        fields = ("id", "display_label", "start_boundary", "end_boundary", "created_at", "updated_at")
+        fields = (
+            "id",
+            "university",
+            "university_detail",
+            "display_label",
+            "start_boundary",
+            "end_boundary",
+            "created_at",
+            "updated_at",
+        )
         read_only_fields = ("id", "created_at", "updated_at")
 
 

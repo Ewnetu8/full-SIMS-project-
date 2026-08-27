@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Calendar, Plus, Edit2, Trash2, XCircle } from 'lucide-react';
 import * as React from 'react';
 
 import { ConfirmationDialog, toast } from '@/components/feedback';
@@ -27,6 +27,7 @@ export function AcademicYearManagement() {
   const {
     academicYears,
     isLoadingAcademicYears,
+    academicYearsError,
     academicYearSearchQuery,
     fetchAcademicYears,
     addAcademicYear,
@@ -158,6 +159,19 @@ export function AcademicYearManagement() {
           Add Academic Year
         </Button>
       </div>
+
+      {/* Error State Banner */}
+      {academicYearsError && (
+        <Card className="p-4 border-destructive/40 bg-destructive/10 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-destructive">
+            <XCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">{academicYearsError}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => fetchAcademicYears()}>
+            Retry
+          </Button>
+        </Card>
+      )}
 
       {/* Filter / Search Bar */}
       <Card className="p-4">
