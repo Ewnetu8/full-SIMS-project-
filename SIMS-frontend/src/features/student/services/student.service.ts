@@ -103,11 +103,7 @@ export const studentService = {
    * Starts an examination attempt for the logged-in student.
    */
   startExam: async (id: string): Promise<ExamAttempt> => {
-    const res = await api.post<any>(API_ENDPOINTS.EXAMS.START(id), {});
-    if (res && res.attempt) {
-      return res.attempt;
-    }
-    return res;
+    return await api.post<ExamAttempt>(API_ENDPOINTS.EXAMS.START(id), {});
   },
 
   /**
@@ -221,7 +217,7 @@ export const studentService = {
     try {
       const enrollments = await studentService.getEnrollments();
       const authUser = useAuthStore.getState().user;
-      
+
       // Resolve student identifier authentically (ensuring UUID is never used)
       let studentId: string | null = resolveStudentIdentifier(authUser);
       let department: string | null = null;
