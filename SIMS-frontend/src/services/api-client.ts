@@ -163,6 +163,7 @@ function createApiClient(): AxiosInstance {
             failedQueue.push({ resolve, reject });
           })
             .then((token: string) => {
+              originalRequest._retry = true;
               originalRequest.headers.set('Authorization', `Bearer ${token}`);
               return client(originalRequest);
             })
@@ -179,7 +180,7 @@ function createApiClient(): AxiosInstance {
           const newAccessToken = refreshRes.tokens?.accessToken || '';
 
           if (newAccessToken) {
-            useAuthStore.getState().refreshSession({ accessToken: newAccessToken });
+            useAuthStore.getState().refreshSession(refreshRes.tokens);
             originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
 
             // Resolve all queued requests with the new access token
@@ -195,12 +196,11 @@ function createApiClient(): AxiosInstance {
 
           const refreshStatus = axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined;
 
-          // ONLY clear session if refresh explicitly fails with 401 (refresh token missing/expired)
+          // Clear session if refresh explicitly fails with 401 (refresh token missing/expired)
           if (refreshStatus === 401) {
             useAuthStore.getState().clearSession();
             toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
           }
-          // Do NOT clear session on 403 (CSRF failure or permission error)
           return Promise.reject(apiError);
         } finally {
           isRefreshing = false;

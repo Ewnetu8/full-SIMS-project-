@@ -1,7 +1,8 @@
 // ─── Questions API Service ────────────────────────────────────────────────────
 
-import { api } from '@/services/api-client';
 import { API_ENDPOINTS } from '@/constants';
+import { api } from '@/services/api-client';
+
 import type {
   Question,
   QuestionWithWarnings,
@@ -28,7 +29,11 @@ import type {
  * @returns Promise resolving to an array of questions
  */
 export async function listQuestions(params?: ListQuestionsParams): Promise<Question[]> {
-  return api.get<Question[]>(API_ENDPOINTS.QUESTIONS.ROOT, { params });
+  const res = await api.get<Question[] | { results?: Question[] }>(
+    API_ENDPOINTS.QUESTIONS.ROOT,
+    { params }
+  );
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 /**
@@ -109,7 +114,11 @@ export async function deleteQuestion(
 export async function listQuestionOptions(
   params?: ListQuestionOptionsParams,
 ): Promise<QuestionOption[]> {
-  return api.get<QuestionOption[]>(API_ENDPOINTS.QUESTIONS.OPTIONS, { params });
+  const res = await api.get<QuestionOption[] | { results?: QuestionOption[] }>(
+    API_ENDPOINTS.QUESTIONS.OPTIONS,
+    { params }
+  );
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 /**

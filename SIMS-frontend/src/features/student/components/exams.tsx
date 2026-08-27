@@ -43,6 +43,12 @@ export function ExamsPage({ completed = false }: { completed?: boolean }) {
 
   React.useEffect(() => {
     void fetchActiveExams();
+
+    const interval = setInterval(() => {
+      void fetchActiveExams();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [fetchActiveExams]);
 
   const title = completed ? 'Completed exams' : 'Available exams';
@@ -200,20 +206,9 @@ export function ExamDetails({ examId }: { examId: string }) {
     };
   }, [examId]);
 
-  const handleStartExam = async () => {
+  const handleStartExam = () => {
     if (!exam) return;
-    setIsStarting(true);
-    try {
-      await studentService.startExam(exam.id);
-      router.push(ROUTES.STUDENT.EXAM_TAKE(exam.id));
-    } catch (err: any) {
-      setIsStarting(false);
-      const msg =
-        err?.message ||
-        err?.detail ||
-        'This exam is not currently available or you are not enrolled in this course.';
-      toast.error(msg, { id: 'exam-start-error' });
-    }
+    router.push(ROUTES.STUDENT.EXAM_TAKE(exam.id));
   };
 
   if (loading) {

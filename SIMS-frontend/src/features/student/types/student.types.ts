@@ -130,9 +130,15 @@ export interface ExamAttempt {
   start_time: string;
   submission_time?: string | null;
   is_disrupted: boolean;
+  grading_status?: string;
   questions?: Question[];
   created_at: string;
   updated_at: string;
+}
+
+export interface StartExamResponse {
+  attempt: ExamAttempt;
+  questions: Question[];
 }
 
 export interface StudentAnswerRequest {

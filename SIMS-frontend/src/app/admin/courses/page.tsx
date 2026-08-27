@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Course Management — ExamSphere Admin',
-  description: 'Manage academic courses, credit hours, and lecturer assignments.',
+  description: 'Manage academic course definitions, curriculum subjects, and degree programs.',
 };
 
 export default function AdminCoursesPage() {

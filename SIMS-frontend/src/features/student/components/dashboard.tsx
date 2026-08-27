@@ -67,6 +67,12 @@ export function StudentDashboard() {
     void fetchActiveExams();
     void fetchResults();
     void fetchNotifications();
+
+    const interval = setInterval(() => {
+      void fetchActiveExams();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [fetchEnrollments, fetchActiveExams, fetchResults, fetchNotifications]);
 
   const currentHour = new Date().getHours();
@@ -105,7 +111,7 @@ export function StudentDashboard() {
           icon={<BookOpen className="h-5 w-5" />}
         />
         <StatsCard
-          title="Active exams"
+          title="Available exams"
           value={isLoading ? '...' : activeExamsCount}
           icon={<ClipboardCheck className="h-5 w-5" />}
         />
@@ -134,11 +140,11 @@ export function StudentDashboard() {
       )}
 
       <section className="grid gap-6 xl:grid-cols-5">
-        {/* Active Examinations Card */}
+        {/* Available Examinations Card */}
         <Card className="xl:col-span-3">
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle>Active & Scheduled Examinations</CardTitle>
+              <CardTitle>Available Exams</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 Assessments currently available for your enrolled courses.
               </p>
@@ -157,42 +163,53 @@ export function StudentDashboard() {
                   <Skeleton className="h-3 w-1/3" />
                 </div>
               ))
+            ) : examsError ? (
+              <ErrorState
+                title="Unable to load available exams"
+                description={examsError}
+                onRetry={() => { void fetchActiveExams(); }}
+                retryLabel="Try again"
+              />
             ) : activeExams.length === 0 ? (
               <EmptyState
                 icon={<ClipboardCheck className="h-8 w-8 text-muted-foreground" />}
-                title="No active exams"
-                description="You don't have any exams available right now."
+                title="No Available Exams"
+                description="You currently have no exams available for your enrolled courses."
               />
             ) : (
               activeExams.map((exam) => {
                 const offering = exam.course_offering_detail;
-                const courseTitle = offering?.course_title || offering?.course_detail?.title || 'Course Exam';
+                const courseTitle = offering?.course_title || offering?.course_detail?.title || 'Course Assessment';
                 const courseCode = offering?.course_code || offering?.course_detail?.course_code || 'COURSE';
 
                 return (
                   <div
                     key={exam.id}
-                    className="flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 rounded-xl border border-border p-4 transition hover:border-primary/50 hover:bg-accent/30 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground">{exam.title}</p>
-                      <p className="mt-1.5 text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{courseCode}</span>
-                        <span>· {courseTitle}</span>
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                          {courseCode}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate">{courseTitle}</span>
+                      </div>
+                      <p className="font-semibold text-foreground text-sm">{exam.title}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
-                          <CalendarDays className="h-3.5 w-3.5" />
+                          <CalendarDays className="h-3.5 w-3.5 text-primary" />
                           {formatDate(exam.start_window)}
                         </span>
                         <span className="inline-flex items-center gap-1">
-                          <Clock3 className="h-3.5 w-3.5" />
+                          <Clock3 className="h-3.5 w-3.5 text-primary" />
                           {formatTime(exam.start_window)} · {exam.duration_minutes} mins
                         </span>
                       </div>
                     </div>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={ROUTES.STUDENT.EXAM(exam.id)}>View details</Link>
+                    <Button asChild size="sm" className="shrink-0 self-start sm:self-auto">
+                      <Link href={ROUTES.STUDENT.EXAM(exam.id)}>
+                        View details <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      </Link>
                     </Button>
                   </div>
                 );
@@ -217,7 +234,7 @@ export function StudentDashboard() {
             <QuickAction
               href={ROUTES.STUDENT.EXAMS}
               icon={<ClipboardCheck className="h-5 w-5" />}
-              title="Active Exams"
+              title="Available Exams"
               description="Take or preview scheduled examinations"
             />
             <QuickAction
@@ -281,22 +298,29 @@ export function StudentDashboard() {
                 return (
                   <div
                     key={enrollment.id}
-                    className="rounded-xl border border-border p-4 transition hover:border-primary/50 hover:bg-accent/40"
+                    className="flex flex-col justify-between gap-3 rounded-xl border border-border p-4 transition hover:border-primary/50 hover:bg-accent/40 sm:flex-row sm:items-center"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-foreground">
-                          {course?.title || 'Enrolled Course'}
-                        </p>
-                        <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{course?.course_code || 'CODE'}</span>
-                          <span>· {course?.credit_hours || 0} credit hrs · Section {offering?.section || 'A'}</span>
-                        </p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                          {course?.course_code || 'CODE'}
+                        </span>
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono font-medium text-foreground">
+                          {enrollment.status}
+                        </span>
                       </div>
-                      <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary">
-                        {enrollment.status}
-                      </span>
+                      <p className="mt-1.5 font-semibold text-foreground truncate">
+                        {course?.title || 'Enrolled Course'}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {course?.credit_hours || 0} credit hrs · Section {offering?.section || 'A'}
+                      </p>
                     </div>
+                    <Button asChild variant="outline" size="sm" className="shrink-0 self-start sm:self-auto">
+                      <Link href={ROUTES.STUDENT.COURSE(enrollment.id)}>
+                        View details <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      </Link>
+                    </Button>
                   </div>
                 );
               })}

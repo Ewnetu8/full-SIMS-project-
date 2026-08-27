@@ -112,11 +112,20 @@ export const API_ENDPOINTS = {
     BY_ID: (id: string) => `/api/v1/courses/${id}`,
     PREREQUISITES: '/api/v1/course-prerequisites',
     PREREQUISITE_BY_ID: (id: string) => `/api/v1/course-prerequisites/${id}`,
+    MY_COURSES: '/api/v1/my-courses',
   },
 
   COURSE_OFFERINGS: {
     ROOT: '/api/v1/course-offerings',
     BY_ID: (id: string) => `/api/v1/course-offerings/${id}`,
+    MY_COURSES: '/api/v1/my-courses',
+  },
+
+  // ── Teaching Assignments (SIMS API 7) ───────────────────────────────────────
+  TEACHING_ASSIGNMENTS: {
+    ROOT: '/api/v1/teaching-assignments',
+    BY_ID: (id: string) => `/api/v1/teaching-assignments/${id}`,
+    MY_COURSES: '/api/v1/my-courses',
   },
 
   // ── Enrollments ───────────────────────────────────────────────────────────

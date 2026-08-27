@@ -34,11 +34,59 @@ export const studentService = {
   },
 
   /**
+   * GET /api/v1/enrollments/{id}
+   * Retrieves a single enrollment record for the authenticated student.
+   */
+  getEnrollmentById: async (id: string): Promise<Enrollment> => {
+    return await api.get<Enrollment>(API_ENDPOINTS.ENROLLMENTS.BY_ID(id));
+  },
+
+  /**
+   * GET /api/v1/courses/{id}
+   * Retrieves course details.
+   */
+  getCourseById: async (id: string): Promise<Course> => {
+    return await api.get<Course>(API_ENDPOINTS.COURSES.BY_ID(id));
+  },
+
+  /**
+   * GET /api/v1/course-offerings/{id}
+   * Retrieves course offering details.
+   */
+  getCourseOfferingById: async (id: string): Promise<CourseOffering> => {
+    return await api.get<CourseOffering>(API_ENDPOINTS.COURSE_OFFERINGS.BY_ID(id));
+  },
+
+  /**
    * GET /api/v1/exams/active
-   * Returns active examinations available to the student.
+   * Returns active examinations available to the student for their enrolled courses.
    */
   getActiveExams: async (): Promise<Examination[]> => {
-    const data = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ACTIVE);
+    try {
+      const activeData = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ACTIVE);
+      if (Array.isArray(activeData) && activeData.length > 0) {
+        return activeData;
+      }
+    } catch (err) {
+      console.warn('GET /api/v1/exams/active failed or returned error, falling back to /exams:', err);
+    }
+
+    try {
+      const listData = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ROOT, {
+        params: { status: 'ACTIVE' },
+      });
+      return Array.isArray(listData) ? listData : [];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * GET /api/v1/exams
+   * Lists examinations for student's enrolled courses.
+   */
+  getExams: async (params?: { status?: string; course_offering?: string }): Promise<Examination[]> => {
+    const data = await api.get<Examination[]>(API_ENDPOINTS.EXAMS.ROOT, { params });
     return Array.isArray(data) ? data : [];
   },
 
@@ -55,11 +103,7 @@ export const studentService = {
    * Starts an examination attempt for the logged-in student.
    */
   startExam: async (id: string): Promise<ExamAttempt> => {
-    const res = await api.post<any>(API_ENDPOINTS.EXAMS.START(id), {});
-    if (res && res.attempt) {
-      return res.attempt;
-    }
-    return res;
+    return await api.post<ExamAttempt>(API_ENDPOINTS.EXAMS.START(id), {});
   },
 
   /**
@@ -173,7 +217,7 @@ export const studentService = {
     try {
       const enrollments = await studentService.getEnrollments();
       const authUser = useAuthStore.getState().user;
-      
+
       // Resolve student identifier authentically (ensuring UUID is never used)
       let studentId: string | null = resolveStudentIdentifier(authUser);
       let department: string | null = null;

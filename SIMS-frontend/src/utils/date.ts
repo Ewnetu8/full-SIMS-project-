@@ -109,3 +109,80 @@ export function formatDuration(totalSeconds: number): string {
   }
   return `${pad(minutes)}:${pad(seconds)}`;
 }
+
+/**
+ * Converts an ISO datetime string to an HTML datetime-local input string (YYYY-MM-DDTHH:mm)
+ * preserving the user's local timezone.
+ */
+export function toDatetimeLocalValue(isoString?: string | null): string {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Converts an HTML datetime-local input string (YYYY-MM-DDTHH:mm) to an ISO string
+ * for transmission to the backend API.
+ */
+export function toIsoStringFromDatetimeLocal(localString?: string | null): string {
+  if (!localString) return '';
+  try {
+    const d = new Date(localString);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Calculates duration in minutes between start and end datetime-local or ISO strings.
+ * Returns null if either date is missing or if end is not after start.
+ */
+export function calculateDurationMinutes(
+  startString?: string | null,
+  endString?: string | null,
+): number | null {
+  if (!startString || !endString) return null;
+  try {
+    const startMs = new Date(startString).getTime();
+    const endMs = new Date(endString).getTime();
+    if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
+      return null;
+    }
+    return Math.round((endMs - startMs) / 60000);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Formats duration in minutes into a user-friendly string (e.g., "90 minutes (1 hr 30 mins)").
+ */
+export function formatDurationMinutes(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined || isNaN(minutes) || minutes <= 0) {
+    return '—';
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0) {
+    if (remainingMinutes > 0) {
+      return `${minutes} minutes (${hours} hr ${remainingMinutes} min)`;
+    }
+    return `${minutes} minutes (${hours} hr)`;
+  }
+  return `${minutes} minutes`;
+}
+

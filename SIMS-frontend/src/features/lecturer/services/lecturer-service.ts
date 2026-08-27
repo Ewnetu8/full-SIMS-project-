@@ -5,10 +5,15 @@
  * Django REST Framework backend APIs via academic-api, examinations-api, and questions-api.
  */
 
+import { getExamAnalytics, getExamResults } from '@/features/analytics/services/analytics-api';
+import { calculateDurationMinutes, toIsoStringFromDatetimeLocal } from '@/utils/date';
+
 import {
+  listMyCourses,
   listCourseOfferings,
   getCourseOffering,
   listEnrollments,
+  listStudents,
   listDepartments,
 } from './academic-api';
 import {
@@ -17,25 +22,52 @@ import {
   createExamination,
   patchExamination,
   publishExamination,
+  scheduleExamination,
   deleteExamination,
 } from './examinations-api';
 import {
   createQuestion,
+  patchQuestion,
   createQuestionOption,
-  deleteQuestion,
+  listQuestionOptions,
+  patchQuestionOption,
+  deleteQuestionOption,
+  listRubricCriteria,
+  createRubricCriterion,
+  patchRubricCriterion,
+  deleteRubricCriterion,
 } from './questions-api';
-import { getExamAnalytics, getExamResults } from '@/features/analytics/services/analytics-api';
 
-import type { Examination, Question as BackendQuestion, CourseOffering, Enrollment } from '@/types/lecturer';
-import type { Course, LecturerExam, LecturerNotification, LecturerStats, LecturerAnalytics, Question as UiQuestion, StudentSubmission } from '../types';
+import type {
+  Course,
+  LecturerExam,
+  LecturerNotification,
+  LecturerStats,
+  Question as UiQuestion,
+  StudentSubmission,
+} from '../types';
+import type {
+  Examination,
+  Question as BackendQuestion,
+  CourseOffering,
+  CourseOfferingBrief,
+  Enrollment,
+  StudentListItem,
+  StudentBrief,
+  ListExaminationsParams,
+} from '@/types/lecturer';
 
 /**
  * Maps a Django backend Question object to the UI Question interface
  */
 function transformQuestionToUi(q: BackendQuestion): UiQuestion {
-  let uiType: UiQuestion['type'] = 'essay';
-  if (q.question_type === 'MCQ') uiType = 'multiple_choice';
-  else if (q.question_type === 'SHORT_ANSWER') uiType = 'short_answer';
+  let uiType: UiQuestion['type'] = 'MCQ';
+  if (q.options && q.options.length === 2) {
+    const texts = q.options.map((o) => o.option_text.trim().toLowerCase());
+    if ((texts.includes('true') && texts.includes('false')) || (texts.includes('t') && texts.includes('f'))) {
+      uiType = 'TRUE_FALSE';
+    }
+  }
 
   return {
     id: q.id,
@@ -44,16 +76,71 @@ function transformQuestionToUi(q: BackendQuestion): UiQuestion {
     marks: Number(q.total_points) || 1,
     required: true,
     options: q.options?.map((o) => ({ id: o.id, text: o.option_text })),
-    correctAnswer: q.options?.filter((o) => o.is_correct).map((o) => o.id),
+    correctAnswer: q.options?.find((o) => o.is_correct)?.id,
+    rubricCriteria: q.rubric_criteria?.map((rc) => ({
+      id: rc.id,
+      criterionText: rc.criterion_text,
+      pointWeight: Number(rc.point_weight),
+    })),
+    explanationNote: q.rubric_criteria
+      ?.map((rc) => `${rc.criterion_text} (${rc.point_weight} pts)`)
+      .join('\n'),
   };
+}
+
+const examMetaCache = new Map<string, { totalMarks?: number; passingScore?: number }>();
+
+export function getExamMeta(id?: string | null): { totalMarks?: number; passingScore?: number } | null {
+  if (!id) return null;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(`sims_exam_meta_${id}`);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+  }
+  return examMetaCache.get(id) ?? null;
+}
+
+export function setExamMeta(id: string, meta: { totalMarks?: number; passingScore?: number }) {
+  if (!id) return;
+  const existing = getExamMeta(id) || {};
+  const merged = { ...existing, ...meta };
+  examMetaCache.set(id, merged);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`sims_exam_meta_${id}`, JSON.stringify(merged));
+    } catch {}
+  }
 }
 
 /**
  * Maps a Django backend Examination object to the UI LecturerExam interface
  */
 function transformExamToUi(exam: Examination): LecturerExam {
-  const questions = (exam.questions || []).map(transformQuestionToUi);
-  const totalMarks = questions.reduce((sum, q) => sum + q.marks, 0) || 100;
+  const meta = getExamMeta(exam.id);
+  const questions = (exam.questions || [])
+    .filter((q) => (q as any).is_active !== false)
+    .map(transformQuestionToUi);
+  const questionsSum = questions.reduce((sum, q) => sum + q.marks, 0);
+
+  // 1. Backend response fields take primary precedence, followed by stored metadata
+  const rawTotalMarks = (exam as any).total_marks ?? (exam as any).totalMarks ?? meta?.totalMarks;
+  const rawPassingScore = (exam as any).passing_score ?? (exam as any).passingScore ?? meta?.passingScore;
+
+  const totalMarks =
+    rawTotalMarks !== undefined && rawTotalMarks !== null && !isNaN(Number(rawTotalMarks))
+      ? Number(rawTotalMarks)
+      : questionsSum > 0
+      ? questionsSum
+      : 100;
+
+  // Passing score can legitimately be 0
+  const passingScore =
+    rawPassingScore !== undefined && rawPassingScore !== null && !isNaN(Number(rawPassingScore))
+      ? Number(rawPassingScore)
+      : Math.round(totalMarks * 0.5);
+
+  const calculatedDuration = calculateDurationMinutes(exam.start_window, exam.end_window);
 
   return {
     id: exam.id,
@@ -66,9 +153,9 @@ function transformExamToUi(exam: Examination): LecturerExam {
       'Ensure a stable internet connection.',
       'Answer all required questions before the timer expires.',
     ],
-    durationMinutes: exam.duration_minutes || 60,
+    durationMinutes: calculatedDuration ?? exam.duration_minutes ?? 0,
     totalMarks,
-    passingScore: Math.round(totalMarks * 0.5),
+    passingScore,
     status: exam.status,
     startDate: exam.start_window || '',
     endDate: exam.end_window || '',
@@ -79,6 +166,32 @@ function transformExamToUi(exam: Examination): LecturerExam {
     questions,
     createdAt: exam.created_at || '',
     updatedAt: exam.updated_at || '',
+  };
+}
+
+/**
+ * Maps a Django CourseOfferingBrief (from GET /api/v1/my-courses) + enrollments + exams into the UI Course interface
+ */
+function transformBriefToUiCourse(
+  brief: CourseOfferingBrief,
+  allEnrollments: Enrollment[],
+  allExams: Examination[]
+): Course {
+  const offeringEnrollments = allEnrollments.filter(
+    (e) => e.course_offering === brief.id && e.status === 'ENROLLED'
+  );
+  const offeringExams = allExams.filter((e) => e.course_offering === brief.id);
+
+  return {
+    id: brief.id,
+    code: brief.course_code || 'COURSE',
+    name: brief.course_title || 'Unnamed Course',
+    semester: brief.semester_index || 'FIRST',
+    academicYear: brief.semester || '2024-2025',
+    studentCount: offeringEnrollments.length,
+    examCount: offeringExams.length,
+    description: brief.course_title || '',
+    section: brief.section,
   };
 }
 
@@ -104,31 +217,42 @@ function transformOfferingToUiCourse(
     studentCount: offeringEnrollments.length,
     examCount: offeringExams.length,
     description: offering.course_detail?.title || '',
+    section: offering.section || 'A',
+    capacity: offering.capacity,
+    creditHours: offering.course_detail?.credit_hours,
+    intendedClassStanding: offering.course_detail?.intended_class_standing,
+    programName: offering.course_detail?.program_detail?.name,
   };
 }
 
 export const lecturerService = {
   /**
-   * Get lecturer dashboard statistics calculated from real backend data
+   * Get lecturer dashboard statistics calculated from real backend data.
+   * Total courses count is derived from the lecturer's assigned courses (/api/v1/my-courses).
    */
   async getStats(): Promise<LecturerStats> {
     try {
-      const [offeringsRes, enrollmentsRes, examsRes] = await Promise.allSettled([
-        listCourseOfferings(),
+      const [myCoursesRes, enrollmentsRes, examsRes] = await Promise.allSettled([
+        listMyCourses(),
         listEnrollments(),
         listExaminations(),
       ]);
 
-      const offerings = offeringsRes.status === 'fulfilled' ? offeringsRes.value : [];
+      const myCourses = myCoursesRes.status === 'fulfilled' ? myCoursesRes.value : [];
       const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
       const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
 
-      const activeExams = exams.filter((e) => e.status === 'ACTIVE' || e.status === 'PUBLISHED').length;
-      const enrolledStudentsCount = enrollments.filter((e) => e.status === 'ENROLLED').length;
+      const assignedCourseIds = new Set(myCourses.map((c) => c.id));
+      const activeExams = exams.filter(
+        (e) => (e.status === 'ACTIVE' || e.status === 'PUBLISHED') && (assignedCourseIds.size === 0 || assignedCourseIds.has(e.course_offering))
+      ).length;
+      const enrolledStudentsCount = enrollments.filter(
+        (e) => e.status === 'ENROLLED' && (assignedCourseIds.size === 0 || assignedCourseIds.has(e.course_offering))
+      ).length;
 
       return {
         totalStudents: enrolledStudentsCount,
-        totalCourses: offerings.length,
+        totalCourses: myCourses.length,
         activeExams,
         pendingGrading: 0,
       };
@@ -144,59 +268,120 @@ export const lecturerService = {
   },
 
   /**
-   * Get lecturer's course offerings
+   * Get raw course offerings from backend
    */
-  async getCourses(): Promise<Course[]> {
-    try {
-      const [offeringsRes, enrollmentsRes, examsRes] = await Promise.allSettled([
-        listCourseOfferings(),
-        listEnrollments(),
-        listExaminations(),
-      ]);
-
-      const offerings = offeringsRes.status === 'fulfilled' ? offeringsRes.value : [];
-      const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
-      const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
-
-      return offerings.map((o) => transformOfferingToUiCourse(o, enrollments, exams));
-    } catch (err) {
-      console.error('Error fetching courses:', err);
-      return [];
-    }
+  async getCourseOfferings(): Promise<CourseOffering[]> {
+    return listCourseOfferings();
   },
 
   /**
-   * Get course offering by ID
+   * Get single course offering by ID from backend
+   */
+  async getCourseOfferingById(id: string): Promise<CourseOffering> {
+    return getCourseOffering(id);
+  },
+
+  /**
+   * Get lecturer's active assigned course offerings mapped to UI Course domain.
+   * Source of truth: GET /api/v1/my-courses
+   */
+  async getCourses(): Promise<Course[]> {
+    const [myCourses, enrollments, exams] = await Promise.all([
+      listMyCourses().catch((err) => {
+        console.error('Error fetching lecturer assigned courses:', err);
+        throw err;
+      }),
+      listEnrollments().catch(() => [] as Enrollment[]),
+      listExaminations().catch(() => [] as Examination[]),
+    ]);
+
+    return myCourses.map((brief) => transformBriefToUiCourse(brief, enrollments, exams));
+  },
+
+  /**
+   * Get course offering by ID mapped to UI Course domain
    */
   async getCourseById(id: string): Promise<Course | null> {
     try {
-      const [offeringRes, enrollmentsRes, examsRes] = await Promise.allSettled([
+      const [offering, enrollments, exams] = await Promise.all([
         getCourseOffering(id),
-        listEnrollments(),
-        listExaminations(),
+        listEnrollments().catch(() => [] as Enrollment[]),
+        listExaminations().catch(() => [] as Examination[]),
       ]);
-
-      const offering = offeringRes.status === 'fulfilled' ? offeringRes.value : null;
-      const enrollments = enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value : [];
-      const exams = examsRes.status === 'fulfilled' ? examsRes.value : [];
 
       if (!offering) return null;
       return transformOfferingToUiCourse(offering, enrollments, exams);
     } catch (err) {
       console.error(`Error fetching course ${id}:`, err);
-      return null;
+      throw err;
     }
   },
 
   /**
-   * Get lecturer's exams from backend
+   * Get course offering full details including real enrollments and associated examinations
    */
-  async getExams(): Promise<LecturerExam[]> {
+  async getCourseOfferingWithDetails(id: string): Promise<{
+    offering: CourseOffering;
+    course: Course;
+    enrollments: Enrollment[];
+    exams: LecturerExam[];
+  }> {
+    const [offering, allEnrollments, courseExamsList, studentsList] = await Promise.all([
+      getCourseOffering(id),
+      listEnrollments().catch(() => [] as Enrollment[]),
+      listExaminations({ course_offering: id }).catch(() => [] as Examination[]),
+      listStudents().catch(() => [] as StudentListItem[]),
+    ]);
+
+    const studentMap = new Map<string, StudentListItem>();
+    studentsList.forEach((s) => {
+      if (s.id) {
+        studentMap.set(s.id, s);
+      }
+    });
+
+    const courseEnrollments: Enrollment[] = allEnrollments
+      .filter((e) => e.course_offering === id)
+      .map((e) => {
+        const studentInfo = (e.student_detail as StudentListItem | undefined) || studentMap.get(e.student);
+        const studentId =
+          (e.student_detail as StudentBrief | undefined)?.student_identifier ||
+          studentInfo?.student_identifier ||
+          undefined;
+        const studentName =
+          (e.student_detail as StudentBrief | undefined)?.full_name ||
+          studentInfo?.user_full_name ||
+          undefined;
+
+        return {
+          ...e,
+          student_identifier: studentId,
+          student_name: studentName,
+          student_detail: studentInfo || e.student_detail,
+        };
+      });
+
+    const courseExams = courseExamsList.map(transformExamToUi);
+    const course = transformOfferingToUiCourse(offering, allEnrollments, courseExamsList);
+
+    return {
+      offering,
+      course,
+      enrollments: courseEnrollments,
+      exams: courseExams,
+    };
+  },
+
+  /**
+   * Get lecturer's exams from backend with optional filters (status, course_offering)
+   */
+  async getExams(params?: ListExaminationsParams): Promise<LecturerExam[]> {
     try {
-      const exams = await listExaminations();
+      const exams = await listExaminations(params);
       return exams.map(transformExamToUi);
-    } catch {
-      return [];
+    } catch (err) {
+      console.error('Error fetching examinations:', err);
+      throw err;
     }
   },
 
@@ -221,36 +406,24 @@ export const lecturerService = {
   },
 
   /**
-   * Toggle or transition exam status strictly enforcing Django lifecycle:
-   * DRAFT -> SCHEDULED -> ACTIVE -> CLOSED -> PUBLISHED (via publish endpoint)
+   * Publish examination results.
+   * Only allowed when status is CLOSED and all attempts are fully graded.
    */
-  async togglePublishExam(id: string): Promise<LecturerExam | null> {
-    try {
-      const current = await getExamination(id);
-      if (!current) return null;
-
-      if (current.status === 'CLOSED') {
-        const published = await publishExamination(id);
-        return transformExamToUi(published);
-      }
-
-      let nextStatus: Examination['status'] = 'SCHEDULED';
-      if (current.status === 'DRAFT') nextStatus = 'SCHEDULED';
-      else if (current.status === 'SCHEDULED') nextStatus = 'ACTIVE';
-      else if (current.status === 'ACTIVE') nextStatus = 'CLOSED';
-      else if (current.status === 'PUBLISHED') nextStatus = 'DRAFT';
-
-      const updated = await patchExamination(id, { status: nextStatus });
-      return transformExamToUi(updated);
-    } catch (err: any) {
-      console.error('Failed to update/publish exam status:', err);
-      throw err;
-    }
+  async publishExamResults(id: string): Promise<LecturerExam> {
+    const published = await publishExamination(id);
+    return transformExamToUi(published);
   },
 
+  /**
+   * Legacy alias for publishExamResults
+   */
+  async togglePublishExam(id: string): Promise<LecturerExam> {
+    return this.publishExamResults(id);
+  },
 
   /**
-   * Save (create or update) an examination and its questions to backend
+   * Save (create or update) an examination and its questions to backend.
+   * New examinations are always created in DRAFT.
    */
   async saveExam(data: Partial<LecturerExam>): Promise<LecturerExam> {
     const courseOfferingId = data.courseId;
@@ -258,58 +431,122 @@ export const lecturerService = {
       throw new Error('Course offering is required to save an examination.');
     }
 
-    const now = new Date();
-    const startWindow = data.startDate || now.toISOString();
-    const endDateObj = data.endDate ? new Date(data.endDate) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const endWindow = endDateObj.toISOString();
+    const rawStart = data.startDate || (data as any).start_window;
+    const rawEnd = data.endDate || (data as any).end_window;
+
+    const startWindow = rawStart ? toIsoStringFromDatetimeLocal(rawStart) : '';
+    const endWindow = rawEnd ? toIsoStringFromDatetimeLocal(rawEnd) : '';
+    const calculatedDuration = calculateDurationMinutes(rawStart, rawEnd);
+    const durationMinutes = calculatedDuration ?? data.durationMinutes ?? (data as any).duration_minutes ?? 0;
 
     let exam: Examination;
 
     if (data.id) {
-      exam = await patchExamination(data.id, {
+      const patchPayload: Record<string, any> = {
+        course_offering: courseOfferingId,
         title: data.title || 'Untitled Exam',
-        start_window: startWindow,
-        end_window: endWindow,
-        duration_minutes: data.durationMinutes || 60,
-      });
+      };
+      if (startWindow) patchPayload.start_window = startWindow;
+      if (endWindow) patchPayload.end_window = endWindow;
+      if (durationMinutes > 0) patchPayload.duration_minutes = durationMinutes;
+      if (data.totalMarks !== undefined && data.totalMarks !== null) {
+        patchPayload.total_marks = Number(data.totalMarks);
+      }
+      if (data.passingScore !== undefined && data.passingScore !== null) {
+        patchPayload.passing_score = Number(data.passingScore);
+      }
+
+      console.log('[SCHEDULE DEBUG] Saving draft update payload', patchPayload);
+      exam = await patchExamination(data.id, patchPayload as any);
+      if (data.totalMarks !== undefined || data.passingScore !== undefined) {
+        setExamMeta(data.id, {
+          totalMarks: data.totalMarks !== undefined && data.totalMarks !== null ? Number(data.totalMarks) : undefined,
+          passingScore: data.passingScore !== undefined && data.passingScore !== null ? Number(data.passingScore) : undefined,
+        });
+      }
     } else {
-      exam = await createExamination({
+      if (!startWindow || !endWindow) {
+        throw new Error('Start window and End window are required to create an examination.');
+      }
+      const createPayload: Record<string, any> = {
         course_offering: courseOfferingId,
         title: data.title || 'Untitled Exam',
         start_window: startWindow,
         end_window: endWindow,
-        duration_minutes: data.durationMinutes || 60,
-      });
+        duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+      };
+      if (data.totalMarks !== undefined && data.totalMarks !== null) {
+        createPayload.total_marks = Number(data.totalMarks);
+      }
+      if (data.passingScore !== undefined && data.passingScore !== null) {
+        createPayload.passing_score = Number(data.passingScore);
+      }
+
+      console.log('[SCHEDULE DEBUG] Creating draft payload', createPayload);
+      exam = await createExamination(createPayload as any);
+      if (data.totalMarks !== undefined || data.passingScore !== undefined) {
+        setExamMeta(exam.id, {
+          totalMarks: data.totalMarks !== undefined && data.totalMarks !== null ? Number(data.totalMarks) : undefined,
+          passingScore: data.passingScore !== undefined && data.passingScore !== null ? Number(data.passingScore) : undefined,
+        });
+      }
     }
 
     // Persist questions if provided
     if (data.questions && data.questions.length > 0) {
       for (const q of data.questions) {
-        let backendType: 'MCQ' | 'SHORT_ANSWER' | 'ESSAY' = 'ESSAY';
-        if (q.type === 'multiple_choice' || q.type === 'multiple_select' || q.type === 'true_false') {
-          backendType = 'MCQ';
-        } else if (q.type === 'short_answer') {
-          backendType = 'SHORT_ANSWER';
+        let questionId = q.id;
+
+        if (q.id && !q.id.startsWith('q-')) {
+          await patchQuestion(q.id, {
+            examination: exam.id,
+            question_text: q.prompt,
+            question_type: 'MCQ',
+            total_points: q.marks,
+          });
+        } else {
+          const createdQuestion = await createQuestion({
+            examination: exam.id,
+            question_text: q.prompt,
+            question_type: 'MCQ',
+            total_points: q.marks,
+          });
+          questionId = createdQuestion.id;
         }
 
-        const createdQuestion = await createQuestion({
-          examination: exam.id,
-          question_text: q.prompt,
-          question_type: backendType,
-          total_points: q.marks,
-        });
+        // Add or sync MCQ / True-False options
+        if (q.options && q.options.length > 0) {
+          // Delete existing options first to prevent validation conflict during updates
+          const existingOptions = await listQuestionOptions({ question: questionId }).catch(() => []);
+          for (const existingOpt of existingOptions) {
+            await deleteQuestionOption(existingOpt.id).catch(() => {});
+          }
 
-        // Add MCQ options if available
-        if (backendType === 'MCQ' && q.options && q.options.length > 0) {
-          for (const opt of q.options) {
-            const isCorrect = Array.isArray(q.correctAnswer)
-              ? q.correctAnswer.includes(opt.id)
-              : q.correctAnswer === opt.id;
+          let optionsToCreate: { text: string; isCorrect: boolean }[] = [];
+          if (q.type === 'TRUE_FALSE' || q.type === 'true_false') {
+            const isTrueCorrect = q.correctAnswer === 'True' || 
+              q.options.find((o) => o.id === q.correctAnswer)?.text.toLowerCase() === 'true';
+            optionsToCreate = [
+              { text: 'True', isCorrect: isTrueCorrect },
+              { text: 'False', isCorrect: !isTrueCorrect },
+            ];
+          } else {
+            optionsToCreate = q.options.map((opt) => ({
+              text: opt.text,
+              isCorrect: Array.isArray(q.correctAnswer)
+                ? q.correctAnswer.includes(opt.id)
+                : q.correctAnswer === opt.id,
+            }));
+          }
 
+          // Sort so correct option is created first (satisfying backend single-correct validation)
+          const sortedOptions = [...optionsToCreate].sort((a, b) => (b.isCorrect ? 1 : 0) - (a.isCorrect ? 1 : 0));
+
+          for (const opt of sortedOptions) {
             await createQuestionOption({
-              question: createdQuestion.id,
+              question: questionId,
               option_text: opt.text,
-              is_correct: Boolean(isCorrect),
+              is_correct: Boolean(opt.isCorrect),
             });
           }
         }
@@ -323,7 +560,10 @@ export const lecturerService = {
   },
 
   /**
-   * Duplicate an exam
+   * Duplicate an exam through supported frontend API orchestration:
+   * 1. Fetches the existing exam.
+   * 2. Creates a new DRAFT examination with copied fields and fresh timestamps.
+   * 3. Clones the questions, options, and rubric criteria for the new exam.
    */
   async duplicateExam(examId: string): Promise<LecturerExam | null> {
     try {
@@ -335,12 +575,54 @@ export const lecturerService = {
         title: `${original.title} (Copy)`,
         start_window: original.start_window,
         end_window: original.end_window,
-        duration_minutes: original.duration_minutes,
+        duration_minutes: original.duration_minutes || 60,
       });
 
-      return transformExamToUi(duplicated);
-    } catch {
-      return null;
+      const origMeta = getExamMeta(examId);
+      if (origMeta) {
+        setExamMeta(duplicated.id, origMeta);
+      }
+
+      // Clone questions if present
+      if (original.questions && original.questions.length > 0) {
+        for (const q of original.questions) {
+          const createdQ = await createQuestion({
+            examination: duplicated.id,
+            question_text: q.question_text,
+            question_type: q.question_type,
+            total_points: q.total_points,
+          });
+
+          if (q.options && q.options.length > 0) {
+            const sortedOptions = [...q.options].sort(
+              (a, b) => (b.is_correct ? 1 : 0) - (a.is_correct ? 1 : 0)
+            );
+            for (const opt of sortedOptions) {
+              await createQuestionOption({
+                question: createdQ.id,
+                option_text: opt.option_text,
+                is_correct: opt.is_correct,
+              });
+            }
+          }
+
+          if (q.rubric_criteria && q.rubric_criteria.length > 0) {
+            for (const rc of q.rubric_criteria) {
+              await createRubricCriterion({
+                question: createdQ.id,
+                criterion_text: rc.criterion_text,
+                point_weight: Number(rc.point_weight),
+              }).catch(() => {});
+            }
+          }
+        }
+      }
+
+      const finalExam = await getExamination(duplicated.id);
+      return transformExamToUi(finalExam);
+    } catch (err) {
+      console.error('Failed to duplicate exam:', err);
+      throw err;
     }
   },
 
@@ -391,12 +673,20 @@ export const lecturerService = {
   /**
    * Get recent activity
    */
-  async getRecentActivity(): Promise<any[]> {
+  async getRecentActivity(): Promise<unknown[]> {
     return [];
   },
 
   /**
-   * Schedule exam window
+   * Publish examination results via POST /api/v1/exams/{id}/publish
+   */
+  async publishExam(examId: string): Promise<LecturerExam> {
+    const published = await publishExamination(examId);
+    return transformExamToUi(published);
+  },
+
+  /**
+   * Schedule exam window via POST /api/v1/exams/{id}/schedule (or PATCH if already SCHEDULED)
    */
   async scheduleExam(
     examId: string,
@@ -408,16 +698,74 @@ export const lecturerService = {
       endDate?: string;
       durationMinutes?: number;
     }
-  ): Promise<void> {
-    const startWindow = data.start_window || data.startDate || new Date().toISOString();
-    const endWindow = data.end_window || data.endDate || new Date(Date.now() + 86400000).toISOString();
-    const durationMinutes = data.duration_minutes ?? data.durationMinutes ?? 60;
+  ): Promise<LecturerExam> {
+    const rawStart = data.startDate || data.start_window;
+    const rawEnd = data.endDate || data.end_window;
 
-    await patchExamination(examId, {
-      start_window: startWindow,
-      end_window: endWindow,
-      duration_minutes: durationMinutes,
+    if (!rawStart || !rawEnd) {
+      throw new Error('Start and End dates are required for scheduling.');
+    }
+
+    const startIso = toIsoStringFromDatetimeLocal(rawStart);
+    const endIso = toIsoStringFromDatetimeLocal(rawEnd);
+    const calculatedDuration = calculateDurationMinutes(rawStart, rawEnd);
+
+    if (!startIso || !endIso) {
+      throw new Error('Please enter valid start and end dates/times.');
+    }
+
+    const durationMinutes = calculatedDuration ?? data.duration_minutes ?? data.durationMinutes ?? 60;
+
+    try {
+      const scheduled = await scheduleExamination(examId, {
+        start_window: startIso,
+        end_window: endIso,
+        duration_minutes: Number(durationMinutes),
+      });
+
+      return transformExamToUi(scheduled);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (typeof detail === 'string' && detail.toLowerCase().includes('only draft')) {
+        // If already SCHEDULED, update via PATCH
+        const patched = await patchExamination(examId, {
+          start_window: startIso,
+          end_window: endIso,
+          duration_minutes: Number(durationMinutes),
+        });
+        return transformExamToUi(patched);
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Update an existing examination's schedule via PATCH /api/v1/exams/{id}
+   */
+  async updateExamSchedule(
+    examId: string,
+    data: {
+      startDate: string;
+      endDate: string;
+      durationMinutes?: number;
+    }
+  ): Promise<LecturerExam> {
+    const startIso = toIsoStringFromDatetimeLocal(data.startDate);
+    const endIso = toIsoStringFromDatetimeLocal(data.endDate);
+    const calculatedDuration = calculateDurationMinutes(data.startDate, data.endDate);
+    const duration = calculatedDuration ?? data.durationMinutes ?? 60;
+
+    if (!startIso || !endIso) {
+      throw new Error('Please enter valid start and end dates/times.');
+    }
+
+    const patched = await patchExamination(examId, {
+      start_window: startIso,
+      end_window: endIso,
+      duration_minutes: Number(duration),
     });
+
+    return transformExamToUi(patched);
   },
 
   /**

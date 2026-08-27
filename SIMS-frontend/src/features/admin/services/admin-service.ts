@@ -48,6 +48,10 @@ import type {
   CreditHourPolicyPayload,
   EnrollmentOverride,
   CreateEnrollmentOverridePayload,
+  TeachingAssignment,
+  CreateTeachingAssignmentPayload,
+  UpdateTeachingAssignmentPayload,
+  TeachingAssignmentFilterParams,
 } from '../types';
 import type { AdminAnalyticsResponse } from '@/types/api';
 
@@ -455,6 +459,31 @@ export const adminService = {
 
   async deleteTag(id: string): Promise<void> {
     return academicService.deleteTag(id);
+  },
+
+  // ── Teaching Assignments (SIMS API 7) ──────────────────────────────────────
+  async getTeachingAssignments(params?: TeachingAssignmentFilterParams): Promise<TeachingAssignment[]> {
+    return academicService.getTeachingAssignments(params);
+  },
+
+  async getTeachingAssignmentById(id: string): Promise<TeachingAssignment> {
+    return academicService.getTeachingAssignmentById(id);
+  },
+
+  async createTeachingAssignment(payload: CreateTeachingAssignmentPayload): Promise<TeachingAssignment> {
+    return academicService.createTeachingAssignment(payload);
+  },
+
+  async updateTeachingAssignment(id: string, payload: UpdateTeachingAssignmentPayload): Promise<TeachingAssignment> {
+    return academicService.updateTeachingAssignment(id, payload);
+  },
+
+  async patchTeachingAssignment(id: string, payload: Partial<UpdateTeachingAssignmentPayload>): Promise<TeachingAssignment> {
+    return academicService.patchTeachingAssignment(id, payload);
+  },
+
+  async deleteTeachingAssignment(id: string): Promise<void> {
+    return academicService.deleteTeachingAssignment(id);
   },
 
   async getAdminAnalytics(): Promise<AdminAnalyticsResponse> {

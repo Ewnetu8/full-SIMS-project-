@@ -15,11 +15,21 @@ export const examinationService = {
     // 1. Get Exam details from backend
     const exam: Examination = await studentService.getExamDetails(examId);
 
-    // 2. Start Exam Attempt
-    const attempt: ExamAttempt = await studentService.startExam(examId);
+    // 2. Start Exam Attempt (returns { attempt, questions })
+    const startResponse = await studentService.startExam(examId);
+    console.log('[START EXAM RESPONSE]', startResponse);
+
+    const attempt: ExamAttempt = (startResponse as any)?.attempt || (startResponse as any);
+    console.log('[START EXAM ATTEMPT]', attempt);
+    console.log('[START EXAM ATTEMPT ID]', attempt?.id);
+
+    const rawQuestions: Question[] =
+      Array.isArray((startResponse as any)?.questions) && (startResponse as any).questions.length > 0
+        ? (startResponse as any).questions
+        : exam.questions || [];
 
     // 3. Map Questions
-    const mappedQuestions: ExaminationQuestion[] = (exam.questions || []).map((q: Question) => ({
+    const mappedQuestions: ExaminationQuestion[] = rawQuestions.map((q: Question) => ({
       id: q.id,
       type: (q.question_type as any) || 'MCQ',
       prompt: q.question_text,
@@ -29,6 +39,16 @@ export const examinationService = {
         text: opt.option_text,
       })),
     }));
+
+    console.log(
+      '[MAPPED QUESTIONS]',
+      mappedQuestions.map((q) => ({
+        id: q.id,
+        prompt: q.prompt,
+        marks: q.marks,
+        options: q.options,
+      }))
+    );
 
     const durationSeconds = (exam.duration_minutes || 60) * 60;
     const totalMarks = mappedQuestions.reduce((acc, q) => acc + q.marks, 0);

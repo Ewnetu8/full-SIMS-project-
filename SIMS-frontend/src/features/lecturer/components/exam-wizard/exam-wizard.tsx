@@ -9,6 +9,8 @@ import { ROUTES } from '@/constants';
 
 import { useLecturerStore } from '../../store';
 
+import { toDatetimeLocalValue, calculateDurationMinutes } from '@/utils/date';
+
 import { StepBasicInfo } from './step-basic-info';
 import { StepQuestionBuilder } from './step-question-builder';
 import { StepReview } from './step-review';
@@ -31,16 +33,20 @@ export function ExamWizard({ initialExam }: ExamWizardProps) {
 
   React.useEffect(() => {
     if (initialExam) {
+      const startLocal = toDatetimeLocalValue(initialExam.startDate);
+      const endLocal = toDatetimeLocalValue(initialExam.endDate);
+      const calculatedDuration = calculateDurationMinutes(startLocal, endLocal) ?? initialExam.durationMinutes ?? 0;
+
       setEditingExam(initialExam.id, {
         title: initialExam.title,
         courseId: initialExam.courseId,
         description: initialExam.description,
         instructions: initialExam.instructions.join('\n'),
-        durationMinutes: initialExam.durationMinutes,
+        durationMinutes: calculatedDuration,
         totalMarks: initialExam.totalMarks,
         passingScore: initialExam.passingScore,
-        startDate: initialExam.startDate.slice(0, 16),
-        endDate: initialExam.endDate.slice(0, 16),
+        startDate: startLocal,
+        endDate: endLocal,
         randomizeQuestions: initialExam.randomizeQuestions,
         allowMultipleAttempts: initialExam.allowMultipleAttempts,
         autoSubmitOnTimeout: initialExam.autoSubmitOnTimeout,
@@ -89,7 +95,7 @@ export function ExamWizard({ initialExam }: ExamWizardProps) {
             {initialExam ? 'Edit Examination' : 'Create New Examination'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Complete all steps to build and publish your exam.
+            Complete all steps to build and schedule your exam.
           </p>
         </div>
         <Button

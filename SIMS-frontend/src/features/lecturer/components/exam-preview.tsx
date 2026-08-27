@@ -6,17 +6,17 @@ import * as React from 'react';
 
 import { Badge, Button, Card, CardContent } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { formatDurationMinutes } from '@/utils/date';
 
 import { lecturerService } from '../services';
 
 import type { LecturerExam } from '../types';
 
 const TYPE_LABELS: Record<string, string> = {
+  MCQ: 'Multiple Choice',
+  TRUE_FALSE: 'True / False',
   multiple_choice: 'Multiple Choice',
-  multiple_select: 'Multiple Select',
   true_false: 'True / False',
-  short_answer: 'Short Answer',
-  essay: 'Essay',
 };
 
 interface ExamPreviewProps {
@@ -76,7 +76,7 @@ export function ExamPreview({ examId }: ExamPreviewProps) {
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 text-sm rounded-xl border border-border bg-muted/30 p-4">
           <div>
             <p className="text-xs text-muted-foreground">Duration</p>
-            <p className="font-medium">{exam.durationMinutes} minutes</p>
+            <p className="font-medium">{formatDurationMinutes(exam.durationMinutes)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Marks</p>
@@ -122,8 +122,8 @@ export function ExamPreview({ examId }: ExamPreviewProps) {
                 </div>
               </div>
 
-              {/* Answer input simulation */}
-              {(q.type === 'multiple_choice' || q.type === 'true_false') && q.options && (
+              {/* Answer input simulation (MCQ & True/False) */}
+              {q.options && q.options.length > 0 && (
                 <div className="space-y-2">
                   {q.options.map((opt) => (
                     <label
@@ -135,38 +135,6 @@ export function ExamPreview({ examId }: ExamPreviewProps) {
                     </label>
                   ))}
                 </div>
-              )}
-
-              {q.type === 'multiple_select' && q.options && (
-                <div className="space-y-2">
-                  {q.options.map((opt) => (
-                    <label
-                      key={opt.id}
-                      className="flex items-center gap-3 rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                    >
-                      <input type="checkbox" className="accent-primary" disabled />
-                      <span className="text-sm">{opt.text}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {q.type === 'short_answer' && (
-                <input
-                  type="text"
-                  disabled
-                  placeholder="Student types their answer here..."
-                  className="w-full rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground"
-                />
-              )}
-
-              {q.type === 'essay' && (
-                <textarea
-                  disabled
-                  rows={5}
-                  placeholder="Student types their essay response here..."
-                  className="w-full rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground resize-none"
-                />
               )}
             </CardContent>
           </Card>

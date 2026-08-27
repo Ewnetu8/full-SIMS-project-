@@ -41,33 +41,12 @@ import { ExamAnalyticsView } from '@/features/analytics/components/exam-analytic
 
 import { useAdminStore } from '../store';
 import type { AdminExamOverview, ExaminationStatus } from '../types';
-
-// Helpers to handle HTML datetime-local inputs
-function toDatetimeLocalValue(isoString?: string | null): string {
-  if (!isoString) return '';
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return '';
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const year = d.getFullYear();
-    const month = pad(d.getMonth() + 1);
-    const day = pad(d.getDate());
-    const hours = pad(d.getHours());
-    const minutes = pad(d.getMinutes());
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  } catch {
-    return '';
-  }
-}
-
-function toIsoStringFromDatetimeLocal(localString: string): string {
-  if (!localString) return '';
-  try {
-    return new Date(localString).toISOString();
-  } catch {
-    return '';
-  }
-}
+import {
+  calculateDurationMinutes,
+  formatDurationMinutes,
+  toDatetimeLocalValue,
+  toIsoStringFromDatetimeLocal,
+} from '@/utils/date';
 
 function getStatusBadgeVariant(status: ExaminationStatus): 'default' | 'secondary' | 'success' | 'destructive' | 'warning' | 'outline' {
   switch (status) {
@@ -82,7 +61,7 @@ function getStatusBadgeVariant(status: ExaminationStatus): 'default' | 'secondar
     case 'PUBLISHED':
       return 'success';
     default:
-      return 'secondary';
+      return 'outline';
   }
 }
 
@@ -107,26 +86,31 @@ export function ExaminationManagement() {
     setExamCourseOfferingFilter,
   } = useAdminStore();
 
-  // Dialog / Modal States
   const [selectedExam, setSelectedExam] = React.useState<AdminExamOverview | null>(null);
   const [detailTab, setDetailTab] = React.useState<'overview' | 'results' | 'analytics'>('overview');
-  const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   const [editingExam, setEditingExam] = React.useState<AdminExamOverview | null>(null);
   const [schedulingExam, setSchedulingExam] = React.useState<AdminExamOverview | null>(null);
   const [publishingExam, setPublishingExam] = React.useState<AdminExamOverview | null>(null);
   const [deletingExam, setDeletingExam] = React.useState<AdminExamOverview | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
 
   // Form State
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
 
-  const [formData, setFormData] = React.useState({
+  const [formData, setFormData] = React.useState<{
+    course_offering: string;
+    title: string;
+    start_window: string;
+    end_window: string;
+    duration_minutes: number;
+  }>({
     course_offering: '',
     title: '',
     start_window: '',
     end_window: '',
-    duration_minutes: 60,
+    duration_minutes: 0,
   });
 
   // Initial Data Fetch
@@ -141,16 +125,12 @@ export function ExaminationManagement() {
   const handleOpenCreateModal = () => {
     setFormError(null);
     setFieldErrors({});
-    const now = new Date();
-    const futureStart = new Date(now.getTime() + 24 * 60 * 60 * 1000); // tomorrow
-    const futureEnd = new Date(futureStart.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
-
     setFormData({
       course_offering: courseOfferings[0]?.id || '',
       title: '',
-      start_window: toDatetimeLocalValue(futureStart.toISOString()),
-      end_window: toDatetimeLocalValue(futureEnd.toISOString()),
-      duration_minutes: 60,
+      start_window: '',
+      end_window: '',
+      duration_minutes: 0,
     });
     setIsCreateModalOpen(true);
   };
@@ -159,12 +139,16 @@ export function ExaminationManagement() {
     setFormError(null);
     setFieldErrors({});
     setEditingExam(exam);
+    const startVal = toDatetimeLocalValue(exam.start_window);
+    const endVal = toDatetimeLocalValue(exam.end_window);
+    const dur = calculateDurationMinutes(startVal, endVal) ?? exam.duration_minutes ?? exam.durationMinutes ?? 0;
+
     setFormData({
       course_offering: exam.course_offering || exam.course_offering_detail?.id || '',
       title: exam.title,
-      start_window: toDatetimeLocalValue(exam.start_window),
-      end_window: toDatetimeLocalValue(exam.end_window),
-      duration_minutes: exam.duration_minutes || exam.durationMinutes || 60,
+      start_window: startVal,
+      end_window: endVal,
+      duration_minutes: dur,
     });
   };
 
@@ -172,16 +156,16 @@ export function ExaminationManagement() {
     setFormError(null);
     setFieldErrors({});
     setSchedulingExam(exam);
-    const now = new Date();
-    const defaultStart = exam.start_window ? new Date(exam.start_window) : new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const defaultEnd = exam.end_window ? new Date(exam.end_window) : new Date(defaultStart.getTime() + 2 * 60 * 60 * 1000);
+    const startVal = toDatetimeLocalValue(exam.start_window);
+    const endVal = toDatetimeLocalValue(exam.end_window);
+    const dur = calculateDurationMinutes(startVal, endVal) ?? exam.duration_minutes ?? 0;
 
     setFormData({
       course_offering: exam.course_offering || '',
       title: exam.title,
-      start_window: toDatetimeLocalValue(defaultStart.toISOString()),
-      end_window: toDatetimeLocalValue(defaultEnd.toISOString()),
-      duration_minutes: exam.duration_minutes || 60,
+      start_window: startVal,
+      end_window: endVal,
+      duration_minutes: dur,
     });
   };
 
@@ -207,7 +191,9 @@ export function ExaminationManagement() {
         errors.end_window = 'End window must be after the start window.';
       }
     }
-    if (!formData.duration_minutes || Number(formData.duration_minutes) <= 0) {
+    const calculatedDuration = calculateDurationMinutes(formData.start_window, formData.end_window);
+    const duration = calculatedDuration ?? (formData.duration_minutes === 0 ? NaN : Number(formData.duration_minutes));
+    if (isNaN(duration) || duration <= 0) {
       errors.duration_minutes = 'Duration must be at least 1 minute.';
     }
 
@@ -962,7 +948,13 @@ export function ExaminationManagement() {
                       type="datetime-local"
                       value={formData.start_window}
                       onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, start_window: e.target.value }));
+                        const newStart = e.target.value;
+                        const dur = calculateDurationMinutes(newStart, formData.end_window);
+                        setFormData((prev) => ({
+                          ...prev,
+                          start_window: newStart,
+                          duration_minutes: dur ?? 0,
+                        }));
                         if (fieldErrors.start_window) setFieldErrors((p) => ({ ...p, start_window: '' }));
                       }}
                       error={!!fieldErrors.start_window}
@@ -981,7 +973,13 @@ export function ExaminationManagement() {
                       type="datetime-local"
                       value={formData.end_window}
                       onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, end_window: e.target.value }));
+                        const newEnd = e.target.value;
+                        const dur = calculateDurationMinutes(formData.start_window, newEnd);
+                        setFormData((prev) => ({
+                          ...prev,
+                          end_window: newEnd,
+                          duration_minutes: dur ?? 0,
+                        }));
                         if (fieldErrors.end_window) setFieldErrors((p) => ({ ...p, end_window: '' }));
                       }}
                       error={!!fieldErrors.end_window}
@@ -993,21 +991,23 @@ export function ExaminationManagement() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="create-exam-duration" required>
-                    Duration (Minutes)
+                  <Label htmlFor="create-exam-duration">
+                    Duration (Calculated Automatically)
                   </Label>
                   <Input
                     id="create-exam-duration"
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={formData.duration_minutes}
-                    onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }));
-                      if (fieldErrors.duration_minutes) setFieldErrors((p) => ({ ...p, duration_minutes: '' }));
-                    }}
-                    error={!!fieldErrors.duration_minutes}
+                    type="text"
+                    readOnly
+                    disabled
+                    value={formatDurationMinutes(
+                      calculateDurationMinutes(formData.start_window, formData.end_window) ??
+                        (Number(formData.duration_minutes) || null)
+                    )}
+                    className="bg-muted/50 font-medium cursor-not-allowed"
                   />
+                  <p className="text-2xs text-muted-foreground">
+                    Automatically calculated from start and end window.
+                  </p>
                   {fieldErrors.duration_minutes && (
                     <p className="text-xs text-destructive font-medium">{fieldErrors.duration_minutes}</p>
                   )}
@@ -1086,7 +1086,13 @@ export function ExaminationManagement() {
                       type="datetime-local"
                       value={formData.start_window}
                       onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, start_window: e.target.value }));
+                        const newStart = e.target.value;
+                        const dur = calculateDurationMinutes(newStart, formData.end_window);
+                        setFormData((prev) => ({
+                          ...prev,
+                          start_window: newStart,
+                          duration_minutes: dur ?? 0,
+                        }));
                         if (fieldErrors.start_window) setFieldErrors((p) => ({ ...p, start_window: '' }));
                       }}
                       error={!!fieldErrors.start_window}
@@ -1105,7 +1111,13 @@ export function ExaminationManagement() {
                       type="datetime-local"
                       value={formData.end_window}
                       onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, end_window: e.target.value }));
+                        const newEnd = e.target.value;
+                        const dur = calculateDurationMinutes(formData.start_window, newEnd);
+                        setFormData((prev) => ({
+                          ...prev,
+                          end_window: newEnd,
+                          duration_minutes: dur ?? 0,
+                        }));
                         if (fieldErrors.end_window) setFieldErrors((p) => ({ ...p, end_window: '' }));
                       }}
                       error={!!fieldErrors.end_window}
@@ -1117,21 +1129,23 @@ export function ExaminationManagement() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="edit-exam-duration" required>
-                    Duration (Minutes)
+                  <Label htmlFor="edit-exam-duration">
+                    Duration (Calculated Automatically)
                   </Label>
                   <Input
                     id="edit-exam-duration"
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={formData.duration_minutes}
-                    onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }));
-                      if (fieldErrors.duration_minutes) setFieldErrors((p) => ({ ...p, duration_minutes: '' }));
-                    }}
-                    error={!!fieldErrors.duration_minutes}
+                    type="text"
+                    readOnly
+                    disabled
+                    value={formatDurationMinutes(
+                      calculateDurationMinutes(formData.start_window, formData.end_window) ??
+                        (Number(formData.duration_minutes) || null)
+                    )}
+                    className="bg-muted/50 font-medium cursor-not-allowed"
                   />
+                  <p className="text-2xs text-muted-foreground">
+                    Automatically calculated from start and end window.
+                  </p>
                   {fieldErrors.duration_minutes && (
                     <p className="text-xs text-destructive font-medium">{fieldErrors.duration_minutes}</p>
                   )}
@@ -1199,7 +1213,13 @@ export function ExaminationManagement() {
                       type="datetime-local"
                       value={formData.start_window}
                       onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, start_window: e.target.value }));
+                        const newStart = e.target.value;
+                        const dur = calculateDurationMinutes(newStart, formData.end_window);
+                        setFormData((prev) => ({
+                          ...prev,
+                          start_window: newStart,
+                          duration_minutes: dur ?? 0,
+                        }));
                         if (fieldErrors.start_window) setFieldErrors((p) => ({ ...p, start_window: '' }));
                       }}
                       error={!!fieldErrors.start_window}
@@ -1218,7 +1238,13 @@ export function ExaminationManagement() {
                       type="datetime-local"
                       value={formData.end_window}
                       onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, end_window: e.target.value }));
+                        const newEnd = e.target.value;
+                        const dur = calculateDurationMinutes(formData.start_window, newEnd);
+                        setFormData((prev) => ({
+                          ...prev,
+                          end_window: newEnd,
+                          duration_minutes: dur ?? 0,
+                        }));
                         if (fieldErrors.end_window) setFieldErrors((p) => ({ ...p, end_window: '' }));
                       }}
                       error={!!fieldErrors.end_window}
@@ -1230,21 +1256,23 @@ export function ExaminationManagement() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="sched-exam-duration" required>
-                    Duration (Minutes)
+                  <Label htmlFor="sched-exam-duration">
+                    Duration (Calculated Automatically)
                   </Label>
                   <Input
                     id="sched-exam-duration"
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={formData.duration_minutes}
-                    onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, duration_minutes: Number(e.target.value) }));
-                      if (fieldErrors.duration_minutes) setFieldErrors((p) => ({ ...p, duration_minutes: '' }));
-                    }}
-                    error={!!fieldErrors.duration_minutes}
+                    type="text"
+                    readOnly
+                    disabled
+                    value={formatDurationMinutes(
+                      calculateDurationMinutes(formData.start_window, formData.end_window) ??
+                        (Number(formData.duration_minutes) || null)
+                    )}
+                    className="bg-muted/50 font-medium cursor-not-allowed"
                   />
+                  <p className="text-2xs text-muted-foreground">
+                    Automatically calculated from start and end window.
+                  </p>
                   {fieldErrors.duration_minutes && (
                     <p className="text-xs text-destructive font-medium">{fieldErrors.duration_minutes}</p>
                   )}

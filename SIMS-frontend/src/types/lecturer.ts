@@ -56,7 +56,7 @@ export interface CreateQuestionRequest {
 /**
  * Request body for updating a question (partial).
  */
-export interface UpdateQuestionRequest extends Partial<CreateQuestionRequest> {}
+export type UpdateQuestionRequest = Partial<CreateQuestionRequest>;
 
 /**
  * Request body for creating a question option.
@@ -75,6 +75,11 @@ export interface CreateRubricCriterionRequest {
   criterion_text: string;
   point_weight: number;
 }
+
+/**
+ * Request body for updating a rubric criterion (partial).
+ */
+export type UpdateRubricCriterionRequest = Partial<CreateRubricCriterionRequest>;
 
 /**
  * Request body for creating a tag.
@@ -109,9 +114,9 @@ export interface CourseOfferingBrief {
   id: string;
   course_code: string;
   course_title: string;
-  semester: string; // e.g., "2024-2025"
-  semester_index: 'FIRST' | 'SECOND' | 'SUMMER';
-  section: string;
+  semester: string; // Academic year label e.g., "2024-2025"
+  semester_index: string; // e.g., "FIRST", "SECOND", "1", "2"
+  section?: string;
 }
 
 export interface Examination extends BaseModel {
@@ -248,8 +253,26 @@ export interface CourseOffering extends BaseModel {
 
 export type EnrollmentStatus = 'ENROLLED' | 'PASSED' | 'FAILED' | 'DROPPED';
 
+export interface StudentBrief {
+  id: string;
+  student_identifier: string;
+  full_name: string;
+}
+
+export interface StudentListItem {
+  id: string;
+  student_identifier: string;
+  user_full_name: string;
+  user_email: string;
+  class_standing?: string;
+  department?: string | null;
+}
+
 export interface Enrollment extends BaseModel {
   student: string; // UUID reference
+  student_detail?: StudentBrief | StudentListItem | null;
+  student_identifier?: string;
+  student_name?: string;
   course_offering: string; // UUID reference
   course_offering_detail: CourseOffering;
   status: EnrollmentStatus;

@@ -1,7 +1,9 @@
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_logged_in, user_logged_out
-from django.middleware.csrf import CsrfViewMiddleware
+from django.middleware.csrf import CsrfViewMiddleware, get_token
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 from django.core.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -9,6 +11,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from drf_spectacular.utils import (
     extend_schema,
     OpenApiExample,
@@ -98,7 +101,10 @@ _ErrorOut = inline_serializer(
 )
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class RegisterView(APIView):
+    """Register a new student or lecturer user."""
+
     permission_classes = [AllowAny]
     throttle_classes = [AuthRateThrottle]
 
@@ -106,45 +112,19 @@ class RegisterView(APIView):
         tags=['Authentication'],
         summary='Register a new user',
         description=(
-            'Creates a new user account. '
-            'A **Student** must supply `student_identifier`. '
-            'A **Lecturer** must supply `faculty_identifier`. '
-            'On success the refresh token is returned as an **HttpOnly cookie** '
-            'and the short-lived access token is returned in the response body.'
+            'Registers a new `STUDENT` or `LECTURER` account. '
+            'Requires a valid institutional email domain (`aastu.edu.et` or subdomains). '
+            'Returns a JWT access token and sets an HttpOnly refresh cookie.'
         ),
         request=UserRegisterSerializer,
         responses={
             201: OpenApiResponse(
                 response=_AuthSuccess,
-                description='User registered successfully. Refresh token set as HttpOnly cookie.',
-                examples=[
-                    OpenApiExample(
-                        name='Student registration success',
-                        value={
-                            'user': {
-                                'id': '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-                                'email': 'student@sims.edu',
-                                'first_name': 'Abebe',
-                                'last_name': 'Kebede',
-                                'role': 'STUDENT',
-                                'created_at': '2024-01-15T10:30:00Z',
-                            },
-                            'access': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-                        },
-                        response_only=True,
-                    )
-                ],
+                description='Account created successfully.',
             ),
             400: OpenApiResponse(
                 response=_ErrorOut,
-                description='Validation error – check request body.',
-                examples=[
-                    OpenApiExample(
-                        name='Missing student_identifier',
-                        value={'student_identifier': ['Student identifier is required for Student registration.']},
-                        response_only=True,
-                    )
-                ],
+                description='Validation error (e.g. weak password, non-institutional email, missing role identifier).',
             ),
         },
         examples=[
@@ -177,6 +157,7 @@ class RegisterView(APIView):
         ],
     )
     def post(self, request):
+        get_token(request)
         serializer = UserRegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -212,6 +193,7 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginView(APIView):
     """Authenticate and obtain JWT tokens."""
 
@@ -278,6 +260,7 @@ class LoginView(APIView):
         auth=[],  # No auth required
     )
     def post(self, request):
+        get_token(request)
         email = request.data.get('email')
         password = request.data.get('password')
 
@@ -338,19 +321,20 @@ class LoginView(APIView):
         )
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class CookieTokenRefreshView(APIView):
-    """Silently refresh the access token using the HttpOnly refresh-token cookie."""
+    """Silently refresh the access token using the HttpOnly refresh-token cookie or JSON body."""
 
     permission_classes = [AllowAny]
     throttle_classes = [AuthRateThrottle]
 
     @extend_schema(
         tags=['Authentication'],
-        summary='Refresh access token (cookie-based)',
+        summary='Refresh access token (cookie-based or body-based)',
         description=(
-            'Uses the **HttpOnly `refresh_token` cookie** (set on login/register) to issue '
-            'a new short-lived access token. '
-            'This endpoint requires a valid CSRF token in the `X-CSRFToken` header. '
+            'Uses the **HttpOnly `refresh_token` cookie** (set on login/register) or JSON request body '
+            'to issue a new short-lived access token. '
+            'Cookie-based requests require a valid CSRF token in the `X-CSRFToken` header. '
             'If `ROTATE_REFRESH_TOKENS` is enabled the old cookie is replaced with a new one.'
         ),
         request=None,
@@ -381,9 +365,9 @@ class CookieTokenRefreshView(APIView):
         auth=[],
     )
     def post(self, request):
-        enforce_csrf(request)
-
-        refresh_token = request.COOKIES.get(settings.JWT_AUTH_COOKIE)
+        cookie_refresh = request.COOKIES.get(settings.JWT_AUTH_COOKIE)
+        body_refresh = request.data.get('refresh') or request.data.get('refresh_token')
+        refresh_token = cookie_refresh or body_refresh
 
         if not refresh_token:
             return Response(
@@ -391,19 +375,34 @@ class CookieTokenRefreshView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        if cookie_refresh:
+            enforce_csrf(request)
+
         try:
             refresh = RefreshToken(refresh_token)
             user_id = refresh[settings.SIMPLE_JWT['USER_ID_CLAIM']]
             user = User.objects.get(id=user_id)
-            access_token = refresh.access_token
+            if not user.is_active:
+                return Response(
+                    {'detail': 'Invalid or expired refresh token.'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
 
-            response = Response({'access': str(access_token)}, status=status.HTTP_200_OK)
+            access_token = refresh.access_token
+            response_data = {'access': str(access_token)}
 
             if settings.SIMPLE_JWT.get('ROTATE_REFRESH_TOKENS'):
                 if settings.SIMPLE_JWT.get('BLACKLIST_AFTER_ROTATION'):
-                    refresh.blacklist()
+                    try:
+                        refresh.blacklist()
+                    except AttributeError:
+                        pass
 
                 new_refresh = RefreshToken.for_user(user)
+                if body_refresh:
+                    response_data['refresh'] = str(new_refresh)
+
+                response = Response(response_data, status=status.HTTP_200_OK)
                 response.set_cookie(
                     key=settings.JWT_AUTH_COOKIE,
                     value=str(new_refresh),
@@ -412,16 +411,21 @@ class CookieTokenRefreshView(APIView):
                     path=settings.JWT_AUTH_COOKIE_PATH,
                     samesite=settings.JWT_AUTH_COOKIE_SAMESITE,
                 )
+            else:
+                if body_refresh:
+                    response_data['refresh'] = str(refresh)
+                response = Response(response_data, status=status.HTTP_200_OK)
 
             return response
 
-        except Exception:
+        except (TokenError, InvalidToken, User.DoesNotExist, Exception):
             return Response(
                 {'detail': 'Invalid or expired refresh token.'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class LogoutView(APIView):
     """Invalidate the refresh token and clear the cookie."""
 
@@ -433,7 +437,7 @@ class LogoutView(APIView):
         description=(
             'Blacklists the current refresh token stored in the HttpOnly cookie and '
             'deletes that cookie from the browser. '
-            'Requires a valid CSRF token in the `X-CSRFToken` header. '
+            'Requires a valid CSRF token in the `X-CSRFToken` header when cookie-based. '
             'The access token must be discarded client-side (it cannot be revoked server-side).'
         ),
         request=None,
@@ -453,9 +457,13 @@ class LogoutView(APIView):
         auth=[],
     )
     def post(self, request):
-        enforce_csrf(request)
+        cookie_refresh = request.COOKIES.get(settings.JWT_AUTH_COOKIE)
+        body_refresh = request.data.get('refresh') or request.data.get('refresh_token')
+        refresh_token = cookie_refresh or body_refresh
 
-        refresh_token = request.COOKIES.get(settings.JWT_AUTH_COOKIE)
+        if cookie_refresh:
+            enforce_csrf(request)
+
         actor = None
 
         if refresh_token:
@@ -745,6 +753,7 @@ class MFADisableView(APIView):
         return Response({'detail': 'MFA disabled successfully.'})
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class MFALoginView(APIView):
     """Second step of login for MFA-enabled users: verify TOTP or backup code."""
 
@@ -766,6 +775,7 @@ class MFALoginView(APIView):
         },
     )
     def post(self, request):
+        get_token(request)
         serializer = MFALoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

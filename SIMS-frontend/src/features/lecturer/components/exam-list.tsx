@@ -1,27 +1,28 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Archive,
+  AlertCircle,
   Calendar,
-  ChevronDown,
+  CheckCircle2,
+  Clock,
   Copy,
   Eye,
-  Filter,
+  FileQuestion,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
-  Search,
+  RefreshCw,
   Trash2,
   Upload,
   Users,
-  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
-import { toast } from '@/components/feedback';
+import { EmptyState, toast } from '@/components/feedback';
 import {
   Badge,
   Button,
@@ -29,12 +30,14 @@ import {
   CardContent,
   Dialog,
   DialogBody,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   Input,
+  SearchInput,
   Select,
   SelectContent,
   SelectItem,
@@ -42,6 +45,11 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import {
+  calculateDurationMinutes,
+  formatDurationMinutes,
+  toDatetimeLocalValue,
+} from '@/utils/date';
 
 import { lecturerService } from '../services';
 import { useLecturerStore } from '../store';
@@ -56,102 +64,279 @@ export function ExamList() {
   const [exams, setExams] = React.useState<LecturerExam[]>([]);
   const [courses, setCourses] = React.useState<Course[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [deletingId, setDeletingId] = React.useState<string | null>(null);
-  const [publishingId, setPublishingId] = React.useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = React.useState<LecturerExam | null>(null);
-  const [confirmPublish, setConfirmPublish] = React.useState<LecturerExam | null>(null);
-  const [actionMenuId, setActionMenuId] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const [deletingExam, setDeletingExam] = React.useState<LecturerExam | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  const [publishingExam, setPublishingExam] = React.useState<LecturerExam | null>(null);
+  const [isPublishing, setIsPublishing] = React.useState(false);
 
   const [schedulingExam, setSchedulingExam] = React.useState<LecturerExam | null>(null);
-  const [scheduleForm, setScheduleForm] = React.useState({ startDate: '', endDate: '', durationMinutes: 60 });
+  const [scheduleForm, setScheduleForm] = React.useState<{
+    startDate: string;
+    endDate: string;
+  }>({ startDate: '', endDate: '' });
+  const [scheduleError, setScheduleError] = React.useState<string | null>(null);
   const [isScheduling, setIsScheduling] = React.useState(false);
 
-  const handleScheduleSubmit = async () => {
-    if (!schedulingExam) return;
-    if (!scheduleForm.startDate || !scheduleForm.endDate) {
-      toast.error('Missing dates', { description: 'Start and End dates are required.' });
+  const [actionMenuId, setActionMenuId] = React.useState<string | null>(null);
+
+  const fetchExams = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const backendParams: import('@/types/lecturer').ListExaminationsParams = {};
+      if (statusFilter !== 'ALL') {
+        backendParams.status = statusFilter;
+      }
+      if (courseFilter !== 'ALL') {
+        backendParams.course_offering = courseFilter;
+      }
+
+      const [loadedExams, loadedCourses] = await Promise.all([
+        lecturerService.getExams(backendParams),
+        lecturerService.getCourses(),
+      ]);
+
+      setExams(loadedExams);
+      setCourses(loadedCourses);
+    } catch (err: any) {
+      console.error('Failed to load exams:', err);
+      const status = err?.response?.status;
+      if (status === 401) {
+        setError('Unauthorized. Please sign in to view your examinations.');
+      } else if (status === 403) {
+        setError('You do not have permission to view examinations.');
+      } else {
+        setError(err?.message || 'Failed to load examinations. Please check your connection.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, courseFilter]);
+
+  React.useEffect(() => {
+    fetchExams();
+  }, [fetchExams]);
+
+  // Lightweight polling for dynamic status updates (SCHEDULED/ACTIVE exams)
+  React.useEffect(() => {
+    const hasDynamicExams = exams.some(
+      (e) => e.status === 'SCHEDULED' || e.status === 'ACTIVE'
+    );
+    if (!hasDynamicExams) return;
+
+    const interval = setInterval(() => {
+      fetchExams();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [exams, fetchExams]);
+
+  const filtered = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return exams;
+    return exams.filter(
+      (exam) =>
+        exam.title.toLowerCase().includes(q) ||
+        exam.courseCode.toLowerCase().includes(q) ||
+        exam.courseName.toLowerCase().includes(q),
+    );
+  }, [exams, searchQuery]);
+
+  function handleOpenScheduleModal(exam: LecturerExam) {
+    console.log('[SCHEDULE DEBUG] Selected exam', exam);
+    const startDate = exam.startDate ? toDatetimeLocalValue(exam.startDate) : '';
+    const endDate = exam.endDate ? toDatetimeLocalValue(exam.endDate) : '';
+    console.log('[SCHEDULE DEBUG] Schedule form', { startDate, endDate });
+
+    setSchedulingExam(exam);
+    setScheduleForm({
+      startDate,
+      endDate,
+    });
+    setScheduleError(null);
+  }
+
+  const calculatedDuration = calculateDurationMinutes(scheduleForm.startDate, scheduleForm.endDate);
+
+  async function handleDeleteConfirm() {
+    if (!deletingExam) return;
+
+    if (deletingExam.status !== 'DRAFT') {
+      toast.error('Cannot Delete Examination', {
+        description: `${deletingExam.status} examinations cannot be deleted. Only DRAFT examinations can be deleted.`,
+      });
+      setDeletingExam(null);
       return;
     }
+
+    setIsDeleting(true);
+    try {
+      await lecturerService.deleteExam(deletingExam.id);
+      setExams((prev) => prev.filter((e) => e.id !== deletingExam.id));
+      toast.success('Examination deleted', {
+        description: `"${deletingExam.title}" was permanently removed.`,
+      });
+      setDeletingExam(null);
+    } catch (err: any) {
+      console.error('[DELETE EXAM ERROR]', {
+        status: err?.response?.status,
+        data: err?.response?.data,
+      });
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || err?.message;
+      if (status === 409) {
+        toast.error('Cannot Delete Examination', {
+          description: detail || 'This examination cannot be deleted because student attempts already exist.',
+        });
+      } else if (status === 403) {
+        toast.error('Permission Denied', {
+          description: detail || 'You do not have permission to delete this examination.',
+        });
+      } else if (status === 404) {
+        toast.error('Not Found', {
+          description: 'Examination not found or already deleted.',
+        });
+      } else if (status === 400) {
+        toast.error('Cannot Delete Examination', {
+          description: detail || 'Validation error while attempting deletion.',
+        });
+      } else {
+        toast.error('Delete Failed', {
+          description: detail || 'Could not delete examination.',
+        });
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleScheduleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!schedulingExam) return;
+    setScheduleError(null);
+
+    if (!scheduleForm.startDate || !scheduleForm.endDate) {
+      setScheduleError('Please enter both start and end dates/times.');
+      return;
+    }
+
+    const start = new Date(scheduleForm.startDate);
+    const end = new Date(scheduleForm.endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      setScheduleError('Please enter valid start and end dates/times.');
+      return;
+    }
+
+    if (end <= start) {
+      setScheduleError('End time must be after start time.');
+      return;
+    }
+
+    if (!calculatedDuration || calculatedDuration <= 0) {
+      setScheduleError('Duration must be greater than 0 minutes.');
+      return;
+    }
+
     setIsScheduling(true);
     try {
-      await lecturerService.scheduleExam(schedulingExam.id, scheduleForm);
-      toast.success('Exam Scheduled', { description: `Exam windows updated via DRF schedule API.` });
-      setExams((prev) =>
-        prev.map((e) =>
-          e.id === schedulingExam.id
-            ? { ...e, startDate: scheduleForm.startDate, endDate: scheduleForm.endDate, durationMinutes: scheduleForm.durationMinutes }
-            : e
-        )
-      );
+      const schedulePayload = {
+        startDate: scheduleForm.startDate,
+        endDate: scheduleForm.endDate,
+        durationMinutes: calculatedDuration,
+      };
+      console.log('[SCHEDULE DEBUG] Schedule payload', schedulePayload);
+      const updated = await lecturerService.scheduleExam(schedulingExam.id, schedulePayload);
+      console.log('[SCHEDULE DEBUG] Updated exam', updated);
+
+      setExams((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      toast.success(schedulingExam.status === 'SCHEDULED' ? 'Schedule Updated' : 'Examination Scheduled', {
+        description: `Examination window set to ${formatDurationMinutes(updated.durationMinutes)}.`,
+      });
       setSchedulingExam(null);
+      fetchExams();
     } catch (err: any) {
-      toast.error('Schedule failed', { description: err?.message || 'Could not schedule examination.' });
+      const responseData = err?.response?.data;
+      const detail =
+        responseData?.detail ||
+        (Array.isArray(responseData?.errors) ? responseData.errors.join('. ') : undefined) ||
+        err?.message;
+      setScheduleError(detail || 'Failed to schedule exam. Ensure all questions are objective/auto-gradable.');
+      toast.error('Scheduling Failed', {
+        description: detail || 'Validation error while scheduling.',
+      });
     } finally {
       setIsScheduling(false);
     }
-  };
-
-  React.useEffect(() => {
-    async function load() {
-      const [e, c] = await Promise.all([lecturerService.getExams(), lecturerService.getCourses()]);
-      setExams(e);
-      setCourses(c);
-      setLoading(false);
-    }
-    load();
-  }, []);
-
-  const filtered = exams.filter((exam) => {
-    const matchesSearch =
-      !searchQuery ||
-      exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      exam.courseCode.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || exam.status === statusFilter;
-    const matchesCourse = courseFilter === 'ALL' || exam.courseId === courseFilter;
-    return matchesSearch && matchesStatus && matchesCourse;
-  });
-
-  async function handleDelete(exam: LecturerExam) {
-    setDeletingId(exam.id);
-    await lecturerService.deleteExam(exam.id);
-    setExams((prev) => prev.filter((e) => e.id !== exam.id));
-    setConfirmDelete(null);
-    setDeletingId(null);
   }
 
-  async function handleTogglePublish(exam: LecturerExam) {
-    setPublishingId(exam.id);
+  async function handlePublishConfirm() {
+    if (!publishingExam) return;
+    setIsPublishing(true);
     try {
-      const updated = await lecturerService.togglePublishExam(exam.id);
-      if (updated) {
-        setExams((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-        toast.success(`Exam ${updated.status === 'PUBLISHED' ? 'published' : 'updated'} successfully.`, {
-          description: `Status changed to ${updated.status}.`,
-        });
-      }
-    } catch (err) {
-      toast.error('Unable to publish examination', {
-        description: 'Ensure all student attempts are fully graded before publishing.',
+      const published = await lecturerService.publishExam(publishingExam.id);
+      setExams((prev) => prev.map((item) => (item.id === published.id ? published : item)));
+      toast.success('Examination Published', {
+        description: 'Grades released and enrolled students notified.',
+      });
+      setPublishingExam(null);
+    } catch (err: any) {
+      console.error('[PUBLISH EXAM ERROR]', {
+        status: err?.response?.status,
+        data: err?.response?.data,
+      });
+      const backendErrors = err?.response?.data?.errors;
+      const backendDetail = err?.response?.data?.detail;
+      const formattedErrors = Array.isArray(backendErrors) && backendErrors.length > 0
+        ? backendErrors.join(' ')
+        : undefined;
+
+      const detail = formattedErrors || backendDetail || err?.message;
+      toast.error('Cannot Publish Examination', {
+        description: detail || 'All student attempts must be fully graded with results generated before publishing.',
       });
     } finally {
-      setConfirmPublish(null);
-      setPublishingId(null);
+      setIsPublishing(false);
     }
   }
-
 
   async function handleDuplicate(examId: string) {
-    const copy = await lecturerService.duplicateExam(examId);
-    if (copy) {
-      setExams((prev) => [copy, ...prev]);
-    }
     setActionMenuId(null);
+    try {
+      const dup = await lecturerService.duplicateExam(examId);
+      if (dup) {
+        setExams((prev) => [dup, ...prev]);
+        toast.success('Exam duplicated', {
+          description: `Created "${dup.title}". Saved as Draft.`,
+        });
+      }
+    } catch (err: any) {
+      toast.error('Failed to duplicate exam', {
+        description: err?.message || 'Please check backend logs.',
+      });
+    }
   }
 
-  if (loading) {
+  if (loading && exams.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-3" />
+        <h3 className="text-base font-semibold text-foreground">Could not load examinations</h3>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">{error}</p>
+        <Button onClick={() => fetchExams()} variant="outline" size="sm" leftIcon={<RefreshCw className="h-4 w-4" />}>
+          Try Again
+        </Button>
       </div>
     );
   }
@@ -160,33 +345,28 @@ export function ExamList() {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Examination Management</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Examination Management
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Create, manage, publish, and monitor all your academic examinations.
+              Author, schedule, manage, and publish course examinations across their lifecycle.
             </p>
           </div>
-          <Button asChild leftIcon={<Plus className="h-4 w-4" />}>
+          <Button asChild size="sm" leftIcon={<Plus className="h-4 w-4" />}>
             <Link href={ROUTES.LECTURER.EXAM_CREATE}>Create New Exam</Link>
           </Button>
         </div>
 
-        {/* Filters row */}
-        <div className="flex flex-wrap gap-3">
-          <div className="flex-1 min-w-52">
-            <Input
-              placeholder="Search exams..."
+        {/* Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by title, code, or course name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              leadingIcon={<Search className="h-4 w-4" />}
-              trailingIcon={
-                searchQuery ? (
-                  <button onClick={() => setSearchQuery('')} className="rounded-full p-0.5 hover:bg-muted">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ) : undefined
-              }
+              onClear={() => setSearchQuery('')}
             />
           </div>
 
@@ -195,8 +375,7 @@ export function ExamList() {
             onValueChange={(v) => setStatusFilter(v as ExamStatus | 'ALL')}
           >
             <SelectTrigger className="w-40">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Statuses</SelectItem>
@@ -209,14 +388,14 @@ export function ExamList() {
           </Select>
 
           <Select value={courseFilter} onValueChange={(v) => setCourseFilter(v)}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-56">
               <SelectValue placeholder="All Courses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All Courses</SelectItem>
+              <SelectItem value="ALL">All Course Offerings</SelectItem>
               {courses.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
-                  {c.code}
+                  {c.code} {c.section ? `(Sec ${c.section})` : ''} - {c.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -225,281 +404,389 @@ export function ExamList() {
 
         {/* Exams count */}
         <p className="text-xs text-muted-foreground">
-          {filtered.length} exam{filtered.length !== 1 ? 's' : ''} found
+          {filtered.length} examination{filtered.length !== 1 ? 's' : ''} found
         </p>
 
         {/* Exam cards */}
         <div className="space-y-3">
           <AnimatePresence>
-            {filtered.map((exam) => (
-              <motion.div
-                key={exam.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                <Card hoverable className="overflow-hidden">
-                  <CardContent className="p-5">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      {/* Exam info */}
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                            {exam.courseCode}
-                          </span>
-                          <Badge
-                            variant={
-                              exam.status === 'PUBLISHED'
-                                ? 'success'
-                                : exam.status === 'DRAFT'
-                                ? 'warning'
-                                : 'secondary'
-                            }
-                          >
-                            {exam.status}
-                          </Badge>
+            {filtered.map((exam) => {
+              const isDraft = exam.status === 'DRAFT';
+              const isScheduled = exam.status === 'SCHEDULED';
+              const isActive = exam.status === 'ACTIVE';
+              const isClosed = exam.status === 'CLOSED';
+              const isPublished = exam.status === 'PUBLISHED';
+
+              return (
+                <motion.div
+                  key={exam.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <Card hoverable className="overflow-hidden">
+                    <CardContent className="p-5">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        {/* Exam info */}
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                              {exam.courseCode}
+                            </span>
+                            <Badge
+                              variant={
+                                isPublished || isActive
+                                    ? 'success'
+                                    : isScheduled
+                                    ? 'info'
+                                    : isDraft
+                                    ? 'warning'
+                                    : 'secondary'
+                              }
+                            >
+                              {exam.status}
+                            </Badge>
+                          </div>
+                          <h3 className="font-semibold text-foreground leading-snug">{exam.title}</h3>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {exam.courseName || exam.description}
+                          </p>
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-0.5">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {formatDurationMinutes(exam.durationMinutes)}
+                            </span>
+                            <span>·</span>
+                            <span>{exam.totalMarks} total marks</span>
+                            <span>·</span>
+                            <span>{exam.questions.length} questions</span>
+                            {exam.startDate ? (
+                              <>
+                                <span>·</span>
+                                <span>
+                                  Window: {new Date(exam.startDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                  {exam.endDate ? ` — ${new Date(exam.endDate).toLocaleTimeString([], { timeStyle: 'short' })}` : ''}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span>·</span>
+                                <span className="italic">Not Scheduled</span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <h3 className="font-semibold text-foreground leading-snug">{exam.title}</h3>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{exam.description}</p>
-                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-0.5">
-                          <span>{exam.durationMinutes} mins</span>
-                          <span>·</span>
-                          <span>{exam.totalMarks} marks</span>
-                          <span>·</span>
-                          <span>{exam.questions.length} questions</span>
-                          <span>·</span>
-                          <span>Start: {new Date(exam.startDate).toLocaleDateString()}</span>
-                        </div>
-                      </div>
 
-                      {/* Actions */}
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        <Button
-                          asChild
-                          variant="ghost"
-                          size="sm"
-                          leftIcon={<Eye className="h-3.5 w-3.5" />}
-                        >
-                          <Link href={ROUTES.LECTURER.EXAM_PREVIEW(exam.id)}>Preview</Link>
-                        </Button>
-                        <Button
-                          asChild
-                          variant="ghost"
-                          size="sm"
-                          leftIcon={<Users className="h-3.5 w-3.5" />}
-                        >
-                          <Link href={ROUTES.LECTURER.EXAM_SUBMISSIONS(exam.id)}>Submissions</Link>
-                        </Button>
-
-                        {/* Publish/Unpublish */}
-                        <Button
-                          variant={exam.status === 'PUBLISHED' ? 'outline' : 'default'}
-                          size="sm"
-                          leftIcon={<Upload className="h-3.5 w-3.5" />}
-                          onClick={() => setConfirmPublish(exam)}
-                          disabled={exam.status === 'CLOSED'}
-                        >
-                          {exam.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
-                        </Button>
-
-                        {/* More actions dropdown */}
-                        <div className="relative">
+                        {/* Actions strictly gated by status */}
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          {/* 1. Preview: Available in all states */}
                           <Button
-                            variant="outline"
+                            asChild
+                            variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() =>
-                              setActionMenuId((prev) => (prev === exam.id ? null : exam.id))
-                            }
-                            aria-label="More actions"
+                            leftIcon={<Eye className="h-3.5 w-3.5" />}
                           >
-                            <MoreHorizontal className="h-4 w-4" />
+                            <Link href={ROUTES.LECTURER.EXAM_PREVIEW(exam.id)}>Preview</Link>
                           </Button>
-                          {actionMenuId === exam.id && (
-                            <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-popover shadow-xl">
-                              <button
-                                onClick={() => {
-                                  setActionMenuId(null);
-                                  router.push(ROUTES.LECTURER.EXAM_EDIT(exam.id));
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-t-lg"
+
+                          {/* 2. DRAFT State: Edit, Schedule, Delete */}
+                          {isDraft && (
+                            <>
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                leftIcon={<Pencil className="h-3.5 w-3.5" />}
                               >
-                                <Pencil className="h-3.5 w-3.5" /> Edit Exam
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setActionMenuId(null);
-                                  setSchedulingExam(exam);
-                                  setScheduleForm({
-                                    startDate: exam.startDate ? exam.startDate.slice(0, 16) : '',
-                                    endDate: exam.endDate ? exam.endDate.slice(0, 16) : '',
-                                    durationMinutes: exam.durationMinutes || 60,
-                                  });
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-primary"
+                                <Link href={ROUTES.LECTURER.EXAM_EDIT(exam.id)}>Edit</Link>
+                              </Button>
+
+                              <Button
+                                variant="default"
+                                size="sm"
+                                leftIcon={<Calendar className="h-3.5 w-3.5" />}
+                                onClick={() => handleOpenScheduleModal(exam)}
                               >
-                                <Calendar className="h-3.5 w-3.5" /> Schedule Window
-                              </button>
-                              <button
-                                onClick={() => handleDuplicate(exam.id)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
-                              >
-                                <Copy className="h-3.5 w-3.5" /> Duplicate
-                              </button>
-                              <button
-                                onClick={() => setActionMenuId(null)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-muted-foreground"
-                              >
-                                <Archive className="h-3.5 w-3.5" /> Archive (UI only)
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setActionMenuId(null);
-                                  setConfirmDelete(exam);
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-destructive rounded-b-lg"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" /> Delete Exam
-                              </button>
-                            </div>
+                                Schedule
+                              </Button>
+                            </>
                           )}
+
+                          {/* 3. SCHEDULED State: Edit, Edit Schedule */}
+                          {isScheduled && (
+                            <>
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                leftIcon={<Pencil className="h-3.5 w-3.5" />}
+                              >
+                                <Link href={ROUTES.LECTURER.EXAM_EDIT(exam.id)}>Edit</Link>
+                              </Button>
+
+                              <Button
+                                variant="default"
+                                size="sm"
+                                leftIcon={<Calendar className="h-3.5 w-3.5" />}
+                                onClick={() => handleOpenScheduleModal(exam)}
+                              >
+                                Edit Schedule
+                              </Button>
+                            </>
+                          )}
+
+                          {/* 4. ACTIVE / CLOSED / PUBLISHED States: Submissions & Results */}
+                          {(isActive || isClosed || isPublished) && (
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="sm"
+                              leftIcon={<Users className="h-3.5 w-3.5" />}
+                            >
+                              <Link href={ROUTES.LECTURER.EXAM_SUBMISSIONS(exam.id)}>
+                                {isPublished ? 'Results' : 'Submissions'}
+                              </Link>
+                            </Button>
+                          )}
+
+                          {/* 5. CLOSED State: Publish Results Gate */}
+                          {isClosed && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              leftIcon={<Upload className="h-3.5 w-3.5" />}
+                              onClick={() => setPublishingExam(exam)}
+                            >
+                              Publish Results
+                            </Button>
+                          )}
+
+                          {/* More dropdown (for duplicate or delete when DRAFT) */}
+                          <div className="relative">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() =>
+                                setActionMenuId((prev) => (prev === exam.id ? null : exam.id))
+                              }
+                              aria-label="More actions"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                            {actionMenuId === exam.id && (
+                              <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-popover shadow-xl">
+                                <button
+                                  onClick={() => handleDuplicate(exam.id)}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-t-lg"
+                                >
+                                  <Copy className="h-3.5 w-3.5" /> Duplicate
+                                </button>
+                                {isDraft ? (
+                                  <button
+                                    onClick={() => {
+                                      setActionMenuId(null);
+                                      setDeletingExam(exam);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-destructive rounded-b-lg border-t border-border/50"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" /> Delete Exam
+                                  </button>
+                                ) : (
+                                  <div
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-muted-foreground/80 bg-muted/30 cursor-not-allowed rounded-b-lg border-t border-border/50"
+                                    title={
+                                      isScheduled
+                                        ? 'Scheduled examinations cannot be deleted.'
+                                        : isActive
+                                        ? 'Active examinations cannot be deleted.'
+                                        : isClosed
+                                        ? 'Closed examinations cannot be deleted.'
+                                        : 'Published examinations cannot be deleted.'
+                                    }
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 opacity-40 shrink-0" />
+                                    <span className="truncate">
+                                      {isScheduled
+                                        ? 'Scheduled exam cannot be deleted'
+                                        : isActive
+                                        ? 'Active exam cannot be deleted'
+                                        : isClosed
+                                        ? 'Closed exam cannot be deleted'
+                                        : 'Published exam cannot be deleted'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
 
           {filtered.length === 0 && (
-            <div className="py-16 text-center rounded-2xl border border-dashed border-border">
-              <p className="text-muted-foreground">No exams match your current filters.</p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => {
-                  setSearchQuery('');
-                  setStatusFilter('ALL');
-                  setCourseFilter('ALL');
-                }}
-              >
-                Clear Filters
-              </Button>
-            </div>
+            <Card className="border-dashed border-border/80">
+              <CardContent className="p-12">
+                <EmptyState
+                  title={exams.length === 0 ? 'No examinations created' : 'No matching exams found'}
+                  description={
+                    exams.length === 0
+                      ? 'You have not created any examinations yet. Click "Create New Exam" to get started.'
+                      : 'No examinations match your current search and filter settings.'
+                  }
+                  action={
+                    exams.length === 0
+                      ? {
+                          label: 'Create First Exam',
+                          onClick: () => router.push(ROUTES.LECTURER.EXAM_CREATE),
+                        }
+                      : undefined
+                  }
+                />
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
 
-      {/* Confirm Delete Dialog */}
-      <Dialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
-        <DialogContent size="md">
+      {/* Delete Exam Confirmation Dialog */}
+      <Dialog open={!!deletingExam} onOpenChange={(open) => !open && setDeletingExam(null)}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Examination</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
+            <DialogTitle>Delete Examination?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to permanently delete{' '}
-              <strong className="text-foreground">&quot;{confirmDelete?.title}&quot;</strong>? This action will remove the examination and cannot be undone.
+              Are you sure you want to delete <strong className="text-foreground">{deletingExam?.title}</strong>?
+              This action cannot be undone. Examinations with student attempts cannot be deleted.
             </DialogDescription>
-          </DialogBody>
+          </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDelete(null)}>
+            <Button variant="outline" onClick={() => setDeletingExam(null)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              loading={deletingId === confirmDelete?.id}
-              onClick={() => confirmDelete && handleDelete(confirmDelete)}
-            >
-              Delete Exam
+            <Button variant="destructive" onClick={handleDeleteConfirm} loading={isDeleting}>
+              Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Publish/Unpublish Dialog */}
-      <Dialog open={!!confirmPublish} onOpenChange={() => setConfirmPublish(null)}>
-        <DialogContent size="md">
+      {/* Publish Results Confirmation Dialog */}
+      <Dialog open={!!publishingExam} onOpenChange={(open) => !open && setPublishingExam(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publish Examination Results?</DialogTitle>
+            <DialogDescription>
+              Publishing will make graded results visible to all enrolled students for{' '}
+              <strong className="text-foreground">{publishingExam?.title}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-muted/40 rounded-lg border border-border/70 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Publish Gate Requirements:
+            </p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              <li>Status must be <strong>CLOSED</strong></li>
+              <li>Every student attempt must be in <strong>GRADED</strong> state</li>
+              <li>Status transitions: <strong>CLOSED → PUBLISHED</strong></li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishingExam(null)} disabled={isPublishing}>
+              Cancel
+            </Button>
+            <Button onClick={handlePublishConfirm} loading={isPublishing}>
+              Confirm & Publish Results
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Window Dialog */}
+      <Dialog open={!!schedulingExam} onOpenChange={(open) => !open && setSchedulingExam(null)}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {confirmPublish?.status === 'PUBLISHED' ? 'Unpublish Examination' : 'Publish Examination'}
+              {schedulingExam?.status === 'SCHEDULED' ? 'Edit Examination Schedule' : 'Schedule Examination'}
             </DialogTitle>
-          </DialogHeader>
-          <DialogBody>
             <DialogDescription>
-              {confirmPublish?.status === 'PUBLISHED'
-                ? `Unpublishing "${confirmPublish?.title}" will prevent students from starting new attempts. Existing student submissions will remain saved.`
-                : `Publishing "${confirmPublish?.title}" will make it live and accessible to enrolled students according to the scheduled start time.`}
+              Set the active time window for <strong className="text-foreground">{schedulingExam?.title}</strong>.
+              Duration is calculated automatically from the start and end times.
             </DialogDescription>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmPublish(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant={confirmPublish?.status === 'PUBLISHED' ? 'destructive' : 'default'}
-              loading={publishingId === confirmPublish?.id}
-              onClick={() => confirmPublish && handleTogglePublish(confirmPublish)}
-            >
-              {confirmPublish?.status === 'PUBLISHED' ? 'Unpublish Exam' : 'Publish Exam'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogHeader>
+          <form onSubmit={handleScheduleSubmit} className="space-y-4">
+            <DialogBody className="space-y-4">
+              {scheduleError && (
+                <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{scheduleError}</span>
+                </div>
+              )}
 
-      {/* Schedule Exam Window Dialog */}
-      <Dialog open={!!schedulingExam} onOpenChange={() => setSchedulingExam(null)}>
-        <DialogContent size="md">
-          <DialogHeader>
-            <DialogTitle>Schedule Examination Window</DialogTitle>
-            <DialogDescription>
-              Set the active start/end availability windows and duration for &quot;{schedulingExam?.title}&quot;.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4 py-3">
-            <div>
-              <label htmlFor="schedStart" className="text-xs font-medium mb-1.5 block text-foreground">
-                Start Window (Date &amp; Time)
-              </label>
-              <Input
-                id="schedStart"
-                type="datetime-local"
-                value={scheduleForm.startDate}
-                onChange={(e) => setScheduleForm({ ...scheduleForm, startDate: e.target.value })}
-              />
-            </div>
-            <div>
-              <label htmlFor="schedEnd" className="text-xs font-medium mb-1.5 block text-foreground">
-                End Window (Date &amp; Time)
-              </label>
-              <Input
-                id="schedEnd"
-                type="datetime-local"
-                value={scheduleForm.endDate}
-                onChange={(e) => setScheduleForm({ ...scheduleForm, endDate: e.target.value })}
-              />
-            </div>
-            <div>
-              <label htmlFor="schedDur" className="text-xs font-medium mb-1.5 block text-foreground">
-                Duration (Minutes)
-              </label>
-              <Input
-                id="schedDur"
-                type="number"
-                value={scheduleForm.durationMinutes}
-                onChange={(e) => setScheduleForm({ ...scheduleForm, durationMinutes: Number(e.target.value) })}
-              />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSchedulingExam(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleScheduleSubmit} disabled={isScheduling}>
-              {isScheduling ? 'Scheduling...' : 'Save Schedule'}
-            </Button>
-          </DialogFooter>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Start Window (Local Time)</label>
+                  <Input
+                    type="datetime-local"
+                    value={scheduleForm.startDate}
+                    onChange={(e) =>
+                      setScheduleForm((prev) => ({ ...prev, startDate: e.target.value }))
+                    }
+                    required
+                  />
+                  <p className="text-2xs text-muted-foreground">Select start date & time.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">End Window (Local Time)</label>
+                  <Input
+                    type="datetime-local"
+                    value={scheduleForm.endDate}
+                    onChange={(e) =>
+                      setScheduleForm((prev) => ({ ...prev, endDate: e.target.value }))
+                    }
+                    required
+                  />
+                  <p className="text-2xs text-muted-foreground">Must be after start window.</p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Duration (Calculated Automatically)</label>
+                <Input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={formatDurationMinutes(calculatedDuration)}
+                  className="bg-muted/50 font-medium cursor-not-allowed"
+                />
+                <p className="text-2xs text-muted-foreground">
+                  Individual student attempt time limit: {calculatedDuration ? `${calculatedDuration} minutes` : 'select start & end window above'}.
+                </p>
+              </div>
+
+              <div className="p-3 bg-muted/40 rounded-lg border border-border/70 text-xs text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Scheduling Gate Requirements:
+                </p>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  <li>Status: <strong>{schedulingExam?.status === 'SCHEDULED' ? 'SCHEDULED (Updating Schedule)' : 'DRAFT → SCHEDULED'}</strong></li>
+                  <li>Questions must be objective/auto-gradable (no Essay/Short Answer, exactly 1 correct option per MCQ)</li>
+                </ul>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSchedulingExam(null)} disabled={isScheduling}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={isScheduling}>
+                {schedulingExam?.status === 'SCHEDULED' ? 'Save Schedule Changes' : 'Confirm & Schedule'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

@@ -20,6 +20,7 @@ interface LecturerStoreState {
   setEditingExam: (id: string | null, data?: ExamWizardData) => void;
 
   addQuestion: (question: Question) => void;
+  setQuestions: (questions: Question[]) => void;
   updateQuestion: (index: number, question: Question) => void;
   removeQuestion: (index: number) => void;
   reorderQuestions: (startIndex: number, endIndex: number) => void;
@@ -34,11 +35,11 @@ const initialWizardData: ExamWizardData = {
   courseId: '',
   description: '',
   instructions: 'Ensure a stable internet connection. All answers must be submitted within the time limit.',
-  durationMinutes: 60,
+  durationMinutes: 0,
   totalMarks: 100,
   passingScore: 50,
-  startDate: new Date().toISOString().slice(0, 16),
-  endDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16),
+  startDate: '',
+  endDate: '',
   randomizeQuestions: false,
   allowMultipleAttempts: false,
   autoSubmitOnTimeout: true,
@@ -81,6 +82,14 @@ export const useLecturerStore = create<LecturerStoreState>((set) => ({
       wizardData: {
         ...state.wizardData,
         questions: [...state.wizardData.questions, question],
+      },
+    })),
+
+  setQuestions: (questions) =>
+    set((state) => ({
+      wizardData: {
+        ...state.wizardData,
+        questions,
       },
     })),
 

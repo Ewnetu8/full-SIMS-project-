@@ -1,15 +1,20 @@
 export type ExamStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
 
 export type QuestionType =
+  | 'MCQ'
+  | 'TRUE_FALSE'
   | 'multiple_choice'
-  | 'multiple_select'
-  | 'true_false'
-  | 'short_answer'
-  | 'essay';
+  | 'true_false';
 
 export interface QuestionOption {
   id: string;
   text: string;
+}
+
+export interface RubricCriterionItem {
+  id: string;
+  criterionText: string;
+  pointWeight: number;
 }
 
 export interface Question {
@@ -21,6 +26,7 @@ export interface Question {
   options?: QuestionOption[];
   correctAnswer?: string | string[];
   explanationNote?: string;
+  rubricCriteria?: RubricCriterionItem[];
 }
 
 export interface LecturerExam {
@@ -55,6 +61,11 @@ export interface Course {
   studentCount: number;
   examCount: number;
   description: string;
+  section?: string;
+  capacity?: number;
+  creditHours?: number;
+  intendedClassStanding?: string;
+  programName?: string;
 }
 
 export type AIGradingStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED';

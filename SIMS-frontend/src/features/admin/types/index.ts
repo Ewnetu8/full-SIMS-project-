@@ -243,6 +243,41 @@ export interface UpdateLecturerPayload {
 
 export type LecturerProfile = ApiLecturerListItem;
 
+// ─── Teaching Assignments (SIMS API 7) ──────────────────────────────────────
+
+export interface TeachingAssignment {
+  id: string;
+  lecturer: string; // Lecturer UUID reference
+  lecturer_detail?: string; // Faculty identifier e.g. "FAC-881"
+  course_offering: string; // CourseOffering UUID reference
+  course_offering_detail?: {
+    id: string;
+    course_code: string;
+    course_title: string;
+    semester: string;
+    semester_index: string;
+    section?: string;
+  };
+  is_active: boolean;
+  enrolled_students: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateTeachingAssignmentPayload {
+  lecturer: string;
+  course_offering: string;
+  is_active?: boolean;
+}
+
+export interface UpdateTeachingAssignmentPayload {
+  is_active?: boolean;
+}
+
+export interface TeachingAssignmentFilterParams {
+  is_active?: boolean;
+}
+
 export interface University {
   id: string;
   name: string;

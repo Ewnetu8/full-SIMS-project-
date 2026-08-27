@@ -17,6 +17,7 @@ import { API_ENDPOINTS } from '@/constants';
 import { env } from '@/lib/env';
 import { getCsrfToken } from '@/utils/csrf';
 import { isValidUuid } from '@/lib/user-identifier';
+import { parseJwtExp } from '../utils';
 
 import type {
   LoginCredentials,
@@ -27,7 +28,7 @@ import type {
   ResetPasswordResponse,
   RefreshTokenResponse,
 } from '../types';
-import type { BaseUser } from '@/types';
+import type { BaseUser, AuthTokens } from '@/types';
 
 export const authApi = {
   /**
@@ -116,11 +117,11 @@ export const authApi = {
     };
 
     const accessToken = data.access || data.access_token || data.accessToken || data.tokens?.accessToken || '';
-    const expiresAt = Date.now() + (credentials.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000);
+    const jwtExp = parseJwtExp(accessToken);
+    const expiresAt = jwtExp || (Date.now() + 15 * 60 * 1000);
 
-    const formattedTokens = {
+    const formattedTokens: AuthTokens = {
       accessToken,
-      refreshToken: data.refresh || data.tokens?.refreshToken || '',
       expiresAt,
     };
 
@@ -134,12 +135,20 @@ export const authApi = {
   /**
    * POST /api/v1/auth/logout
    * Sends X-CSRFToken header and HttpOnly refresh_token cookie.
+   * Backend invalidates the refresh token and clears the cookie.
    */
   logout: async (): Promise<void> => {
     try {
-      await apiClient.post<void>(API_ENDPOINTS.AUTH.LOGOUT, {});
+      const csrfToken = getCsrfToken();
+      await apiClient.post<void>(
+        API_ENDPOINTS.AUTH.LOGOUT,
+        {},
+        {
+          headers: csrfToken ? { 'X-CSRFToken': csrfToken } : undefined,
+        },
+      );
     } catch (e) {
-      console.error('Logout request error:', e);
+      console.warn('Backend logout request encountered an error (session cleared locally):', e);
     }
   },
 
@@ -165,15 +174,15 @@ export const authApi = {
    * Uses a raw axios call (bypasses the apiClient interceptors to avoid loops)
    * and includes the Django CSRF token from the browser cookie in the
    * X-CSRFToken header, which is required by enforce_csrf() on the backend.
+   * The backend reads the refresh_token from the HttpOnly cookie and returns a new access token.
+   * NO refresh token is passed in the request body.
    */
-  refreshToken: async (token?: string): Promise<RefreshTokenResponse> => {
+  refreshToken: async (): Promise<RefreshTokenResponse> => {
     const csrfToken = getCsrfToken();
-    const storedRefresh = token || (typeof window !== 'undefined' ? (window as any).__EXAMSPHERE_REFRESH__ : undefined);
-    const payload = storedRefresh ? { refresh: storedRefresh } : {};
 
-    const response = await axios.post<any>(
+    const response = await axios.post<{ access?: string; access_token?: string; accessToken?: string }>(
       `${env.NEXT_PUBLIC_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`,
-      payload,
+      {},
       {
         withCredentials: true,
         headers: {
@@ -181,19 +190,20 @@ export const authApi = {
           Accept: 'application/json',
           ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
         },
-      }
+      },
     );
 
     const data = response.data || {};
-    const accessToken = data.access || data.access_token || data.tokens?.accessToken || '';
+    const accessToken = data.access || data.access_token || data.accessToken || '';
+    const jwtExp = parseJwtExp(accessToken);
+    const expiresAt = jwtExp || (Date.now() + 15 * 60 * 1000);
 
     return {
       tokens: {
         accessToken,
-        refreshToken: data.refresh || data.tokens?.refreshToken || storedRefresh || '',
-        expiresAt: Date.now() + 15 * 60 * 1000,
+        expiresAt,
       },
-    } as any;
+    };
   },
 
   /**

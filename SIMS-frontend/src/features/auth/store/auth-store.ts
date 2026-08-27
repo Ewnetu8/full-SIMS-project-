@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 
 import { authApi } from '../services';
+import { parseJwtExp } from '../utils';
 
 import { toast } from '@/components/feedback';
 
@@ -138,8 +139,20 @@ export const useAuthStore = create<AuthStore>()(
         setUser: (user: BaseUser) =>
           set({ user }, false, 'auth/setUser'),
 
-        setTokens: (tokens: AuthTokens) =>
-          set({ tokens }, false, 'auth/setTokens'),
+        setTokens: (tokens: AuthTokens) => {
+          const jwtExp = parseJwtExp(tokens.accessToken);
+          const expiresAt = tokens.expiresAt || jwtExp || (Date.now() + 15 * 60 * 1000);
+          set(
+            {
+              tokens: {
+                accessToken: tokens.accessToken,
+                expiresAt,
+              },
+            },
+            false,
+            'auth/setTokens',
+          );
+        },
 
         setRememberMe: (rememberMe: boolean) =>
           set({ rememberMe }, false, 'auth/setRememberMe'),
@@ -164,16 +177,22 @@ export const useAuthStore = create<AuthStore>()(
           // 1. Update the flag so the custom storage adapter knows where to write.
           setRememberFlag(rememberMe);
 
+          const jwtExp = parseJwtExp(session.tokens.accessToken);
+          const expiresAt = session.tokens.expiresAt || jwtExp || (Date.now() + 15 * 60 * 1000);
+
           // 2. Update the store state — persist middleware will call setItem
           //    which now targets the correct storage.
           set(
             {
-              user:            session.user,
-              tokens:          session.tokens,
+              user: session.user,
+              tokens: {
+                accessToken: session.tokens.accessToken,
+                expiresAt,
+              },
               isAuthenticated: true,
-              isLoading:       false,
+              isLoading: false,
               rememberMe,
-              error:           null,
+              error: null,
             },
             false,
             'auth/login',
@@ -190,6 +209,8 @@ export const useAuthStore = create<AuthStore>()(
             if (get().isAuthenticated) {
               await authApi.logout();
             }
+          } catch (e) {
+            console.warn('Logout request error:', e);
           } finally {
             purgeAllStorages();
             set({ ...initialState }, false, 'auth/logout/complete');
@@ -206,98 +227,95 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         /**
-         * Update access + refresh tokens without modifying the user.
+         * Update access token without modifying the user.
          * Called by the token-refresh interceptor.
          */
-        refreshSession: (tokens: AuthTokens) =>
+        refreshSession: (tokens: AuthTokens) => {
+          const jwtExp = parseJwtExp(tokens.accessToken);
+          const expiresAt = tokens.expiresAt || jwtExp || (Date.now() + 15 * 60 * 1000);
           set(
-            { tokens, isAuthenticated: true },
+            {
+              tokens: {
+                accessToken: tokens.accessToken,
+                expiresAt,
+              },
+              isAuthenticated: true,
+            },
             false,
             'auth/refreshSession',
-          ),
+          );
+        },
 
         initializeAuth: async () => {
           set({ isLoading: true }, false, 'auth/initialize/start');
 
-          const hasRehydratedToken = !!get().tokens?.accessToken;
-          const hasRehydratedUser = !!get().user;
-          const storedRefreshToken = get().tokens?.refreshToken;
+          const state = get();
+          const token = state.tokens?.accessToken;
+          const user = state.user;
+          const jwtExp = token ? parseJwtExp(token) : null;
+          const expiresAt = jwtExp || state.tokens?.expiresAt || 0;
 
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[DEV LOG] App auth initialization started. Rehydrated session present:', {
-              hasToken: hasRehydratedToken,
-              hasUser: hasRehydratedUser,
-            });
-          }
-
-          // If no session exists, finish initialization immediately without making unauthenticated refresh request
-          if (!hasRehydratedToken && !hasRehydratedUser && !storedRefreshToken) {
-            set({ isAuthenticated: false, isLoading: false }, false, 'auth/initialize/anonymous');
+          // CASE 1 — Valid access token exists and not expired
+          if (token && user && Date.now() < expiresAt) {
+            set(
+              {
+                user,
+                tokens: {
+                  accessToken: token,
+                  expiresAt,
+                },
+                isAuthenticated: true,
+                isLoading: false,
+              },
+              false,
+              'auth/initialize/valid-session',
+            );
             return;
           }
 
+          // CASE 4 — No persisted session
+          if (!token && !user) {
+            set({ isAuthenticated: false, isLoading: false }, false, 'auth/initialize/no-session');
+            return;
+          }
+
+          // CASE 2 — Access token expired: attempt refresh
           try {
-            const res = await authApi.refreshToken(storedRefreshToken);
-            const newAccessToken = (res as any).access || (res as any).access_token || (res as any).accessToken || res.tokens?.accessToken || '';
+            const res = await authApi.refreshToken();
+            const newAccessToken = res.tokens?.accessToken || '';
 
             if (newAccessToken) {
-              set(
-                {
-                  tokens: { ...get().tokens, accessToken: newAccessToken },
-                  isAuthenticated: true,
-                  isLoading: false,
-                },
-                false,
-                'auth/initialize/success'
-              );
-
-              if (process.env.NODE_ENV !== 'production') {
-                console.log('[DEV LOG] User session successfully restored via refresh endpoint.');
-              }
-              return;
-            } else {
-              throw new Error('No access token returned from refresh endpoint');
-            }
-          } catch (error: any) {
-            const statusCode = error?.response?.status || error?.statusCode || 0;
-            const message = error?.message || error;
-
-            if (process.env.NODE_ENV !== 'production') {
-              console.warn('[DEV LOG] Refresh token request failed:', { statusCode, reason: message });
-            }
-
-            // 401 Unauthorized means the refresh token is genuinely invalid or expired.
-            if (statusCode === 401) {
-              const hadPreviousSession = get().isAuthenticated || hasRehydratedUser;
-              get().clearSession();
-
-              if (hadPreviousSession) {
+              const newExp = parseJwtExp(newAccessToken) || (Date.now() + 15 * 60 * 1000);
+              let currentUser = get().user;
+              if (!currentUser) {
                 try {
-                  toast.warning('Your session has expired. Please sign in again.', { id: 'session-expired' });
+                  const meRes = await authApi.getMe();
+                  currentUser = meRes.user;
                 } catch {
-                  // Ignore toast errors if component not mounted
+                  // If getMe fails, continue with existing user or default
                 }
               }
-              return;
-            }
 
-            // Non-401 errors (e.g. 403 CSRF verification failure or network/CORS error):
-            // If the user already has a rehydrated session (user + accessToken), preserve it so page reloads do not log out the user!
-            if (hasRehydratedToken && hasRehydratedUser) {
-              if (process.env.NODE_ENV !== 'production') {
-                console.log('[DEV LOG] Preserving rehydrated session for authenticated user:', get().user?.email);
-              }
               set(
                 {
+                  user: currentUser || get().user,
+                  tokens: {
+                    accessToken: newAccessToken,
+                    expiresAt: newExp,
+                  },
                   isAuthenticated: true,
                   isLoading: false,
                 },
                 false,
-                'auth/initialize/preserved'
+                'auth/initialize/refreshed',
               );
               return;
             }
 
+            // If refresh succeeded without access token, clear session cleanly
+            get().clearSession();
+          } catch (error: any) {
+            // CASE 3 — Refresh fails (401, 403 CSRF, etc.): cleanly clear local session without crashing
             get().clearSession();
           } finally {
             set({ isLoading: false }, false, 'auth/initialize/complete');
@@ -320,10 +338,15 @@ export const useAuthStore = create<AuthStore>()(
         // Only persist session-relevant fields.
         // isLoading and error are ephemeral and should not survive a page reload.
         partialize: (state): Partial<AuthState> => ({
-          user:            state.user,
-          tokens:          state.tokens,
+          user: state.user,
+          tokens: state.tokens
+            ? {
+                accessToken: state.tokens.accessToken,
+                expiresAt: state.tokens.expiresAt,
+              }
+            : null,
           isAuthenticated: state.isAuthenticated,
-          rememberMe:      state.rememberMe,
+          rememberMe: state.rememberMe,
         }),
       },
     ),

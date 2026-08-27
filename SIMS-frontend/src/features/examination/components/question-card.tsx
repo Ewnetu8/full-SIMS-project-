@@ -13,6 +13,7 @@ interface ExaminationQuestionCardProps {
   total: number;
   answer: ExaminationAnswer | undefined;
   flagged: boolean;
+  disabled?: boolean;
   onChange: (answer: ExaminationAnswer) => void;
   onToggleFlag: () => void;
 }
@@ -23,6 +24,7 @@ export function ExaminationQuestionCard({
   total,
   answer,
   flagged,
+  disabled = false,
   onChange,
   onToggleFlag,
 }: ExaminationQuestionCardProps) {
@@ -79,9 +81,10 @@ export function ExaminationQuestionCard({
         <button
           type="button"
           onClick={onToggleFlag}
+          disabled={disabled}
           aria-pressed={flagged}
           className={cn(
-            'inline-flex items-center gap-1.5 shrink-0 rounded-xl border px-3 py-2 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'inline-flex items-center gap-1.5 shrink-0 rounded-xl border px-3 py-2 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed',
             flagged
               ? 'border-warning/50 bg-warning/15 text-warning dark:text-warning'
               : 'border-border/80 bg-muted/30 text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -103,7 +106,7 @@ export function ExaminationQuestionCard({
       <div className="mt-6">
         {/* Single Choice / True-False / MCQ */}
         {isChoice && (
-          <fieldset>
+          <fieldset disabled={disabled}>
             <legend className="sr-only">Options for Question {index + 1}</legend>
             <div role="radiogroup" aria-label={`Answer for question ${index + 1}`} className="space-y-3">
               {options.map((option, optionIndex) => {
@@ -113,7 +116,8 @@ export function ExaminationQuestionCard({
                   <label
                     key={option.id}
                     className={cn(
-                      'flex cursor-pointer items-center gap-3.5 rounded-xl border p-4 transition-all hover:border-primary/50 hover:bg-accent/40',
+                      'flex items-center gap-3.5 rounded-xl border p-4 transition-all',
+                      disabled ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:border-primary/50 hover:bg-accent/40',
                       isSelected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
                         : 'border-border/80 bg-background'
@@ -124,8 +128,9 @@ export function ExaminationQuestionCard({
                       name={`q-${question.id}`}
                       value={option.id}
                       checked={isSelected}
+                      disabled={disabled}
                       onChange={() => onChange(option.id)}
-                      className="h-4 w-4 accent-primary"
+                      className="h-4 w-4 accent-primary disabled:cursor-not-allowed"
                     />
                     <span
                       className={cn(
@@ -149,10 +154,11 @@ export function ExaminationQuestionCard({
             <input
               type="text"
               value={textAnswer}
+              disabled={disabled}
               maxLength={question.maxCharacters ?? 200}
               onChange={(e) => onChange(e.target.value)}
               placeholder="Type your concise answer here..."
-              className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm font-medium text-foreground shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm font-medium text-foreground shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
               aria-label={`Short answer for question ${index + 1}`}
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
@@ -169,11 +175,12 @@ export function ExaminationQuestionCard({
           <div className="space-y-2">
             <textarea
               value={textAnswer}
+              disabled={disabled}
               maxLength={question.maxCharacters ?? 2000}
               onChange={(e) => onChange(e.target.value)}
               rows={8}
               placeholder="Write your comprehensive essay response here..."
-              className="w-full resize-y rounded-xl border border-input bg-background p-4 text-sm leading-relaxed text-foreground shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full resize-y rounded-xl border border-input bg-background p-4 text-sm leading-relaxed text-foreground shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
               aria-label={`Essay response for question ${index + 1}`}
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
