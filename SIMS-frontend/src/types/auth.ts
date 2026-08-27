@@ -3,7 +3,7 @@
 /**
  * The set of roles that a user may hold within the system.
  */
-export type UserRole = 'admin' | 'lecturer' | 'student';
+export type UserRole = 'system_admin' | 'admin' | 'lecturer' | 'student';
 
 /**
  * Minimal user shape shared across the application.
@@ -15,6 +15,8 @@ export interface BaseUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  university?: string | null;
+  universityName?: string | null;
   avatarUrl?: string;
   studentIdentifier?: string;
   facultyIdentifier?: string;

@@ -83,7 +83,7 @@ services:
     # The container is marked "healthy" once the server responds with HTTP 200.
     # Other services (e.g., an e2e test runner) can depend on this.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -95,7 +95,7 @@ services:
   # can verify the production build without hitting the dev server.
   # ──────────────────────────────────────────────────────────────────────────────
   frontend-prod:
-    profiles: ["prod"]
+    profiles: [ "prod" ]
     build:
       context: .
       dockerfile: Dockerfile
@@ -114,12 +114,11 @@ services:
       - HOSTNAME=0.0.0.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
-
 
 # ── Named Volumes ─────────────────────────────────────────────────────────────
 # These volumes persist across `docker compose down` (but not `down -v`).

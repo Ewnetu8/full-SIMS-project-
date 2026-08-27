@@ -1,13 +1,17 @@
 'use client';
 
-import { Bell, RefreshCw, AlertCircle } from 'lucide-react';
+import { Bell, RefreshCw, AlertCircle, CheckCheck } from 'lucide-react';
 import * as React from 'react';
 
 import { toast, Skeleton } from '@/components/feedback';
 import { Button, Card } from '@/components/ui';
 import { getUserFriendlyErrorMessage } from '@/lib/errors';
 
-import { useNotifications, useMarkNotificationAsRead } from '../hooks/use-notifications';
+import {
+  useNotifications,
+  useMarkNotificationAsRead,
+  useMarkAllNotificationsAsRead,
+} from '../hooks/use-notifications';
 
 import { NotificationEmptyState } from './notification-empty-state';
 import { NotificationFilters } from './notification-filters';
@@ -30,6 +34,7 @@ export function NotificationsView() {
   } = useNotifications(isReadParam);
 
   const markAsReadMutation = useMarkNotificationAsRead();
+  const markAllAsReadMutation = useMarkAllNotificationsAsRead();
 
   const handleMarkAsRead = (id: string) => {
     markAsReadMutation.mutate(id, {
@@ -38,6 +43,20 @@ export function NotificationsView() {
       },
       onError: (err) => {
         toast.error(getUserFriendlyErrorMessage(err, 'Failed to update notification status.'));
+      },
+    });
+  };
+
+  const handleMarkAllAsRead = () => {
+    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+
+    markAllAsReadMutation.mutate(unreadIds, {
+      onSuccess: () => {
+        toast.success('All notifications marked as read');
+      },
+      onError: (err) => {
+        toast.error(getUserFriendlyErrorMessage(err, 'Failed to update notifications.'));
       },
     });
   };
@@ -62,7 +81,19 @@ export function NotificationsView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {unreadCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkAllAsRead}
+              disabled={markAllAsReadMutation.isPending}
+              className="flex items-center gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/10"
+            >
+              <CheckCheck className="h-4 w-4" />
+              {markAllAsReadMutation.isPending ? 'Marking...' : 'Mark all as read'}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

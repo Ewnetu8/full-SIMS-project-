@@ -53,3 +53,20 @@ export function useMarkNotificationAsRead() {
     },
   });
 }
+
+/**
+ * Mutation hook to mark multiple notifications as read and invalidate queries.
+ */
+export function useMarkAllNotificationsAsRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => notificationsApi.markNotificationAsRead(id)));
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: NOTIFICATION_QUERY_KEYS.all });
+    },
+  });
+}
+

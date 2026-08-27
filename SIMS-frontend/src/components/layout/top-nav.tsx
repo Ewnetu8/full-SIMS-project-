@@ -60,7 +60,7 @@ export function TopNav({
 
   const handleProfileNavigation = () => {
     if (!user) return;
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'system_admin') {
       router.push(ROUTES.ADMIN.PROFILE);
     } else if (user.role === 'lecturer') {
       router.push(ROUTES.LECTURER.PROFILE);

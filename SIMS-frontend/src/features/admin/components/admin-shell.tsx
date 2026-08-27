@@ -43,7 +43,6 @@ const adminNavigation: NavItem[] = [
   { label: 'Enrollment Management', href: ROUTES.ADMIN.ENROLLMENTS, icon: <UserPlus className="h-4 w-4" /> },
   { label: 'Lecturer Directory', href: ROUTES.ADMIN.LECTURERS, icon: <UserCheck className="h-4 w-4" /> },
   { label: 'Teaching Assignments', href: ROUTES.ADMIN.TEACHING_ASSIGNMENTS, icon: <BookCheck className="h-4 w-4" /> },
-  { label: 'Universities', href: ROUTES.ADMIN.UNIVERSITIES, icon: <School className="h-4 w-4" /> },
   { label: 'Colleges', href: ROUTES.ADMIN.COLLEGES, icon: <Landmark className="h-4 w-4" /> },
   { label: 'Departments', href: ROUTES.ADMIN.DEPARTMENTS, icon: <Building2 className="h-4 w-4" /> },
   { label: 'Programs', href: ROUTES.ADMIN.PROGRAMS, icon: <Layers className="h-4 w-4" /> },

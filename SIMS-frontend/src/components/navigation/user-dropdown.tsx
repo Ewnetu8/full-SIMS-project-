@@ -53,9 +53,10 @@ export function UserDropdown({
     .slice(0, 2);
 
   const roleLabel: Record<string, string> = {
-    admin:    'Administrator',
-    lecturer: 'Lecturer',
-    student:  'Student',
+    system_admin: 'System Administrator',
+    admin:        'Administrator',
+    lecturer:     'Lecturer',
+    student:      'Student',
   };
 
   return (

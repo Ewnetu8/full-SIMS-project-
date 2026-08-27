@@ -73,32 +73,45 @@ class UserRegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"faculty_identifier": "Faculty identifier is required for Lecturer registration."}
                 )
-        elif role == RoleChoices.ADMIN:
-            university_id = attrs.get('university_id')
-            if not university_id:
-                raise serializers.ValidationError(
-                    {"university_id": "University is required for Admin registration."}
-                )
-            try:
-                from academics.models import University
-                attrs['university'] = University.objects.get(id=university_id)
-            except University.DoesNotExist:
-                raise serializers.ValidationError({"university_id": "University not found."})
-        
-        # System Admin should not have a university
-        if role == RoleChoices.SYSTEM_ADMIN:
-            attrs['university'] = None
-            attrs.pop('university_id', None)
 
         # Verify department if provided
         dep_id = attrs.get('department_id')
         if dep_id:
             try:
-                attrs['department'] = Department.objects.get(id=dep_id)
+                attrs['department'] = Department.objects.select_related('college__university').get(id=dep_id)
             except Department.DoesNotExist:
                 raise serializers.ValidationError({"department_id": "Department not found."})
         else:
             attrs['department'] = None
+
+        # System Admin should not have a university
+        if role == RoleChoices.SYSTEM_ADMIN:
+            attrs['university'] = None
+            attrs.pop('university_id', None)
+        else:
+            university_id = attrs.get('university_id')
+            if university_id:
+                try:
+                    from academics.models import University
+                    attrs['university'] = University.objects.get(id=university_id)
+                except University.DoesNotExist:
+                    raise serializers.ValidationError({"university_id": "University not found."})
+            elif attrs.get('department') and hasattr(attrs['department'], 'college') and attrs['department'].college and attrs['department'].college.university:
+                attrs['university'] = attrs['department'].college.university
+            elif role == RoleChoices.ADMIN:
+                raise serializers.ValidationError(
+                    {"university_id": "University is required for Admin registration."}
+                )
+            else:
+                attrs['university'] = None
+
+            # Verify that department belongs to the chosen university
+            if attrs.get('department') and attrs.get('university'):
+                dept_uni = getattr(getattr(attrs['department'], 'college', None), 'university', None)
+                if dept_uni and dept_uni.id != attrs['university'].id:
+                    raise serializers.ValidationError(
+                        {"department_id": "Selected department does not belong to the chosen university."}
+                    )
 
         return attrs
 

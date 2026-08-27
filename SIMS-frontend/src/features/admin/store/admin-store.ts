@@ -736,9 +736,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   // Actions - Users
   setUsers: (users) => set({ users }),
   addUser: async (payload) => {
-    const newUser = await adminService.createUser(payload);
-    set((state) => ({ users: [newUser, ...state.users.filter((u) => u.id !== newUser.id)] }));
-    return newUser;
+    return adminService.createUser(payload);
   },
 
   updateUser: async (id, data) => {
