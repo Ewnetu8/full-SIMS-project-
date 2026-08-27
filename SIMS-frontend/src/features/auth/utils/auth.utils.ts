@@ -9,12 +9,14 @@ import type { UserRole } from '@/types';
  * Returns the default home page path for a given user role.
  * Used after login to redirect users to their role-specific dashboard.
  */
-export function getHomeByRole(role: UserRole): string {
-  switch (role) {
-    case 'admin':    return ROUTES.ADMIN.DASHBOARD;
-    case 'lecturer': return ROUTES.LECTURER.DASHBOARD;
-    case 'student':  return ROUTES.STUDENT.DASHBOARD;
-    default:         return ROUTES.HOME;
+export function getHomeByRole(role?: UserRole | string | null): string {
+  const normalized = (role || '').toLowerCase().trim();
+  switch (normalized) {
+    case 'system_admin': return ROUTES.SYSTEM_ADMIN.DASHBOARD;
+    case 'admin':        return ROUTES.ADMIN.DASHBOARD;
+    case 'lecturer':     return ROUTES.LECTURER.DASHBOARD;
+    case 'student':      return ROUTES.STUDENT.DASHBOARD;
+    default:             return ROUTES.HOME;
   }
 }
 
@@ -34,13 +36,14 @@ export const AUTH_ONLY_ROUTES = [
 ] as const;
 
 /** Top-level path prefixes that require authentication. */
-export const PROTECTED_PREFIXES = ['/dashboard', '/admin', '/lecturer', '/student'] as const;
+export const PROTECTED_PREFIXES = ['/dashboard', '/system-admin', '/admin', '/lecturer', '/student'] as const;
 
 /** Path prefixes that are allowed per role. */
 export const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[]> = {
-  admin:    ['/dashboard', '/admin'],
-  lecturer: ['/dashboard', '/lecturer'],
-  student:  ['/dashboard', '/student'],
+  system_admin: ['/dashboard', '/system-admin'],
+  admin:        ['/dashboard', '/admin'],
+  lecturer:     ['/dashboard', '/lecturer'],
+  student:      ['/dashboard', '/student'],
 };
 
 export function isPublicRoute(pathname: string): boolean {
@@ -59,8 +62,9 @@ export function isProtectedRoute(pathname: string): boolean {
  * Returns true if the given role may access the given pathname.
  * `/dashboard` is always allowed for any authenticated user.
  */
-export function hasRoleAccess(role: UserRole, pathname: string): boolean {
-  const allowed = ROLE_ALLOWED_PREFIXES[role];
+export function hasRoleAccess(role: UserRole | string, pathname: string): boolean {
+  const normalized = (role || '').toLowerCase().trim() as UserRole;
+  const allowed = ROLE_ALLOWED_PREFIXES[normalized] || [];
   return allowed.some((prefix) => pathname.startsWith(prefix));
 }
 
@@ -156,9 +160,10 @@ export function getTokenExpiryMs(expiresAt: number): number {
 /** Returns a human-readable label for a user role. */
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
-    admin:    'Administrator',
-    lecturer: 'Lecturer',
-    student:  'Student',
+    system_admin: 'System Administrator',
+    admin:        'Administrator',
+    lecturer:     'Lecturer',
+    student:      'Student',
   };
   return labels[role];
 }

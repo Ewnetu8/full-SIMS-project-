@@ -60,10 +60,11 @@ export interface RegisterUserPayload {
   password?: string;
   first_name?: string;
   last_name?: string;
-  role?: 'STUDENT' | 'LECTURER' | 'ADMIN' | 'student' | 'lecturer' | 'admin';
+  role?: 'SYSTEM_ADMIN' | 'ADMIN' | 'LECTURER' | 'STUDENT' | 'system_admin' | 'admin' | 'lecturer' | 'student';
   student_identifier?: string;
   faculty_identifier?: string;
   department_id?: string | null;
+  university_id?: string | null;
   national_id_fan?: string | null;
 }
 
@@ -99,7 +100,7 @@ export const adminService = {
    * Endpoint: POST /api/v1/auth/register
    */
   async createUser(data: RegisterUserPayload): Promise<UserCompact> {
-    const roleUpper = (data.role || 'STUDENT').toUpperCase() as 'STUDENT' | 'LECTURER' | 'ADMIN';
+    const roleUpper = (data.role || 'STUDENT').toUpperCase() as 'SYSTEM_ADMIN' | 'ADMIN' | 'LECTURER' | 'STUDENT';
 
     const payload: Record<string, unknown> = {
       email: data.email.trim(),
@@ -123,6 +124,10 @@ export const adminService = {
       payload.department_id = data.department_id;
     }
 
+    if (data.university_id && isValidUuid(data.university_id)) {
+      payload.university_id = data.university_id;
+    }
+
     const res = await api.post<{ user?: UserCompact } & UserCompact>(API_ENDPOINTS.AUTH.REGISTER, payload);
     return (res.user || res) as UserCompact;
   },
@@ -139,6 +144,10 @@ export const adminService = {
       payload.national_id_fan = data.national_id_fan ? data.national_id_fan.trim() : null;
     }
     if (data.role !== undefined) payload.role = data.role.toUpperCase();
+    if (data.university_id !== undefined) {
+      payload.university_id = data.university_id;
+      payload.university = data.university_id;
+    }
     if (data.is_active !== undefined) payload.is_active = data.is_active;
     if (data.is_staff !== undefined) payload.is_staff = data.is_staff;
 

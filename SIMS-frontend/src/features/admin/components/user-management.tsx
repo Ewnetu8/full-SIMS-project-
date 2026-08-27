@@ -18,6 +18,7 @@ import {
   Check,
   RefreshCw,
   AlertCircle,
+  School,
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -42,6 +43,7 @@ import {
   SearchInput,
 } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/store';
+import { useUniversities } from '@/features/universities';
 import { getUserFriendlyErrorMessage, parseFieldErrors } from '@/lib/errors';
 import { isValidUuid } from '@/lib/user-identifier';
 
@@ -54,6 +56,8 @@ import type {
 
 export function UserManagement() {
   const authUser = useAuthStore((state) => state.user);
+  const isSystemAdmin = authUser?.role === 'system_admin' || (authUser?.role as string) === 'SYSTEM_ADMIN';
+  const { data: universities = [] } = useUniversities();
 
   const {
     users,
@@ -64,6 +68,8 @@ export function UserManagement() {
     userRoleFilter,
     fetchUsers,
     fetchUserById,
+    fetchStudents,
+    fetchLecturers,
     fetchDepartments,
     addUser,
     updateUser,
@@ -91,7 +97,8 @@ export function UserManagement() {
     lastName: '',
     email: '',
     password: '',
-    role: 'STUDENT' as 'STUDENT' | 'LECTURER' | 'ADMIN',
+    role: 'STUDENT' as 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SYSTEM_ADMIN',
+    universityId: '',
     studentIdentifier: '',
     facultyIdentifier: '',
     departmentId: '',
@@ -103,7 +110,8 @@ export function UserManagement() {
     firstName: '',
     lastName: '',
     nationalId: '',
-    role: 'STUDENT' as 'STUDENT' | 'LECTURER' | 'ADMIN',
+    role: 'STUDENT' as 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SYSTEM_ADMIN',
+    universityId: '',
     isActive: true,
     isStaff: false,
   });
@@ -112,9 +120,9 @@ export function UserManagement() {
 
   // Initial load
   React.useEffect(() => {
-    fetchUsers({ search: userSearchQuery, role: userRoleFilter });
+    fetchUsers({ search: userSearchQuery, role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
     fetchDepartments();
-  }, [fetchUsers, fetchDepartments, userSearchQuery, userRoleFilter]);
+  }, [fetchUsers, fetchDepartments, userSearchQuery, userRoleFilter, isSystemAdmin]);
 
   // Handle Debounced Search
   const handleSearchChange = (value: string) => {
@@ -126,7 +134,7 @@ export function UserManagement() {
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      fetchUsers({ search: value, role: userRoleFilter });
+      fetchUsers({ search: value, role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
     }, 350);
   };
 
@@ -136,7 +144,7 @@ export function UserManagement() {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    fetchUsers({ search: '', role: userRoleFilter });
+    fetchUsers({ search: '', role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
   };
 
   // Handle Role Filter Change
@@ -148,17 +156,33 @@ export function UserManagement() {
   // Handle Open Add Modal
   const handleOpenAddModal = () => {
     setFieldErrors({});
-    setAddFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      password: '',
-      role: 'STUDENT',
-      studentIdentifier: '',
-      facultyIdentifier: '',
-      departmentId: '',
-      nationalId: '',
-    });
+    if (isSystemAdmin) {
+      setAddFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        role: 'ADMIN',
+        universityId: '',
+        studentIdentifier: '',
+        facultyIdentifier: '',
+        departmentId: '',
+        nationalId: '',
+      });
+    } else {
+      setAddFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        role: 'STUDENT',
+        universityId: authUser?.university || '',
+        studentIdentifier: '',
+        facultyIdentifier: '',
+        departmentId: '',
+        nationalId: '',
+      });
+    }
     setIsAddModalOpen(true);
   };
 
@@ -171,11 +195,12 @@ export function UserManagement() {
       lastName: user.last_name || '',
       nationalId: '',
       role: user.role,
+      universityId: user.university || '',
       isActive: user.is_active,
-      isStaff: user.role === 'ADMIN',
+      isStaff: user.role === 'ADMIN' || user.role === 'SYSTEM_ADMIN',
     });
 
-    // Fetch full details to populate national_id and is_staff if available
+    // Fetch full details to populate national_id, university, and is_staff if available
     try {
       const detail = await fetchUserById(user.id);
       setEditFormData({
@@ -183,6 +208,7 @@ export function UserManagement() {
         lastName: detail.last_name || '',
         nationalId: detail.national_id_fan || '',
         role: detail.role,
+        universityId: detail.university || '',
         isActive: detail.is_active,
         isStaff: detail.is_staff,
       });
@@ -233,6 +259,11 @@ export function UserManagement() {
       errors.last_name = 'Last name must not exceed 150 characters.';
     }
 
+    if (addFormData.role === 'ADMIN' && !addFormData.universityId) {
+      errors.universityId = 'University is required for Administrator role.';
+      errors.university_id = 'University is required for Administrator role.';
+    }
+
     if (addFormData.role === 'STUDENT' && !addFormData.studentIdentifier.trim()) {
       errors.studentIdentifier = "Please enter the student's ID before creating the account.";
       errors.student_identifier = "Please enter the student's ID before creating the account.";
@@ -259,10 +290,11 @@ export function UserManagement() {
         first_name?: string;
         last_name?: string;
         national_id_fan?: string | null;
-        role: 'STUDENT' | 'LECTURER' | 'ADMIN';
+        role: 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SYSTEM_ADMIN';
         student_identifier?: string;
         faculty_identifier?: string;
         department_id?: string | null;
+        university_id?: string | null;
       } = {
         email: addFormData.email.trim(),
         password: addFormData.password,
@@ -282,10 +314,19 @@ export function UserManagement() {
         payload.department_id = addFormData.departmentId;
       }
 
+      if (addFormData.universityId && isValidUuid(addFormData.universityId)) {
+        payload.university_id = addFormData.universityId;
+      }
+
       await addUser(payload);
       toast.success('User created successfully.');
       setIsAddModalOpen(false);
-      fetchUsers({ search: searchInput, role: userRoleFilter });
+      fetchUsers({ search: searchInput, role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
+      if (addFormData.role === 'STUDENT') {
+        fetchStudents();
+      } else if (addFormData.role === 'LECTURER') {
+        fetchLecturers();
+      }
     } catch (error: unknown) {
       const parsedFields = parseFieldErrors(error);
       setFieldErrors(parsedFields);
@@ -311,6 +352,10 @@ export function UserManagement() {
         is_staff: editFormData.isStaff,
       };
 
+      if (isSystemAdmin && editFormData.universityId && isValidUuid(editFormData.universityId)) {
+        payload.university_id = editFormData.universityId;
+      }
+
       // Only include role / is_active if not editing own account
       const isSelf = authUser?.id === editingUser.id;
       if (!isSelf) {
@@ -321,7 +366,7 @@ export function UserManagement() {
       await updateUser(editingUser.id, payload);
       toast.success('User updated successfully.');
       setEditingUser(null);
-      fetchUsers({ search: searchInput, role: userRoleFilter });
+      fetchUsers({ search: searchInput, role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
     } catch (error: unknown) {
       const parsedFields = parseFieldErrors(error);
       setFieldErrors(parsedFields);
@@ -337,7 +382,7 @@ export function UserManagement() {
     try {
       await updateUser(user.id, { is_active: true });
       toast.success('User activated successfully.');
-      fetchUsers({ search: searchInput, role: userRoleFilter });
+      fetchUsers({ search: searchInput, role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
     } catch (error: unknown) {
       toast.error(getUserFriendlyErrorMessage(error));
     }
@@ -351,7 +396,7 @@ export function UserManagement() {
       await deleteUser(deactivatingUser.id);
       toast.success('User deactivated successfully.');
       setDeactivatingUser(null);
-      fetchUsers({ search: searchInput, role: userRoleFilter });
+      fetchUsers({ search: searchInput, role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
     } catch (error: unknown) {
       toast.error(getUserFriendlyErrorMessage(error));
     }
@@ -366,14 +411,17 @@ export function UserManagement() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" /> User Management
+            {isSystemAdmin ? <Shield className="h-6 w-6 text-purple-600 dark:text-purple-400" /> : <Users className="h-6 w-6 text-primary" />}
+            {isSystemAdmin ? 'University Administrators' : 'User Management'}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage all institutional user accounts, access roles, and account statuses.
+            {isSystemAdmin
+              ? 'Create, provision, and manage institutional administrators assigned across all universities.'
+              : 'Manage all institutional user accounts, access roles, and account statuses.'}
           </p>
         </div>
         <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenAddModal}>
-          Add New User
+          {isSystemAdmin ? 'Provision Administrator' : 'Add New User'}
         </Button>
       </div>
 
@@ -382,7 +430,7 @@ export function UserManagement() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <SearchInput
-              placeholder="Search by name or email..."
+              placeholder={isSystemAdmin ? 'Search administrators by name or email...' : 'Search by name or email...'}
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
               onClear={handleClearSearch}
@@ -390,16 +438,23 @@ export function UserManagement() {
           </div>
 
           <div>
-            <select
-              className={selectClass}
-              value={userRoleFilter}
-              onChange={(e) => handleRoleFilterChange(e.target.value)}
-            >
-              <option value="ALL">All Roles</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="LECTURER">LECTURER</option>
-              <option value="STUDENT">STUDENT</option>
-            </select>
+            {isSystemAdmin ? (
+              <div className="flex items-center gap-2 h-9 px-3 rounded-lg border border-purple-500/30 bg-purple-500/10 text-xs font-semibold text-purple-700 dark:text-purple-300">
+                <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span className="truncate">Scope: University Administrators (ADMIN)</span>
+              </div>
+            ) : (
+              <select
+                className={selectClass}
+                value={userRoleFilter}
+                onChange={(e) => handleRoleFilterChange(e.target.value)}
+              >
+                <option value="ALL">All Roles</option>
+                <option value="ADMIN">ADMIN</option>
+                <option value="LECTURER">LECTURER</option>
+                <option value="STUDENT">STUDENT</option>
+              </select>
+            )}
           </div>
 
           <div className="flex items-center justify-end">
@@ -407,7 +462,7 @@ export function UserManagement() {
               variant="outline"
               size="sm"
               leftIcon={<RefreshCw className="h-4 w-4" />}
-              onClick={() => fetchUsers({ search: searchInput, role: userRoleFilter })}
+              onClick={() => fetchUsers({ search: searchInput, role: isSystemAdmin ? 'ADMIN' : userRoleFilter })}
               disabled={isLoadingUsers}
             >
               Refresh
@@ -429,7 +484,7 @@ export function UserManagement() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => fetchUsers({ search: searchInput, role: userRoleFilter })}
+            onClick={() => fetchUsers({ search: searchInput, role: isSystemAdmin ? 'ADMIN' : userRoleFilter })}
           >
             Retry
           </Button>
@@ -445,6 +500,7 @@ export function UserManagement() {
                 <th className="px-4 py-3.5">Name</th>
                 <th className="px-4 py-3.5">Email</th>
                 <th className="px-4 py-3.5">Role</th>
+                <th className="px-4 py-3.5">University</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5">Created Date</th>
                 <th className="px-4 py-3.5 text-right">Actions</th>
@@ -453,23 +509,27 @@ export function UserManagement() {
             <tbody className="divide-y divide-border">
               {isLoadingUsers ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     <div className="flex items-center justify-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      Loading users...
+                      {isSystemAdmin ? 'Loading administrators...' : 'Loading users...'}
                     </div>
                   </td>
                 </tr>
               ) : !usersError && users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-16 text-center">
+                  <td colSpan={7} className="px-4 py-16 text-center">
                     <div className="mx-auto flex max-w-md flex-col items-center justify-center text-center">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
-                        <Users className="h-6 w-6" />
+                        {isSystemAdmin ? <Shield className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                       </div>
-                      <h3 className="text-base font-semibold text-foreground">No users found</h3>
+                      <h3 className="text-base font-semibold text-foreground">
+                        {isSystemAdmin ? 'No university administrators found' : 'No users found'}
+                      </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        No user accounts match your current search or filter.
+                        {isSystemAdmin
+                          ? 'No administrator accounts match your current search.'
+                          : 'No user accounts match your current search or filter.'}
                       </p>
                       <Button
                         className="mt-5"
@@ -477,7 +537,7 @@ export function UserManagement() {
                         leftIcon={<Plus className="h-4 w-4" />}
                         onClick={handleOpenAddModal}
                       >
-                        Add New User
+                        {isSystemAdmin ? 'Provision Administrator' : 'Add New User'}
                       </Button>
                     </div>
                   </td>
@@ -489,6 +549,7 @@ export function UserManagement() {
                   const initialFirst = user.first_name?.[0] || '';
                   const initialLast = user.last_name?.[0] || '';
                   const avatarInitials = (initialFirst + initialLast).toUpperCase() || (user.email?.[0]?.toUpperCase() ?? 'U');
+                  const uniName = user.university_name || universities.find((u) => u.id === user.university)?.name;
 
                   return (
                     <tr key={user.id} className="hover:bg-accent/40 transition-colors">
@@ -518,19 +579,39 @@ export function UserManagement() {
                       <td className="px-4 py-3.5">
                         <Badge
                           variant={
-                            user.role === 'ADMIN'
+                            user.role === 'SYSTEM_ADMIN'
                               ? 'default'
-                              : user.role === 'LECTURER'
-                                ? 'secondary'
-                                : 'outline'
+                              : user.role === 'ADMIN'
+                                ? 'default'
+                                : user.role === 'LECTURER'
+                                  ? 'secondary'
+                                  : 'outline'
                           }
-                          className="gap-1 font-semibold"
+                          className={`gap-1 font-semibold ${
+                            user.role === 'SYSTEM_ADMIN'
+                              ? 'bg-purple-600/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                              : ''
+                          }`}
                         >
+                          {user.role === 'SYSTEM_ADMIN' && <Shield className="h-3 w-3 text-purple-600 dark:text-purple-400" />}
                           {user.role === 'ADMIN' && <Shield className="h-3 w-3 text-accent" />}
                           {user.role === 'LECTURER' && <UserCheck className="h-3 w-3 text-primary" />}
                           {user.role === 'STUDENT' && <GraduationCap className="h-3 w-3 text-primary" />}
-                          {user.role}
+                          {user.role === 'SYSTEM_ADMIN' ? 'System Admin' : user.role}
                         </Badge>
+                      </td>
+
+                      {/* University */}
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                        {user.role === 'SYSTEM_ADMIN' ? (
+                          <span className="text-purple-600 dark:text-purple-400 font-medium">Global (All)</span>
+                        ) : uniName ? (
+                          <span className="font-medium text-foreground truncate max-w-[160px] block" title={uniName}>
+                            {uniName}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
 
                       {/* Status */}
@@ -607,10 +688,12 @@ export function UserManagement() {
         <DialogContent size="xl" className="sm:max-w-3xl w-full">
           <DialogHeader>
             <DialogTitle className="text-xl text-[#102A7A] dark:text-foreground font-bold">
-              Add New User Account
+              {isSystemAdmin ? 'Provision University Administrator' : 'Add New User Account'}
             </DialogTitle>
             <DialogDescription>
-              Create a new user account for the university. Assign a role and enter the required information.
+              {isSystemAdmin
+                ? 'Create an administrator account and assign them to manage an institution.'
+                : 'Create a new user account for your university. Assign a role and enter the required information.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -672,14 +755,82 @@ export function UserManagement() {
                   id="addRole"
                   className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
                   value={addFormData.role}
-                  onChange={(e) => setAddFormData({ ...addFormData, role: e.target.value as 'STUDENT' | 'LECTURER' | 'ADMIN' })}
+                  onChange={(e) => {
+                    const newRole = e.target.value as 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SYSTEM_ADMIN';
+                    setAddFormData({
+                      ...addFormData,
+                      role: newRole,
+                      universityId: isSystemAdmin ? addFormData.universityId : (authUser?.university || ''),
+                    });
+                  }}
                 >
-                  <option value="STUDENT">STUDENT</option>
-                  <option value="LECTURER">LECTURER</option>
-                  <option value="ADMIN">ADMIN</option>
+                  {isSystemAdmin ? (
+                    <>
+                      <option value="ADMIN">ADMIN (University Administrator)</option>
+                      <option value="SYSTEM_ADMIN">SYSTEM_ADMIN (Global System Administrator)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="STUDENT">STUDENT</option>
+                      <option value="LECTURER">LECTURER</option>
+                      <option value="ADMIN">ADMIN</option>
+                    </>
+                  )}
                 </select>
                 {fieldErrors.role && <p className="text-xs text-destructive mt-1">{fieldErrors.role}</p>}
               </div>
+
+              {isSystemAdmin ? (
+                addFormData.role === 'ADMIN' ? (
+                  <div>
+                    <Label htmlFor="addUniversity" required>
+                      Assigned University
+                    </Label>
+                    <select
+                      id="addUniversity"
+                      className={`${selectClass} mt-1.5 focus:border-[#102A7A] focus:ring-[#D4AF37]/50`}
+                      value={addFormData.universityId}
+                      onChange={(e) => setAddFormData({ ...addFormData, universityId: e.target.value })}
+                    >
+                      <option value="">Select Target University...</option>
+                      {universities.map((uni) => (
+                        <option key={uni.id} value={uni.id}>
+                          {uni.name} ({uni.code})
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.universityId && <p className="text-xs text-destructive mt-1">{fieldErrors.universityId}</p>}
+                    {fieldErrors.university_id && <p className="text-xs text-destructive mt-1">{fieldErrors.university_id}</p>}
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="addUniversity">University Scope</Label>
+                    <Input
+                      id="addUniversity"
+                      value="Global Scope (All Universities)"
+                      disabled
+                      className="mt-1.5 bg-muted text-muted-foreground"
+                    />
+                  </div>
+                )
+              ) : (
+                <div>
+                  <Label htmlFor="addUniversity">University</Label>
+                  <Input
+                    id="addUniversity"
+                    value={
+                      authUser?.universityName ||
+                      universities.find((u) => u.id === authUser?.university)?.name ||
+                      'Assigned Institution'
+                    }
+                    disabled
+                    className="mt-1.5 bg-muted text-muted-foreground font-medium"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Automatically bound to your institution.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="addNationalId">National ID (FAN)</Label>
@@ -808,7 +959,7 @@ export function UserManagement() {
                 Edit User Account
               </DialogTitle>
               <DialogDescription>
-                Update profile information and account access. Allowed fields: First Name, Last Name, National ID, Role, Active Status, and Staff Access.
+                Update profile information and account access.
               </DialogDescription>
             </DialogHeader>
 
@@ -857,8 +1008,9 @@ export function UserManagement() {
                     className={`${selectClass} mt-1.5`}
                     value={editFormData.role}
                     disabled={authUser?.id === editingUser.id}
-                    onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value as 'STUDENT' | 'LECTURER' | 'ADMIN' })}
+                    onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value as any })}
                   >
+                    {isSystemAdmin && <option value="SYSTEM_ADMIN">SYSTEM_ADMIN</option>}
                     <option value="ADMIN">ADMIN</option>
                     <option value="LECTURER">LECTURER</option>
                     <option value="STUDENT">STUDENT</option>
@@ -867,6 +1019,38 @@ export function UserManagement() {
                     <p className="text-xs text-muted-foreground mt-1">You cannot change your own role.</p>
                   )}
                   {fieldErrors.role && <p className="text-xs text-destructive mt-1">{fieldErrors.role}</p>}
+                </div>
+
+                <div className="md:col-span-2">
+                  <Label htmlFor="editUniversity">University</Label>
+                  {isSystemAdmin ? (
+                    <select
+                      id="editUniversity"
+                      className={`${selectClass} mt-1.5`}
+                      value={editFormData.universityId}
+                      disabled={editFormData.role === 'SYSTEM_ADMIN'}
+                      onChange={(e) => setEditFormData({ ...editFormData, universityId: e.target.value })}
+                    >
+                      <option value="">None / Not Assigned</option>
+                      {universities.map((uni) => (
+                        <option key={uni.id} value={uni.id}>
+                          {uni.name} ({uni.code})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      id="editUniversity"
+                      value={
+                        editingUser.university_name ||
+                        universities.find((u) => u.id === editingUser.university)?.name ||
+                        'Not Assigned'
+                      }
+                      disabled
+                      className="mt-1.5 bg-muted text-muted-foreground"
+                    />
+                  )}
+                  {fieldErrors.university_id && <p className="text-xs text-destructive mt-1">{fieldErrors.university_id}</p>}
                 </div>
               </div>
 
@@ -972,18 +1156,25 @@ export function UserManagement() {
                     <div className="pt-1 flex items-center gap-2.5 flex-wrap">
                       <Badge
                         variant={
-                          viewingUserDetail.role === 'ADMIN'
+                          viewingUserDetail.role === 'SYSTEM_ADMIN'
                             ? 'default'
-                            : viewingUserDetail.role === 'LECTURER'
-                              ? 'secondary'
-                              : 'outline'
+                            : viewingUserDetail.role === 'ADMIN'
+                              ? 'default'
+                              : viewingUserDetail.role === 'LECTURER'
+                                ? 'secondary'
+                                : 'outline'
                         }
-                        className="font-semibold gap-1.5 px-3 py-1 text-xs"
+                        className={`font-semibold gap-1.5 px-3 py-1 text-xs ${
+                          viewingUserDetail.role === 'SYSTEM_ADMIN'
+                            ? 'bg-purple-600/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                            : ''
+                        }`}
                       >
+                        {viewingUserDetail.role === 'SYSTEM_ADMIN' && <Shield className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />}
                         {viewingUserDetail.role === 'ADMIN' && <Shield className="h-3.5 w-3.5 text-accent" />}
                         {viewingUserDetail.role === 'LECTURER' && <UserCheck className="h-3.5 w-3.5 text-primary" />}
                         {viewingUserDetail.role === 'STUDENT' && <GraduationCap className="h-3.5 w-3.5 text-primary" />}
-                        {viewingUserDetail.role}
+                        {viewingUserDetail.role === 'SYSTEM_ADMIN' ? 'System Admin' : viewingUserDetail.role}
                       </Badge>
                       <Badge variant={viewingUserDetail.is_active ? 'success' : 'secondary'} className="px-3 py-1 text-xs">
                         {viewingUserDetail.is_active ? 'Active' : 'Inactive'}
@@ -1002,7 +1193,7 @@ export function UserManagement() {
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Account Information
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="p-4 rounded-xl border border-border/80 bg-card/60 space-y-1.5 shadow-xs">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="flex items-center gap-1.5 font-medium">
@@ -1022,6 +1213,19 @@ export function UserManagement() {
                       </div>
                       <p className="font-mono text-xs font-semibold text-foreground break-all select-all pt-0.5">
                         {viewingUserDetail.id}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-border/80 bg-card/60 space-y-1.5 shadow-xs">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <School className="h-4 w-4 text-primary" /> University
+                      </div>
+                      <p className="text-xs font-semibold text-foreground pt-0.5 truncate">
+                        {viewingUserDetail.role === 'SYSTEM_ADMIN'
+                          ? 'Global (All Universities)'
+                          : viewingUserDetail.university_name ||
+                            universities.find((u) => u.id === viewingUserDetail.university)?.name ||
+                            'Not Assigned'}
                       </p>
                     </div>
 

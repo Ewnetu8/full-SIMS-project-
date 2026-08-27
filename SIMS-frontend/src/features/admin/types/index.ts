@@ -1,6 +1,6 @@
 // ─── Admin Feature Data Types ──────────────────────────────────────────────────
 
-export type UserRole = 'ADMIN' | 'LECTURER' | 'STUDENT' | 'admin' | 'lecturer' | 'student';
+export type UserRole = 'SYSTEM_ADMIN' | 'ADMIN' | 'LECTURER' | 'STUDENT' | 'system_admin' | 'admin' | 'lecturer' | 'student';
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface UserCompact {
@@ -8,7 +8,9 @@ export interface UserCompact {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'ADMIN' | 'LECTURER' | 'STUDENT';
+  role: 'SYSTEM_ADMIN' | 'ADMIN' | 'LECTURER' | 'STUDENT';
+  university?: string | null;
+  university_name?: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -34,9 +36,11 @@ export interface UserDetail {
   first_name: string;
   last_name: string;
   national_id_fan: string | null;
-  role: 'ADMIN' | 'LECTURER' | 'STUDENT';
+  role: 'SYSTEM_ADMIN' | 'ADMIN' | 'LECTURER' | 'STUDENT';
   is_active: boolean;
   is_staff: boolean;
+  university?: string | null;
+  university_name?: string | null;
   student_profile: NestedStudentProfile | null;
   lecturer_profile: NestedLecturerProfile | null;
   created_at: string;
@@ -47,7 +51,8 @@ export interface UpdateUserPayload {
   first_name?: string;
   last_name?: string;
   national_id_fan?: string | null;
-  role?: 'ADMIN' | 'LECTURER' | 'STUDENT';
+  role?: 'SYSTEM_ADMIN' | 'ADMIN' | 'LECTURER' | 'STUDENT';
+  university_id?: string | null;
   is_active?: boolean;
   is_staff?: boolean;
 }
