@@ -23,6 +23,7 @@ import { Breadcrumb } from '@/components/navigation';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { ROUTES } from '@/constants';
 
+import { lecturerDirectoryService } from '@/services';
 import { studentService } from '../services';
 import { useStudentStore } from '../store/student-store';
 import type { Examination } from '../types';
@@ -42,6 +43,7 @@ export function ExamsPage({ completed = false }: { completed?: boolean }) {
   const { activeExams, isLoadingExams, examsError, fetchActiveExams } = useStudentStore();
 
   React.useEffect(() => {
+    void lecturerDirectoryService.loadLecturers();
     void fetchActiveExams();
 
     const interval = setInterval(() => {
@@ -106,6 +108,7 @@ function ExamCard({ exam, completed }: { exam: Examination; completed: boolean }
   const offering = exam.course_offering_detail;
   const courseTitle = offering?.course_title || offering?.course_detail?.title || 'Course Assessment';
   const courseCode = offering?.course_code || offering?.course_detail?.course_code || 'COURSE';
+  const lecturerName = exam.lecturer_name || (exam.lecturer ? lecturerDirectoryService.getLecturerNameSync(exam.lecturer) : '');
 
   const isAvailable = exam.status === 'ACTIVE';
 
@@ -117,7 +120,7 @@ function ExamCard({ exam, completed }: { exam: Examination; completed: boolean }
             <span className="inline-block font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded">{courseCode}</span>
             <CardTitle className="mt-2">{exam.title}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              {courseTitle} {exam.lecturer ? `· ${exam.lecturer}` : ''}
+              {courseTitle} {lecturerName ? `· ${lecturerName}` : ''}
             </p>
           </div>
           <Badge variant={isAvailable ? 'success' : completed ? 'secondary' : 'warning'}>
@@ -178,6 +181,7 @@ function Detail({
 export function ExamDetails({ examId }: { examId: string }) {
   const router = useRouter();
   const [exam, setExam] = React.useState<Examination | null>(null);
+  const [lecturerName, setLecturerName] = React.useState<string>('');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isStarting, setIsStarting] = React.useState(false);
@@ -191,6 +195,10 @@ export function ExamDetails({ examId }: { examId: string }) {
         const data = await studentService.getExamDetails(examId);
         if (isMounted) {
           setExam(data);
+          if (data.lecturer) {
+            const resolved = await lecturerDirectoryService.resolveLecturerName(data.lecturer);
+            if (isMounted) setLecturerName(resolved);
+          }
           setLoading(false);
         }
       } catch (err: any) {
@@ -255,7 +263,7 @@ export function ExamDetails({ examId }: { examId: string }) {
           />
         }
         title={exam.title}
-        description={`${courseCode} · ${courseTitle} ${exam.lecturer ? `(Instructor: ${exam.lecturer})` : ''}`}
+        description={`${courseCode} · ${courseTitle} ${lecturerName ? `(Instructor: ${lecturerName})` : ''}`}
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <Button asChild variant="outline" leftIcon={<ArrowLeft className="h-4 w-4" />}>

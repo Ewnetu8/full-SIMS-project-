@@ -444,7 +444,14 @@ export function ResultsPage() {
 
 export function ResultDetails({ resultId }: { resultId: string }) {
   const router = useRouter();
-  const { results, fetchResults, enrollments, fetchEnrollments } = useStudentStore();
+  const {
+    results,
+    isLoadingResults,
+    fetchResults,
+    enrollments,
+    isLoadingEnrollments,
+    fetchEnrollments,
+  } = useStudentStore();
 
   React.useEffect(() => {
     if (results.length === 0) {
@@ -455,8 +462,18 @@ export function ResultDetails({ resultId }: { resultId: string }) {
     }
   }, [results.length, enrollments.length, fetchResults, fetchEnrollments]);
 
+  // Show loading skeleton while initially fetching
+  if ((isLoadingResults && results.length === 0) || (isLoadingEnrollments && enrollments.length === 0)) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
   // Find either in official results (from /api/v1/results/me) or in enrollments
-  const result = results.find((r) => r.id === resultId || r.exam_id === resultId);
+  const result = results.find((r) => r.id === resultId || r.exam_id === resultId || r.exam_attempt === resultId);
   const enrollment = enrollments.find((e) => e.id === resultId);
 
   if (!result && !enrollment) {

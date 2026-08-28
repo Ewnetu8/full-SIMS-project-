@@ -1,3 +1,4 @@
+import { lecturerDirectoryService } from '@/services';
 import { studentService } from '@/features/student/services/student.service';
 import type {
   ExaminationAnswer,
@@ -29,16 +30,24 @@ export const examinationService = {
         : exam.questions || [];
 
     // 3. Map Questions
-    const mappedQuestions: ExaminationQuestion[] = rawQuestions.map((q: Question) => ({
-      id: q.id,
-      type: (q.question_type as any) || 'MCQ',
-      prompt: q.question_text,
-      marks: typeof q.total_points === 'number' ? q.total_points : parseFloat(String(q.total_points || 1)),
-      options: (q.options || []).map((opt) => ({
-        id: opt.id,
-        text: opt.option_text,
-      })),
-    }));
+    const mappedQuestions: ExaminationQuestion[] = rawQuestions.map(
+      (q, index) => ({
+        id: q.id,
+        index: index + 1,
+        prompt: q.question_text,
+        type: q.question_type,
+        marks: parseFloat(String(q.total_points || 1)),
+        options: (q.options || []).map((opt) => ({
+          id: opt.id,
+          text: opt.option_text,
+        })),
+        rubricCriteria: (q.rubric_criteria || []).map((rc) => ({
+          id: rc.id,
+          name: rc.name || rc.criterion_name,
+          points: parseFloat(String(rc.max_points || rc.points || 0)),
+        })),
+      })
+    );
 
     console.log(
       '[MAPPED QUESTIONS]',
@@ -62,13 +71,17 @@ export const examinationService = {
       exam.course_offering_detail?.course_detail?.course_code ||
       'COURSES';
 
+    const lecturerName = exam.lecturer
+      ? await lecturerDirectoryService.resolveLecturerName(exam.lecturer)
+      : 'Course Instructor';
+
     return {
       examId: exam.id,
       attemptId: attempt.id,
       examTitle: exam.title,
       course: courseTitle,
       courseCode: courseCode,
-      lecturer: exam.lecturer || 'Course Instructor',
+      lecturer: lecturerName || 'Course Instructor',
       durationSeconds,
       totalMarks,
       instructions: [

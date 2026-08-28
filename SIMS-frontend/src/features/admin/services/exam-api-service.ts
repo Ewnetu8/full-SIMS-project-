@@ -1,4 +1,5 @@
 import { api } from '@/services/api-client';
+import { lecturerDirectoryService } from '@/services/lecturer-directory-service';
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
 import type {
   AdminExamOverview,
@@ -41,12 +42,16 @@ export interface ApiQuestion {
 }
 
 function mapApiExamToOverview(e: ApiExamination): AdminExamOverview {
+  const resolvedLecturerName = e.lecturer
+    ? lecturerDirectoryService.getLecturerNameSync(e.lecturer)
+    : 'Faculty Instructor';
+
   return {
     id: e.id,
     course_offering: e.course_offering,
     course_offering_detail: e.course_offering_detail || null,
     lecturer: e.lecturer,
-    lecturerName: e.lecturer || 'Faculty Instructor',
+    lecturerName: resolvedLecturerName,
     title: e.title,
     status: e.status,
     start_window: e.start_window || null,
@@ -73,6 +78,7 @@ export const examApiService = {
    * Endpoint: GET /api/v1/exams
    */
   async getExams(params?: { status?: string; course_offering?: string }): Promise<AdminExamOverview[]> {
+    await lecturerDirectoryService.loadLecturers();
     const queryParams = new URLSearchParams();
     if (params?.status && params.status !== 'ALL') {
       queryParams.append('status', params.status);
@@ -92,6 +98,7 @@ export const examApiService = {
    * Endpoint: GET /api/v1/exams/{id}
    */
   async getExamById(id: string): Promise<AdminExamOverview> {
+    await lecturerDirectoryService.loadLecturers();
     const raw = await api.get<ApiExamination>(API_ENDPOINTS.EXAMS.BY_ID(id));
     return mapApiExamToOverview(raw);
   },
