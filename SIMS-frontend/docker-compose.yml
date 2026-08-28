@@ -61,6 +61,9 @@ services:
       # Node environment — controls Next.js dev mode (HMR, detailed errors)
       - NODE_ENV=development
 
+      # Polling-based file watching for Docker Desktop on Windows
+      - WATCHPACK_POLLING=true
+
       # Suppress telemetry
       - NEXT_TELEMETRY_DISABLED=1
 

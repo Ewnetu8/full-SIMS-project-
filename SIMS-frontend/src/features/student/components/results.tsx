@@ -113,7 +113,7 @@ export function ResultsPage() {
           />
         }
         title="Official Examination Results & Grades"
-        description="View your verified exam attempts, official scores, grade letters, and certification records directly from SIMS."
+        description="View your verified exam attempts, official scores, and certification records directly from SIMS."
       />
 
       {/* Summary Metrics Cards */}
@@ -298,11 +298,11 @@ export function ResultsPage() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-2xl font-mono font-extrabold text-foreground">
-                        {result.grade_letter || '—'}
-                      </div>
-                      <div className="text-xs font-mono font-semibold text-muted-foreground">
+                      <div className="text-lg font-mono font-bold text-foreground">
                         {result.final_score ? `${parseFloat(result.final_score).toFixed(1)} pts` : '—'}
+                      </div>
+                      <div className="text-xs font-medium text-muted-foreground">
+                        Final Score
                       </div>
                     </div>
                   </div>
@@ -505,19 +505,16 @@ export function ResultDetails({ resultId }: { resultId: string }) {
         />
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main Grade Card */}
-          <Card className="shadow-sm lg:col-span-1 border-border">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider">
-                Official Grade Letter
+          {/* Main Score & Status Card */}
+          <Card className="shadow-sm lg:col-span-1 border-border flex flex-col justify-center">
+            <CardHeader className="text-center pb-0">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Examination Score
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-center">
-              <div className="text-6xl font-mono font-extrabold text-success">
-                {result.grade_letter || '—'}
-              </div>
-              <div className="text-lg font-mono font-bold text-foreground">
-                Score: {result.final_score ? `${parseFloat(result.final_score).toFixed(2)} pts` : 'Not graded'}
+            <CardContent className="space-y-4 text-center pt-2 pb-6">
+              <div className="text-4xl font-mono font-extrabold text-foreground">
+                {result.final_score ? `${parseFloat(result.final_score).toFixed(2)} pts` : 'Not graded'}
               </div>
               <Badge
                 variant={result.grading_status === 'CERTIFIED' ? 'success' : 'secondary'}
