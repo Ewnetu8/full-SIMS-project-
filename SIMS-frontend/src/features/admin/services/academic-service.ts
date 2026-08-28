@@ -345,8 +345,18 @@ export const academicService = {
 
   // ── Academic Years ───────────────────────────────────────────────────────────
   async getAcademicYears(): Promise<AcademicYear[]> {
-    const raw = await api.get<ApiAcademicYear[]>(API_ENDPOINTS.ACADEMICS.ACADEMIC_YEARS);
-    return raw.map((y) => ({
+    const raw = await api.get<ApiAcademicYear[] | { results?: ApiAcademicYear[]; data?: ApiAcademicYear[] }>(
+      API_ENDPOINTS.ACADEMICS.ACADEMIC_YEARS,
+    );
+    let list: ApiAcademicYear[] = [];
+    if (Array.isArray(raw)) {
+      list = raw;
+    } else if (Array.isArray(raw?.results)) {
+      list = raw.results;
+    } else if (Array.isArray(raw?.data)) {
+      list = raw.data;
+    }
+    return list.map((y) => ({
       id: y.id,
       displayLabel: y.display_label,
       startBoundary: y.start_boundary,

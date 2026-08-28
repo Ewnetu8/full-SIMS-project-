@@ -43,17 +43,9 @@ COPY . .
 # ── Runtime Configuration ─────────────────────────────────────────────────────
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Enable polling-based file watching for environments where inotify is
-# unavailable or unreliable (Windows WSL2, some VM setups).
-# Next.js will poll every 300 ms instead of relying on fs.watch events.
 ENV WATCHPACK_POLLING=true
-
+ENV PORT=3000
 EXPOSE 3000
 
-# Start the Next.js development server with Turbopack for faster HMR.
-# (Remove --turbopack if your project uses a custom webpack config that is
-# not yet Turbopack-compatible.)
-CMD ["npm", "run", "dev"]
+# Start the Next.js development server with Turbopack with a clean build cache.
+CMD ["sh", "-c", "rm -rf /app/.next/* && npm run dev"]

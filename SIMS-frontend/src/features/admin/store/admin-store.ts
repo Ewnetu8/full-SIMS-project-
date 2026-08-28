@@ -92,6 +92,7 @@ interface AdminStoreState {
   isLoadingPrograms: boolean;
   programsError: string | null;
   isLoadingAcademicYears: boolean;
+  academicYearsError: string | null;
   isLoadingSemesters: boolean;
   semestersError: string | null;
   isLoadingCourses: boolean;
@@ -343,6 +344,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   isLoadingPrograms: false,
   programsError: null,
   isLoadingAcademicYears: false,
+  academicYearsError: null,
   isLoadingSemesters: false,
   semestersError: null,
   isLoadingCourses: false,
@@ -606,12 +608,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   },
 
   fetchAcademicYears: async () => {
-    set({ isLoadingAcademicYears: true });
+    set({ isLoadingAcademicYears: true, academicYearsError: null });
     try {
       const academicYears = await adminService.getAcademicYears();
-      set({ academicYears, isLoadingAcademicYears: false });
-    } catch {
-      set({ isLoadingAcademicYears: false });
+      set({ academicYears, isLoadingAcademicYears: false, academicYearsError: null });
+    } catch (err: unknown) {
+      set({ academicYears: [], isLoadingAcademicYears: false, academicYearsError: getUserFriendlyErrorMessage(err) });
     }
   },
 
@@ -827,17 +829,20 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   setAcademicYearSearchQuery: (academicYearSearchQuery) => set({ academicYearSearchQuery }),
   addAcademicYear: async (data) => {
     const year = await adminService.createAcademicYear(data);
-    set((state) => ({ academicYears: [year, ...state.academicYears] }));
+    set((state) => ({ academicYears: [year, ...state.academicYears.filter((y) => y.id !== year.id)] }));
+    await get().fetchAcademicYears();
     return year;
   },
   updateAcademicYear: async (id, data) => {
     const updated = await adminService.updateAcademicYear(id, data);
     set((state) => ({ academicYears: state.academicYears.map((y) => (y.id === id ? updated : y)) }));
+    await get().fetchAcademicYears();
     return updated;
   },
   deleteAcademicYear: async (id) => {
     await adminService.deleteAcademicYear(id);
     set((state) => ({ academicYears: state.academicYears.filter((y) => y.id !== id) }));
+    await get().fetchAcademicYears();
   },
 
   // Actions - Semesters

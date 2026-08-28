@@ -627,11 +627,32 @@ export const lecturerService = {
   },
 
   /**
-   * Get student submissions for an exam.
-   * Fallback for backend routes not available.
+   * Get student submissions for an exam from GET /api/v1/results/exam/{id}.
    */
   async getSubmissions(examId?: string): Promise<StudentSubmission[]> {
-    return [];
+    if (!examId) return [];
+    try {
+      const results = await getExamResults(examId);
+      const exam = await this.getExamById(examId).catch(() => null);
+      if (!results?.students || !Array.isArray(results.students)) return [];
+
+      return results.students.map((s: any) => ({
+        id: s.attempt_id || s.student_id,
+        examId,
+        examTitle: (results as any).exam_title || results.title || exam?.title || 'Examination',
+        studentId: s.student_identifier || s.student_id,
+        studentName: s.student_name || 'Enrolled Student',
+        studentEmail: s.student_email || '',
+        submittedAt: s.submission_time || new Date().toISOString(),
+        score: s.final_score !== null && s.final_score !== undefined ? Number(s.final_score) : undefined,
+        totalMarks: exam?.totalMarks || 100,
+        status: s.final_score !== null && s.final_score !== undefined ? 'GRADED' : 'SUBMITTED',
+        aiGradingStatus: s.grading_status === 'GRADING_COMPLETE' ? 'COMPLETED' : 'PENDING',
+        answers: {},
+      }));
+    } catch {
+      return [];
+    }
   },
 
   /**

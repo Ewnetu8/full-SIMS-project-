@@ -113,6 +113,7 @@ export interface Examination {
     course_detail?: Course;
   };
   lecturer: string;
+  lecturer_name?: string;
   title: string;
   status: ExaminationStatusEnum;
   start_window: string;

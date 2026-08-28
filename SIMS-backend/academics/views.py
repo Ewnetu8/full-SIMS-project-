@@ -444,7 +444,7 @@ class AcademicYearListView(APIView):
 
     @extend_schema(tags=["AcademicYear"], summary="List academic years", responses={200: AcademicYearSerializer(many=True)})
     def get(self, request):
-        queryset = AcademicYear.objects.all().order_by("-start_boundary")
+        queryset = AcademicYear.objects.all().select_related("university").order_by("-start_boundary")
         uni = _get_user_university(request)
         if uni:
             queryset = queryset.filter(university=uni)
@@ -458,7 +458,10 @@ class AcademicYearListView(APIView):
             data['university'] = str(uni.pk)
         serializer = AcademicYearSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            if uni:
+                serializer.save(university=uni)
+            else:
+                serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -469,7 +472,7 @@ class AcademicYearDetailView(APIView):
 
     def get_object(self, pk):
         try:
-            return AcademicYear.objects.get(pk=pk)
+            return AcademicYear.objects.select_related("university").get(pk=pk)
         except AcademicYear.DoesNotExist:
             return None
 
