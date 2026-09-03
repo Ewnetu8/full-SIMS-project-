@@ -20,6 +20,7 @@ export interface BaseUser {
   avatarUrl?: string;
   studentIdentifier?: string;
   facultyIdentifier?: string;
+  mfaEnabled?: boolean | null;
   createdAt: string;
   updatedAt: string;
 }

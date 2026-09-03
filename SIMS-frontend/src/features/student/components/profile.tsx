@@ -18,6 +18,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useAuthStore } from '@/features/auth/store';
+import { MfaSettings } from '@/features/auth/components';
 import { useTheme } from '@/providers/theme-provider';
 import { PageHeader } from '@/components/layout';
 import { Breadcrumb } from '@/components/navigation';
@@ -282,6 +283,9 @@ export function ProfilePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Account Security & MFA */}
+          <MfaSettings />
         </div>
       </div>
     </div>

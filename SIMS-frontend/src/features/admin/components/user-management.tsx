@@ -120,9 +120,10 @@ export function UserManagement() {
 
   // Initial load
   React.useEffect(() => {
+    if (!authUser) return;
     fetchUsers({ search: userSearchQuery, role: isSystemAdmin ? 'ADMIN' : userRoleFilter });
     fetchDepartments();
-  }, [fetchUsers, fetchDepartments, userSearchQuery, userRoleFilter, isSystemAdmin]);
+  }, [fetchUsers, fetchDepartments, userSearchQuery, userRoleFilter, isSystemAdmin, authUser]);
 
   // Handle Debounced Search
   const handleSearchChange = (value: string) => {

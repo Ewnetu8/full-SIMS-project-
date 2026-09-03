@@ -202,7 +202,10 @@ JWT_AUTH_COOKIE = 'refresh_token'
 JWT_AUTH_COOKIE_SECURE = not DEBUG  # True in prod, False in dev (or custom via SSL proxy check)
 JWT_AUTH_COOKIE_HTTP_ONLY = True
 JWT_AUTH_COOKIE_PATH = '/api/v1/auth/'
-JWT_AUTH_COOKIE_SAMESITE = 'Lax'
+JWT_AUTH_COOKIE_SAMESITE = os.environ.get('JWT_AUTH_COOKIE_SAMESITE', 'None')
+
+CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'None')
+CSRF_COOKIE_SECURE = not DEBUG
 
 # CORS Config
 CORS_ALLOWED_ORIGINS = []
@@ -215,6 +218,19 @@ else:
         'http://127.0.0.1:3000',
     ]
 CORS_ALLOW_CREDENTIALS = True  # Required to allow sending the HTTP-only refresh cookie
+
+# CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = []
+csrf_trusted_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if csrf_trusted_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_env.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://localhost',
+        'https://127.0.0.1',
+    ]
 
 # Celery settings
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')

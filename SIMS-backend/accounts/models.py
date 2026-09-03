@@ -63,7 +63,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     mfa_enabled = models.BooleanField(default=False)
-    mfa_secret = models.CharField(max_length=64, blank=True, default='')
+    mfa_secret = models.CharField(max_length=255, blank=True, default='')
 
     objects = UserManager()
 

@@ -19,7 +19,15 @@ const studentNavigation: NavItem[] = [
 ];
 
 export function StudentShell({ children }: { children: React.ReactNode }) {
-  useRouteProtection(['student']);
+  const { isAuthenticated, user, isLoading } = useRouteProtection(['student']);
+
+  if (isLoading || !isAuthenticated || !user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout

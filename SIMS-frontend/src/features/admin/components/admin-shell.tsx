@@ -68,10 +68,11 @@ export interface AdminShellProps {
 
 export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
   const router = useRouter();
-  const { data: notifications = [] } = useNotifications();
+  const { isAuthenticated, user, isLoading } = useRouteProtection(['admin']);
+  const { data: notifications = [] } = useNotifications(undefined, {
+    enabled: Boolean(isAuthenticated && user),
+  });
   const markAsReadMutation = useMarkNotificationAsRead();
-
-  useRouteProtection(['admin']);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -93,6 +94,14 @@ export function AdminShell({ children, breadcrumbItems }: AdminShellProps) {
       markAsReadMutation.mutate(n.id);
     });
   }, [notifications, markAsReadMutation]);
+
+  if (isLoading || !isAuthenticated || !user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout

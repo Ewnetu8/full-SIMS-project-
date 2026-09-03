@@ -13,6 +13,10 @@ export const API_ENDPOINTS = {
     RESET_PASSWORD: '/api/v1/auth/reset-password',
     ME: '/api/v1/auth/me',
     LECTURER_PROTECTED: '/api/v1/auth/protected/lecturer-only',
+    MFA_SETUP: '/api/v1/auth/mfa/setup',
+    MFA_VERIFY: '/api/v1/auth/mfa/verify',
+    MFA_LOGIN: '/api/v1/auth/mfa/login',
+    MFA_DISABLE: '/api/v1/auth/mfa/disable',
   },
 
   // ── Academics ─────────────────────────────────────────────────────────────

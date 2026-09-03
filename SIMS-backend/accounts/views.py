@@ -76,6 +76,7 @@ _AuthSuccess = inline_serializer(
     fields={
         'user': _UserOut,
         'access': drf_serializers.CharField(help_text='Short-lived JWT access token (15 min).'),
+        'refresh': drf_serializers.CharField(required=False, help_text='Refresh token.'),
     }
 )
 
@@ -83,6 +84,7 @@ _TokenRefreshOut = inline_serializer(
     name='TokenRefreshOut',
     fields={
         'access': drf_serializers.CharField(help_text='New short-lived JWT access token.'),
+        'refresh': drf_serializers.CharField(required=False, help_text='New refresh token.'),
     }
 )
 
@@ -177,6 +179,7 @@ class RegisterView(APIView):
             response_data = {
                 'user': UserResponseSerializer(user).data,
                 'access': str(access_token),
+                'refresh': str(refresh),
             }
 
             response = Response(response_data, status=status.HTTP_201_CREATED)
@@ -302,6 +305,7 @@ class LoginView(APIView):
                 {
                     'user': UserResponseSerializer(user).data,
                     'access': str(access_token),
+                    'refresh': str(refresh),
                 },
                 status=status.HTTP_200_OK,
             )
@@ -399,8 +403,7 @@ class CookieTokenRefreshView(APIView):
                         pass
 
                 new_refresh = RefreshToken.for_user(user)
-                if body_refresh:
-                    response_data['refresh'] = str(new_refresh)
+                response_data['refresh'] = str(new_refresh)
 
                 response = Response(response_data, status=status.HTTP_200_OK)
                 response.set_cookie(
@@ -412,8 +415,7 @@ class CookieTokenRefreshView(APIView):
                     samesite=settings.JWT_AUTH_COOKIE_SAMESITE,
                 )
             else:
-                if body_refresh:
-                    response_data['refresh'] = str(refresh)
+                response_data['refresh'] = str(refresh)
                 response = Response(response_data, status=status.HTTP_200_OK)
 
             return response
@@ -833,6 +835,7 @@ class MFALoginView(APIView):
             {
                 'user': UserResponseSerializer(user).data,
                 'access': str(access_token),
+                'refresh': str(refresh),
             },
             status=status.HTTP_200_OK,
         )

@@ -7,6 +7,7 @@ import {
   Bell,
   Building2,
   Shield,
+  ShieldCheck,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -24,6 +25,7 @@ const systemAdminNavigation: NavItem[] = [
   { label: 'Overview', href: ROUTES.SYSTEM_ADMIN.DASHBOARD, icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Universities', href: ROUTES.SYSTEM_ADMIN.UNIVERSITIES, icon: <School className="h-4 w-4" /> },
   { label: 'University Admins', href: ROUTES.SYSTEM_ADMIN.USERS, icon: <Shield className="h-4 w-4" /> },
+  { label: 'Security & MFA', href: ROUTES.SECURITY_SETTINGS, icon: <ShieldCheck className="h-4 w-4" /> },
   { label: 'Notifications', href: ROUTES.SYSTEM_ADMIN.NOTIFICATIONS, icon: <Bell className="h-4 w-4" /> },
 ];
 
@@ -35,10 +37,11 @@ export interface SystemAdminShellProps {
 
 export function SystemAdminShell({ children, breadcrumbItems }: SystemAdminShellProps) {
   const router = useRouter();
-  const { data: notifications = [] } = useNotifications();
+  const { isAuthenticated, user, isLoading } = useRouteProtection(['system_admin']);
+  const { data: notifications = [] } = useNotifications(undefined, {
+    enabled: Boolean(isAuthenticated && user),
+  });
   const markAsReadMutation = useMarkNotificationAsRead();
-
-  useRouteProtection(['system_admin']);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -61,6 +64,14 @@ export function SystemAdminShell({ children, breadcrumbItems }: SystemAdminShell
     });
   }, [notifications, markAsReadMutation]);
 
+  if (isLoading || !isAuthenticated || !user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <DashboardLayout
       showFooter
@@ -68,12 +79,12 @@ export function SystemAdminShell({ children, breadcrumbItems }: SystemAdminShell
       topNavProps={{
         actions: (
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-500/10 px-2.5 py-1 rounded-full border border-purple-500/20">
-              <Shield className="h-3 w-3" /> System Admin Scope
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/5 px-2.5 py-1 rounded-md border border-primary/20">
+              <Shield className="h-3.5 w-3.5 text-[#B08A00]" /> System Administration Scope
             </span>
             {unreadCount > 0 && (
-              <span className="hidden text-xs font-medium text-accent sm:inline bg-accent/10 px-2.5 py-1 rounded-full border border-accent/20">
-                {unreadCount} alert{unreadCount > 1 ? 's' : ''}
+              <span className="hidden text-xs font-medium text-amber-700 dark:text-amber-400 sm:inline bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/20">
+                {unreadCount} notification{unreadCount > 1 ? 's' : ''}
               </span>
             )}
           </div>

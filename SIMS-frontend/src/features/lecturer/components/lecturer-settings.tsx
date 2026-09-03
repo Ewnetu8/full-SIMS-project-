@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/layout';
 import { Breadcrumb } from '@/components/navigation';
 import { Badge, Card, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { MfaSettings } from '@/features/auth/components';
 import { useAuthStore } from '@/features/auth/store';
 import { useTheme } from '@/providers/theme-provider';
 import type { ThemeMode } from '@/types';
@@ -175,6 +176,9 @@ export function LecturerSettings() {
                 </div>
               </div>
             </Card>
+
+            {/* Two-Factor Authentication Management */}
+            <MfaSettings />
           </div>
         </TabsContent>
 

@@ -23,6 +23,11 @@ const initialState: AuthState = {
   isLoading:       false,
   rememberMe:      false,
   error:           null,
+  mfaEnabled:      null,
+  isMfaLoading:    false,
+  mfaToken:        null,
+  mfaEmail:        null,
+  mfaRememberMe:   false,
 };
 
 // ─── Remember Me Storage Adapter ──────────────────────────────────────────────
@@ -119,8 +124,8 @@ const rememberMeStorage: StateStorage = {
 /**
  * Global authentication store.
  *
- * Persisted fields: `user`, `tokens`, `isAuthenticated`, `rememberMe`.
- * Non-persisted: `isLoading`, `error` (ephemeral UI state).
+ * Persisted fields: `user`, `tokens`, `isAuthenticated`, `rememberMe`, `mfaEnabled`.
+ * Non-persisted: `isLoading`, `isMfaLoading`, `error` (ephemeral UI state).
  *
  * When `rememberMe` is **true** the data is stored in `localStorage`
  * (survives browser close). When **false** it goes into `sessionStorage`
@@ -137,7 +142,16 @@ export const useAuthStore = create<AuthStore>()(
         // ── Setters ─────────────────────────────────────────────────────────────
 
         setUser: (user: BaseUser) =>
-          set({ user }, false, 'auth/setUser'),
+          set(
+            (state) => ({
+              user: {
+                ...user,
+                mfaEnabled: user.mfaEnabled ?? state.mfaEnabled ?? state.user?.mfaEnabled ?? null,
+              },
+            }),
+            false,
+            'auth/setUser',
+          ),
 
         setTokens: (tokens: AuthTokens) => {
           const jwtExp = parseJwtExp(tokens.accessToken);
@@ -163,6 +177,71 @@ export const useAuthStore = create<AuthStore>()(
         setError: (error: string | null) =>
           set({ error }, false, 'auth/setError'),
 
+        setMfaEnabled: (mfaEnabled: boolean | null) =>
+          set(
+            (state) => ({
+              mfaEnabled,
+              user: state.user ? { ...state.user, mfaEnabled } : state.user,
+            }),
+            false,
+            'auth/setMfaEnabled',
+          ),
+
+        fetchMfaStatus: async () => {
+          const state = get();
+          if (!state.isAuthenticated && !state.tokens?.accessToken) {
+            set({ mfaEnabled: null, isMfaLoading: false }, false, 'auth/fetchMfaStatus/unauthenticated');
+            return null;
+          }
+
+          // If already in-flight, return current status
+          if (state.isMfaLoading) {
+            return state.mfaEnabled;
+          }
+
+          set({ isMfaLoading: true }, false, 'auth/fetchMfaStatus/start');
+          try {
+            const status = await authApi.getMfaStatus();
+            set(
+              (s) => ({
+                mfaEnabled: status,
+                isMfaLoading: false,
+                user: s.user ? { ...s.user, mfaEnabled: status } : s.user,
+              }),
+              false,
+              'auth/fetchMfaStatus/success',
+            );
+            return status;
+          } catch (err: unknown) {
+            console.warn('Failed to fetch authoritative MFA status:', err);
+            set({ isMfaLoading: false }, false, 'auth/fetchMfaStatus/error');
+            return null;
+          }
+        },
+
+        setMfaPending: (mfaToken: string, email?: string, rememberMe?: boolean) =>
+          set(
+            {
+              mfaToken,
+              mfaEmail: email || null,
+              mfaRememberMe: Boolean(rememberMe),
+              error: null,
+            },
+            false,
+            'auth/setMfaPending',
+          ),
+
+        clearMfaPending: () =>
+          set(
+            {
+              mfaToken: null,
+              mfaEmail: null,
+              mfaRememberMe: false,
+            },
+            false,
+            'auth/clearMfaPending',
+          ),
+
         // ── Session Actions ──────────────────────────────────────────────────────
 
         /**
@@ -179,20 +258,27 @@ export const useAuthStore = create<AuthStore>()(
 
           const jwtExp = parseJwtExp(session.tokens.accessToken);
           const expiresAt = session.tokens.expiresAt || jwtExp || (Date.now() + 15 * 60 * 1000);
+          const mfaEnabled = typeof session.user.mfaEnabled === 'boolean' ? session.user.mfaEnabled : false;
 
           // 2. Update the store state — persist middleware will call setItem
           //    which now targets the correct storage.
           set(
             {
-              user: session.user,
+              user: { ...session.user, mfaEnabled },
               tokens: {
                 accessToken: session.tokens.accessToken,
+                refreshToken: session.tokens.refreshToken,
                 expiresAt,
               },
               isAuthenticated: true,
               isLoading: false,
               rememberMe,
               error: null,
+              mfaEnabled,
+              isMfaLoading: false,
+              mfaToken: null,
+              mfaEmail: null,
+              mfaRememberMe: false,
             },
             false,
             'auth/login',
@@ -237,6 +323,7 @@ export const useAuthStore = create<AuthStore>()(
             {
               tokens: {
                 accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken || get().tokens?.refreshToken,
                 expiresAt,
               },
               isAuthenticated: true,
@@ -270,12 +357,19 @@ export const useAuthStore = create<AuthStore>()(
               false,
               'auth/initialize/valid-session',
             );
+
+            // Reconcile authoritative MFA status with backend API
+            get().fetchMfaStatus();
             return;
           }
 
           // CASE 4 — No persisted session
           if (!token && !user) {
-            set({ isAuthenticated: false, isLoading: false }, false, 'auth/initialize/no-session');
+            set(
+              { isAuthenticated: false, isLoading: false, mfaEnabled: null, isMfaLoading: false },
+              false,
+              'auth/initialize/no-session',
+            );
             return;
           }
 
@@ -301,6 +395,7 @@ export const useAuthStore = create<AuthStore>()(
                   user: currentUser || get().user,
                   tokens: {
                     accessToken: newAccessToken,
+                    refreshToken: res.tokens?.refreshToken || get().tokens?.refreshToken,
                     expiresAt: newExp,
                   },
                   isAuthenticated: true,
@@ -309,6 +404,9 @@ export const useAuthStore = create<AuthStore>()(
                 false,
                 'auth/initialize/refreshed',
               );
+
+              // Reconcile authoritative MFA status with backend API
+              get().fetchMfaStatus();
               return;
             }
 
@@ -327,7 +425,13 @@ export const useAuthStore = create<AuthStore>()(
          */
         updateProfile: (user: BaseUser) =>
           set(
-            { user, isAuthenticated: true },
+            (state) => ({
+              user: {
+                ...user,
+                mfaEnabled: user.mfaEnabled ?? state.mfaEnabled ?? state.user?.mfaEnabled ?? null,
+              },
+              isAuthenticated: true,
+            }),
             false,
             'auth/updateProfile',
           ),
@@ -335,8 +439,7 @@ export const useAuthStore = create<AuthStore>()(
       {
         name: STORAGE_KEY,
         storage: createJSONStorage(() => rememberMeStorage),
-        // Only persist session-relevant fields.
-        // isLoading and error are ephemeral and should not survive a page reload.
+        // Persist session-relevant fields including mfaEnabled
         partialize: (state): Partial<AuthState> => ({
           user: state.user,
           tokens: state.tokens
@@ -347,6 +450,7 @@ export const useAuthStore = create<AuthStore>()(
             : null,
           isAuthenticated: state.isAuthenticated,
           rememberMe: state.rememberMe,
+          mfaEnabled: state.mfaEnabled,
         }),
       },
     ),

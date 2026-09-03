@@ -81,4 +81,8 @@ export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs';
 export { Progress }                         from './progress';
 export type { ProgressProps }               from './progress';
 
+export { QRCodeImage }                       from './qr-code';
+export type { QRCodeProps }                 from './qr-code';
+
+
 

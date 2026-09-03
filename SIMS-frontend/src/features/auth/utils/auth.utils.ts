@@ -36,15 +36,25 @@ export const AUTH_ONLY_ROUTES = [
 ] as const;
 
 /** Top-level path prefixes that require authentication. */
-export const PROTECTED_PREFIXES = ['/dashboard', '/system-admin', '/admin', '/lecturer', '/student'] as const;
+export const PROTECTED_PREFIXES = ['/dashboard', '/system-admin', '/admin', '/lecturer', '/student', '/settings'] as const;
 
 /** Path prefixes that are allowed per role. */
 export const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[]> = {
-  system_admin: ['/dashboard', '/system-admin'],
-  admin:        ['/dashboard', '/admin'],
-  lecturer:     ['/dashboard', '/lecturer'],
-  student:      ['/dashboard', '/student'],
+  system_admin: ['/dashboard', '/system-admin', '/settings'],
+  admin:        ['/dashboard', '/admin', '/settings'],
+  lecturer:     ['/dashboard', '/lecturer', '/settings'],
+  student:      ['/dashboard', '/student', '/settings'],
 };
+
+/**
+ * Helper to determine if a user role has permission to access and configure MFA.
+ * All authenticated roles (system_admin, admin, lecturer, student) have MFA capability.
+ */
+export function canAccessMfa(role?: UserRole | string | null): boolean {
+  if (!role) return false;
+  const normalized = role.toLowerCase().trim();
+  return ['system_admin', 'admin', 'lecturer', 'student'].includes(normalized);
+}
 
 export function isPublicRoute(pathname: string): boolean {
   return (PUBLIC_ROUTES as readonly string[]).includes(pathname);
