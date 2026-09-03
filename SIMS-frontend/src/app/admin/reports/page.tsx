@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: 'Institutional academic performance analytics and system usage charts.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function AdminReportsPage() {
   return (
     <AdminShell

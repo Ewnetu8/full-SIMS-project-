@@ -12,12 +12,13 @@ export const NOTIFICATION_QUERY_KEYS = {
 /**
  * Hook to fetch notifications for the authenticated user.
  */
-export function useNotifications(isRead?: boolean) {
+export function useNotifications(isRead?: boolean, options?: { enabled?: boolean }) {
   return useQuery<Notification[], Error>({
     queryKey: NOTIFICATION_QUERY_KEYS.list(isRead),
     queryFn: () => notificationsApi.getNotifications(isRead),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    enabled: options?.enabled,
   });
 }
 

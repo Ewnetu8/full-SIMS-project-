@@ -8,6 +8,7 @@ import { getUserFriendlyErrorMessage } from '@/lib/errors';
 import { Label } from '@/components/forms';
 import { Avatar, Badge, Button, Card, Input } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/store';
+import { MfaSettings } from '@/features/auth/components';
 import { getUserDisplayName } from '@/utils/string';
 
 export function AdminProfile() {
@@ -213,6 +214,10 @@ export function AdminProfile() {
           </Card>
         </div>
       </div>
+
+      {/* Account Security & MFA */}
+      <MfaSettings />
     </div>
   );
 }
+

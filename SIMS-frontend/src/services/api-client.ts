@@ -61,11 +61,12 @@ function createApiClient(): AxiosInstance {
   // ── Request Interceptor ──────────────────────────────────────────────────────
   client.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      // Don't add auth token to login, register, or refresh endpoints
+      // Don't add auth token to login, register, mfa login, or refresh endpoints
       const isAuthEndpoint =
         config.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
         config.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
-        config.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
+        config.url?.includes(API_ENDPOINTS.AUTH.REFRESH) ||
+        config.url?.includes(API_ENDPOINTS.AUTH.MFA_LOGIN);
 
       if (!isAuthEndpoint) {
         const token = useAuthStore.getState().tokens?.accessToken;
@@ -153,10 +154,34 @@ function createApiClient(): AxiosInstance {
       const isAuthEndpoint =
         originalRequest?.url?.includes(API_ENDPOINTS.AUTH.LOGIN) ||
         originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REGISTER) ||
-        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REFRESH);
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.REFRESH) ||
+        originalRequest?.url?.includes(API_ENDPOINTS.AUTH.MFA_LOGIN);
 
-      // Handle 401 Unauthorized for non-auth endpoints by attempting silent refresh
-      if (response.status === 401 && !isAuthEndpoint && originalRequest && !originalRequest._retry) {
+      // Check if original request had an authorization token or client has an active session to refresh
+      const authHeader =
+        originalRequest?.headers?.get?.('Authorization') ||
+        (originalRequest?.headers as Record<string, unknown> | undefined)?.['Authorization'];
+      const hasAuthHeader = Boolean(authHeader);
+      const authState = useAuthStore.getState();
+      const hasActiveSession = Boolean(authState.isAuthenticated && authState.tokens?.accessToken);
+
+      // Handle 401 Unauthorized for non-auth endpoints by attempting silent refresh ONLY if authenticated
+      if (
+        response.status === 401 &&
+        !isAuthEndpoint &&
+        originalRequest &&
+        !originalRequest._retry &&
+        (hasAuthHeader || hasActiveSession)
+      ) {
+        // If the token in store was already refreshed by another in-flight request, retry with the new token directly
+        const currentToken = useAuthStore.getState().tokens?.accessToken;
+        const requestToken = authHeader ? String(authHeader).replace(/^Bearer\s+/i, '') : null;
+        if (currentToken && requestToken && currentToken !== requestToken) {
+          originalRequest._retry = true;
+          originalRequest.headers.set('Authorization', `Bearer ${currentToken}`);
+          return client(originalRequest);
+        }
+
         // If a refresh is ALREADY in progress, queue this request to await new token
         if (isRefreshing) {
           return new Promise<string>((resolve, reject) => {

@@ -18,6 +18,7 @@ import { Breadcrumb } from '@/components/navigation';
 import { Skeleton } from '@/components/feedback';
 import { Avatar, Badge, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { ROUTES } from '@/constants';
+import { MfaSettings } from '@/features/auth/components';
 import { useAuthStore } from '@/features/auth/store';
 import { getUserDisplayName } from '@/utils/string';
 import { lecturerService } from '../services';
@@ -286,6 +287,9 @@ export function LecturerProfile() {
           </Card>
         </div>
       </div>
+
+      {/* Account Security & MFA */}
+      <MfaSettings />
     </div>
   );
 }

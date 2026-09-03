@@ -60,7 +60,9 @@ export function TopNav({
 
   const handleProfileNavigation = () => {
     if (!user) return;
-    if (user.role === 'admin' || user.role === 'system_admin') {
+    if (user.role === 'system_admin') {
+      router.push(ROUTES.SECURITY_SETTINGS);
+    } else if (user.role === 'admin') {
       router.push(ROUTES.ADMIN.PROFILE);
     } else if (user.role === 'lecturer') {
       router.push(ROUTES.LECTURER.PROFILE);
@@ -71,7 +73,9 @@ export function TopNav({
 
   const handleSettingsNavigation = () => {
     if (!user) return;
-    if (user.role === 'lecturer') {
+    if (user.role === 'system_admin' || user.role === 'admin') {
+      router.push(ROUTES.SECURITY_SETTINGS);
+    } else if (user.role === 'lecturer') {
       router.push(ROUTES.LECTURER.SETTINGS);
     }
   };
@@ -85,7 +89,7 @@ export function TopNav({
         avatarUrl: user.avatarUrl,
       }}
       onProfile={handleProfileNavigation}
-      onSettings={user.role === 'lecturer' ? handleSettingsNavigation : undefined}
+      onSettings={handleSettingsNavigation}
       onLogout={() => setIsLogoutDialogOpen(true)}
     />
   ) : null;

@@ -39,9 +39,10 @@ export function LecturerShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
 
-  useRouteProtection(['lecturer']);
+  const { isAuthenticated, user, isLoading } = useRouteProtection(['lecturer']);
 
   React.useEffect(() => {
+    if (!isAuthenticated || !user) return;
     lecturerService.getNotifications().then((data) => {
       setNotifications(
         data.map((n) => ({
@@ -54,9 +55,17 @@ export function LecturerShell({ children }: { children: React.ReactNode }) {
         }))
       );
     });
-  }, []);
+  }, [isAuthenticated, user]);
 
   const unread = notifications.filter((n) => !n.read);
+
+  if (isLoading || !isAuthenticated || !user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout

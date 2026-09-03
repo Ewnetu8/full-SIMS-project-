@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRight, Mail, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
@@ -26,7 +28,16 @@ function LoginFormContent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const { user, isAuthenticated, isLoading, setError, setLoading, login: storeLogin, clearSession } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    isLoading,
+    setError,
+    setLoading,
+    login: storeLogin,
+    setMfaPending,
+    clearSession,
+  } = useAuthStore();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -69,30 +80,26 @@ function LoginFormContent() {
     setError(null);
 
     try {
-      console.log('🔐 Login attempt:', { email: values.email, rememberMe: values.rememberMe });
-      console.log('🌐 API Base URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
-      
       const response = await authApi.login(values);
-      
-      console.log('✅ Login successful:', { user: response.user, hasTokens: !!response.tokens });
-      console.log('👤 User role:', response.user.role);
-      console.log('🏠 Home URL will be:', getHomeByRole(response.user.role));
-      
-      storeLogin({ user: response.user, tokens: response.tokens }, values.rememberMe);
-      
-      console.log('📦 Auth store after login:', {
-        isAuthenticated: useAuthStore.getState().isAuthenticated,
-        user: useAuthStore.getState().user,
-      });
-      
-      const homeUrl = redirectTo ?? getHomeByRole(response.user.role);
-      
-      console.log('🚀 Redirecting to:', homeUrl);
-      
-      toast.success(`Welcome back, ${response.user.firstName}!`, { id: 'auth-success' });
+
+      if (response.mfaRequired) {
+        setMfaPending(response.mfaToken, values.email, values.rememberMe);
+        const mfaUrl = redirectTo
+          ? `${ROUTES.MFA_LOGIN}?redirectTo=${encodeURIComponent(redirectTo)}`
+          : ROUTES.MFA_LOGIN;
+        router.push(mfaUrl);
+        return;
+      }
+
+      storeLogin(
+        { user: response.session.user, tokens: response.session.tokens },
+        values.rememberMe
+      );
+
+      const homeUrl = redirectTo ?? getHomeByRole(response.session.user.role);
+      toast.success(`Welcome back, ${response.session.user.firstName}!`, { id: 'auth-success' });
       router.replace(homeUrl);
     } catch (error) {
-      console.error('❌ Login failed:', error);
       const message = handleAuthError(error);
       setFormError(message);
       setError(message);
